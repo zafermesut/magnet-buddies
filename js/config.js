@@ -13,8 +13,8 @@ const DEFAULT_CONFIG = {
 
   // Demir bulutu: hem zırh, hem cephane, hem ağırlık
   startAmmo: 10,         // Başlangıçtaki demir tozu
-  ammoCap: 60,           // Taşınabilecek en fazla demir
-  ammoWeight: 0.8,       // Her demirin kütleye katkısı
+  ammoCap: 40,           // Taşınabilecek en fazla demir
+  ammoWeight: 1.0,       // Her demirin kütleye katkısı
   coreMass: 20,          // Çekirdek kütlesi (demirsiz)
 
   baseSpeed: 300,        // Çekirdek kütlesindeki azami hız (px/sn)
@@ -30,6 +30,7 @@ const DEFAULT_CONFIG = {
   switchNeutral: 0.15,   // Değişim sırasında nötr (savunmasız) kalınan süre (sn)
 
   botReaction: 0.5,      // Botların kutup değişimini fark etme süresi (sn, ortalama)
+  botSwitchGap: 1.1,     // Botun iki kutup değişimi arasındaki en kısa süre (sn)
 
   // Demir saçması (Shift / sağ tık)
   blastCount: 14,        // Bir atışta fırlatılan en fazla demir

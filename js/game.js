@@ -294,6 +294,8 @@ class Game {
         let F = C.forceK * chargeOf(ma) * chargeOf(mb) / (dd * dd) * (1 - q * q);
         if (a.boosted || b.boosted) F *= 2;
         const s = a.sign * b.sign;   // +1 itme, -1 çekme
+        // Zıt kutuplar temasa yaklaştıkça çekim söner: çekip savurabilirsin ama yapışamazsın
+        if (s < 0) F *= clamp((d - (ra + rb)) / ((ra + rb) * 0.9), 0, 1);
         const nx = dx / d, ny = dy / d;
         const accA = Math.min(F / ma, C.maxMagAccel);
         const accB = Math.min(F / mb, C.maxMagAccel);
@@ -503,12 +505,26 @@ class Game {
     b.thinkT = rand(0.12, 0.28) + (1 - b.skill) * 0.25;   // tepki süresi
     const C = CONFIG;
 
-    let enemy = null, ed = 1e9;
+    // Çevredeki herkesin toplam etkisi: kalabalığın çoğunluğuyla aynı kutba geçen itilir.
+    // Hedef olarak en yakın değil, tehlikeye en yakın (itilmeye en uygun) rakip seçilir.
+    let enemy = null, ed = 1e9, bestScore = -1e9, polSum = 0, crowdX = 0, crowdY = 0, crowd = 0;
     for (const o of this.magnets) {
       if (!o.alive || o === b) continue;
-      const d = Math.hypot(o.x - b.x, o.y - b.y);
-      if (d < ed) { enemy = o; ed = d; }
+      const d = Math.hypot(o.x - b.x, o.y - b.y) || 1;
+      const range = rangeOf(o.r, b.r);
+      if (d < range) {
+        const w = chargeOf(o.mass) * (1 - d / range);
+        polSum += this.seenPol(b, o) * w;
+        crowdX += (o.x - b.x) / d * (1 - d / range);
+        crowdY += (o.y - b.y) / d * (1 - d / range);
+        crowd++;
+      }
+      if (d < 750) {
+        const score = -d - this.hazardOf(o).d * 1.5;
+        if (score > bestScore) { bestScore = score; enemy = o; ed = d; }
+      }
     }
+    const crowdPol = polSum > 0 ? 1 : polSum < 0 ? -1 : 0;
     const engaged = enemy && ed < rangeOf(enemy.r, b.r) * 1.2;
     const myHaz = this.hazardOf(b);
 
@@ -520,9 +536,9 @@ class Game {
       vx -= hx / hl * 2; vy -= hy / hl * 2;
       const onHazSide = ((enemy.x - b.x) * hx + (enemy.y - b.y) * hy) / (ed * hl) > 0;
       const sp = this.seenPol(b, enemy);
-      wantPol = onHazSide ? sp : -sp;   // tehlike tarafındaysa it, değilse ona doğru çek
+      wantPol = onHazSide ? sp : crowd > 1 ? crowdPol : -sp;   // tehlike tarafındaysa it, değilse ona doğru çek
       if (onHazSide) blastAt = enemy;
-    } else if (enemy && ed < 750 && b.ammo >= 8) {
+    } else if (enemy && b.ammo >= 8 && crowd <= 2) {
       // Saldırı: rakibin tehlikeye göre arkasına geç, aynı kutupla it, saçmayla vur
       const eh = this.hazardOf(enemy);
       const hx = eh.x - enemy.x, hy = eh.y - enemy.y, hl = Math.hypot(hx, hy) || 1;
@@ -535,8 +551,8 @@ class Game {
       if (lined) {
         wantPol = sp;
         if (eh.d < 500) blastAt = enemy;
-      } else if (engaged) {
-        wantPol = sp;   // pozisyon alırken temas etme
+      } else if (crowd) {
+        wantPol = crowdPol;   // pozisyon alırken kimseye kapılma
       }
     } else {
       // Demir topla
@@ -549,7 +565,12 @@ class Game {
         const d = Math.hypot(b.wander.x - b.x, b.wander.y - b.y) || 1;
         vx += (b.wander.x - b.x) / d; vy += (b.wander.y - b.y) / d;
       }
-      if (engaged) wantPol = this.seenPol(b, enemy);
+      if (crowd) wantPol = crowdPol;
+    }
+
+    // Kalabalıktan uzaklaş: yumaklaşmayı önler
+    if (crowd > 1) {
+      vx -= crowdX * 1.2; vy -= crowdY * 1.2;
     }
 
     // Kenardan ve dikenlerden kaçın
@@ -573,7 +594,8 @@ class Game {
     const len = Math.hypot(vx, vy);
     if (len > 0.01) { b.aimX = b.x + vx / len * 300; b.aimY = b.y + vy / len * 300; }
 
-    if (wantPol && wantPol !== b.pol && Math.random() < 0.35 + b.skill * 0.65) this.switchPolarity(b);
+    if (wantPol && wantPol !== b.pol && this.t - b.polT > C.botSwitchGap &&
+      Math.random() < 0.35 + b.skill * 0.65) this.switchPolarity(b);
 
     if (blastAt && b.ammo >= 6 && Math.hypot(blastAt.x - b.x, blastAt.y - b.y) < 420 &&
       Math.random() < b.skill * 0.6) {
