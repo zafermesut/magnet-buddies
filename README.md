@@ -1,6 +1,6 @@
-# Top Takımı (çalışma adı)
+# Magnet Buddies
 
-Arkadaşlarla aynı klavyede oynanan, birlikte çözülen bir top bulmaca oyunu (Pico Park tarzı).
+Arkadaşlarla linkle online ya da aynı klavyede oynanan, birlikte çözülen bir top bulmaca oyunu.
 Bölümleri tek başına geçemezsin: üst üste binmek, düğme tutmak, kutuyu birlikte itmek ve anahtarı
 taşımak gerekir. İleri bölümlerde herkes bir mıknatısa dönüşür: aynı kutup iter, zıt kutup çeker.
 Ölüm yok, acele yok.

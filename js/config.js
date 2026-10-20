@@ -1,7 +1,7 @@
 'use strict';
 
 // Çalışma adı: oyunun adı kesinleşince sadece burayı değiştir.
-const GAME_TITLE = 'Top Takımı';
+const GAME_TITLE = 'Magnet Buddies';
 
 const T = 40;   // karo boyutu (px)
 const EXIT_W = 70;   // çıkış kapısının genişliği: iki top yan yana sığar
