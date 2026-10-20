@@ -89,6 +89,25 @@ function client(name) {
     const st2 = await a.wait(m => m.t === 'start' && m.level === 1);
     ok(!!st2, 'herhangi bir oyuncu sonraki bölüme geçirebilir');
 
+    console.log('Kendi bölümün online');
+    a.send({ t: 'lobby' });
+    await a.wait(m => m.t === 'room' && m.state === 'lobby');
+    const mine = { name: 'Benim bölümüm', magnet: true, map: [
+      '##########', '#........#', '#........#', '#........#', '#........#', '#.S....E.#', '##########'] };
+    a.send({ t: 'custom', def: Object.assign({}, mine, { map: mine.map.map(r => r.replace('E', '.')) }) });
+    ok(!!(await a.wait(m => m.t === 'error' && /çıkış/.test(m.msg))), 'geçersiz bölüm sunucuda reddedilir (çıkış yok)');
+    b.send({ t: 'custom', def: mine });
+    await sleep(150);
+    ok(!(b.last.room && b.last.room.custom), 'kendi bölümünü yalnızca oda kurucusu yükleyebilir');
+    a.send({ t: 'custom', def: mine });
+    const withCustom = await b.wait(m => m.t === 'room' && m.custom);
+    ok(withCustom && withCustom.custom.name === 'Benim bölümüm', 'kurucunun bölümü odadaki herkese görünür');
+    a.send({ t: 'start', custom: true });
+    const cs = await b.wait(m => m.t === 'start' && m.level === -1);
+    ok(cs && cs.def && cs.def.map.length === 7 && cs.def.magnet, 'kendi bölümü online başladı, tanımı herkese gitti');
+    const sCustom = await b.wait(m => m.t === 's' && m.p.length === 2 && m.p[0][1] < 7 * 40);
+    ok(!!sCustom, 'sunucu kendi bölümünü simüle ediyor');
+
     b.ws.close();
     const back = await a.wait(m => m.t === 'room' && m.state === 'lobby' && m.members.length === 1);
     ok(!!back, 'oyuncu ayrılınca tek kalan odaya döner');

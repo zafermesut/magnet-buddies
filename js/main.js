@@ -3,6 +3,7 @@
 // Ekranlar ve oyun döngüsü.
 //   Aynı klavye: home → lobby (katılım) → select → playing → complete
 //   Online:      home → onlineForm → room (oda + bölüm seçimi) → playing → complete
+//   Editör:      home → editor → (dene) playing → complete → editor
 // Aynı klavyede simülasyon burada çalışır; online'da sunucuda çalışır, burada yalnızca çizilir.
 
 const $ = id => document.getElementById(id);
@@ -10,7 +11,7 @@ const renderer = new Renderer($('game'));
 Input.init();
 
 const STEP = 1 / 60;
-const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete'];
+const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor'];
 
 let mode = 'local';         // local | online
 let state = 'home';
@@ -19,6 +20,10 @@ let game = new Game(0, 0);  // menülerin arkasında boş 1. bölüm görünsün
 let levelIndex = 0;
 let acc = 0, last = performance.now(), completeAt = 0;
 let room = null;            // online: sunucudan gelen son oda bilgisi
+let currentDef = LEVELS[0]; // oynanan bölümün tanımı (hazır ya da kendi bölümün)
+let editorTest = false;     // editörden "Dene" ile mi oynanıyor
+let pendingCustom = null;   // online odaya götürülecek kendi bölümün
+let customSent = false;
 
 document.title = GAME_TITLE;
 for (const el of document.querySelectorAll('.gameTitle')) el.textContent = GAME_TITLE;
@@ -49,12 +54,17 @@ function levelButton(i, disabled, onClick) {
 function show(id) {
   for (const s of SCREENS) $(s).classList.toggle('hidden', s !== id);
   $('hud').classList.toggle('hidden', id !== null);
+  // Editörde bölüm sol paneli açıkta bırakacak şekilde çizilir
+  renderer.padLeft = id === 'editor' ? 260 : 0;
+  renderer.padTop = id === 'editor' ? 24 : 70;
 }
 
 function toHome() {
   Net.close();
   mode = 'local';
   room = null;
+  pendingCustom = null;
+  editorTest = false;
   state = 'home';
   game = new Game(0, 0);
   show('home');
@@ -81,13 +91,28 @@ function toSelect() {
 }
 
 function startLevel(i) {
+  editorTest = false;
   levelIndex = i;
-  game = new Game(i, joined.length);
+  playLocal(LEVELS[i], `${i + 1}. ${LEVELS[i].name}`);
+}
+
+// Editörden "Dene": tek başına deneyen biri iki topu WASD ve ok tuşlarıyla yönetebilir
+function startCustom(def) {
+  editorTest = true;
+  levelIndex = -1;
+  mode = 'local';
+  if (joined.length < 2) joined = ['wasd', 'arrows'];
+  playLocal(def, `★ ${def.name}`);
+}
+
+function playLocal(def, title) {
+  currentDef = def;
+  game = new Game(def === LEVELS[levelIndex] ? levelIndex : def, joined.length);
   acc = 0;
   state = 'playing';
   show(null);
   const sources = Input.sources();
-  setHud(i, joined.map((id, k) => {
+  setHud(title, def, joined.map((id, k) => {
     const s = sources.find(x => x.id === id);
     return { color: PLAYER_COLORS[k], label: `${k + 1}P`, hint: s ? s.hint + (game.magnet ? ' · ' + s.magnetHint : '') : '' };
   }));
@@ -127,24 +152,25 @@ function lobbyInput() {
 
 // ---------- Ortak: HUD ve bölüm sonu ----------
 
-function setHud(i, rows) {
-  $('levelName').textContent = `${i + 1}. ${LEVELS[i].name}`;
-  $('levelHint').textContent = LEVELS[i].hint;
+function setHud(title, def, rows) {
+  $('levelName').textContent = title;
+  $('levelHint').textContent = def.hint || 'Arkadaşının yaptığı bölüm. Kolay gelsin!';
   $('controls').innerHTML = rows.map(r => `<span><b style="color:${r.color}">${esc(r.label)}</b>${esc(r.hint)}</span>`).join('');
 }
 
 function showComplete(i, secs) {
   state = 'complete';
   completeAt = performance.now();
-  const prevBest = progress[i];
-  if (!prevBest || secs < prevBest) progress[i] = secs;
-  saveProgress();
-  const lastLevel = i === LEVELS.length - 1;
+  const custom = i < 0;
+  const prevBest = custom ? 0 : progress[i];
+  if (!custom && (!prevBest || secs < prevBest)) { progress[i] = secs; saveProgress(); }
+  const lastLevel = custom || i === LEVELS.length - 1;
   $('completeTitle').textContent = lastLevel ? 'Tüm bölümler bitti!' : 'Bölüm tamam!';
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
     (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '');
-  $('nextBtn').textContent = lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'BÖLÜM SEÇİMİ') : 'SONRAKİ BÖLÜM';
-  $('toSelectBtn').textContent = mode === 'online' ? 'Odaya dön' : 'Bölüm seçimi';
+  if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
+  $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'BÖLÜM SEÇİMİ') : 'SONRAKİ BÖLÜM';
+  $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Bölüm seçimi';
   $('completeHint').textContent = mode === 'online'
     ? 'Herhangi biriniz devam ettirebilir (zıplama tuşu da olur).'
     : 'Herhangi bir oyuncunun zıplama tuşu da devam ettirir.';
@@ -153,13 +179,33 @@ function showComplete(i, secs) {
 
 function next() {
   if (mode === 'online') { Net.send({ t: 'next' }); return; }
-  if (levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
+  if (editorTest) toEditor();
+  else if (levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
   else toSelect();
 }
 
 function backToChooser() {
   if (mode === 'online') Net.send({ t: 'lobby' });
+  else if (editorTest) toEditor();
   else toSelect();
+}
+
+function restart() {
+  if (mode === 'online') Net.send({ t: 'restart' });
+  else if (editorTest) startCustom(currentDef);
+  else startLevel(levelIndex);
+}
+
+// ---------- Editör ----------
+
+function toEditor(note) {
+  Net.close();
+  mode = 'local';
+  editorTest = false;
+  state = 'editor';
+  if (!Editor.level) Editor.loadSaved();
+  show('editor');
+  if (note) $('edErrors').innerHTML = `<div class="note">${esc(note)}</div>` + $('edErrors').innerHTML;
 }
 
 // ---------- Online ----------
@@ -170,6 +216,8 @@ function toOnlineForm(err) {
   Net.close();
   mode = 'online';
   room = null;
+  editorTest = false;
+  customSent = false;
   state = 'onlineForm';
   game = new Game(0, 0);
   show('onlineForm');
@@ -228,11 +276,22 @@ function renderRoom() {
     : isHost ? 'Bir bölüm seç.' : 'Oda kurucusu bölüm seçiyor…';
   const grid = $('roomLevels');
   grid.innerHTML = '';
-  LEVELS.forEach((l, i) => grid.appendChild(levelButton(i, !isHost || !enough || room.state !== 'lobby', () => Net.send({ t: 'start', level: i }))));
+  const locked = !isHost || !enough || room.state !== 'lobby';
+  LEVELS.forEach((l, i) => grid.appendChild(levelButton(i, locked, () => Net.send({ t: 'start', level: i }))));
+  if (room.custom) {
+    const b = document.createElement('button');
+    b.className = 'lvl custom';
+    b.disabled = locked;
+    b.innerHTML = `<span class="num">★</span><span>${room.custom.magnet ? '🧲 ' : ''}${esc(room.custom.name)}</span><span class="best">kendi bölümün</span>`;
+    b.addEventListener('click', () => Net.send({ t: 'start', custom: true }));
+    grid.appendChild(b);
+  }
 }
 
 Net.on('room', m => {
   room = m;
+  // Editörden gelen kurucu kendi bölümünü odaya yükler (sunucu doğrular)
+  if (pendingCustom && !customSent && m.host === m.you) { customSent = true; Net.send({ t: 'custom', def: pendingCustom }); }
   history.replaceState(null, '', `${location.pathname}?oda=${m.code}`);
   if (m.state === 'lobby' || (state !== 'playing' && state !== 'complete')) {
     if (state !== 'room') { state = 'room'; game = new Game(m.level || 0, 0); show('room'); }
@@ -243,17 +302,22 @@ Net.on('room', m => {
 Net.on('start', m => {
   levelIndex = m.level;
   if (m.you < 0) { state = 'room'; show('room'); renderRoom(); return; }   // bu bölümü izliyor
-  game = new Game(m.level, m.players.length);
+  currentDef = m.def || LEVELS[m.level];
+  game = new Game(m.def || m.level, m.players.length);
   game.players.forEach((p, i) => { p.name = m.players[i].name; p.isMe = i === m.you; });
   state = 'playing';
   show(null);
-  setHud(m.level, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
+  setHud(m.def ? `★ ${m.def.name}` : `${m.level + 1}. ${currentDef.name}`, currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
     hint: 'A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem' + (game.magnet ? ' (basılı: mıknatıs) · E / sağ Shift kutup' : '') }]);
 });
 
 Net.on('s', s => { if (state === 'playing' || state === 'complete') applySnapshot(game, s); });
 Net.on('complete', m => { if (state === 'playing') showComplete(m.level, m.time); });
-Net.on('error', m => { $('onlineError').textContent = m.msg; Net.close(); });
+Net.on('error', m => {
+  if (room) { $('roomNote').textContent = m.msg; return; }   // odadayken (ör. bölüm reddedildi) odada kal
+  $('onlineError').textContent = m.msg;
+  Net.close();
+});
 Net.on('close', () => { if (mode === 'online') toOnlineForm('Bağlantı koptu. Tekrar katılabilirsin.'); });
 
 // Aynı klavyedeki bütün şemalar ve ilk gamepad tek oyuncuyu yönetir
@@ -270,11 +334,20 @@ function onlineInput() {
 
 $('homeOnline').addEventListener('click', () => toOnlineForm());
 $('homeLocal').addEventListener('click', toLobby);
+$('homeEditor').addEventListener('click', () => toEditor());
+$('edBack').addEventListener('click', toHome);
+$('edTest').addEventListener('click', () => startCustom(Editor.def()));
+$('edOnline').addEventListener('click', () => {
+  pendingCustom = Editor.def();
+  customSent = false;
+  toOnlineForm();
+  $('onlineError').textContent = 'Oda kur: bölümün odada ★ ile çıkacak.';
+});
 $('lobbyBack').addEventListener('click', toHome);
 $('startBtn').addEventListener('click', toSelect);
 $('backBtn').addEventListener('click', toLobby);
 $('nextBtn').addEventListener('click', next);
-$('toSelectBtn').addEventListener('click', backToChooser);
+$('toSelectBtn').addEventListener('click', () => (editorTest ? restart() : backToChooser()));
 $('onlineBack').addEventListener('click', toHome);
 $('createBtn').addEventListener('click', () => goOnline({ t: 'create' }));
 $('joinBtn').addEventListener('click', () => goOnline({ t: 'join', code: $('joinCode').value }));
@@ -298,7 +371,7 @@ addEventListener('keydown', e => {
     const n = parseInt(e.key, 10);
     if (n >= 1 && n <= LEVELS.length) startLevel(n - 1);
   } else if (state === 'playing') {
-    if (e.code === 'KeyR') { if (mode === 'online') Net.send({ t: 'restart' }); else startLevel(levelIndex); }
+    if (e.code === 'KeyR') restart();
     if (e.code === 'Escape') backToChooser();
   } else if (state === 'complete') {
     if (e.code === 'Enter') next();
@@ -334,18 +407,29 @@ function frame(now) {
     if (now - completeAt > 900 && anyJump) { completeAt = now + 1e9; next(); }
   }
 
+  if (state === 'editor' && Editor.game) game = Editor.game;
   renderer.draw(game, now / 1000);
+  if (state === 'editor') Editor.drawOverlay(renderer.ctx);
   requestAnimationFrame(frame);
 }
 
-// Linkle gelen: ?oda=KOD
-const linkCode = new URLSearchParams(location.search).get('oda');
-if (linkCode) {
-  toOnlineForm();
-  $('joinCode').value = linkCode.toUpperCase().slice(0, 4);
-  $('onlineError').textContent = $('onlineName').value ? '' : 'Takma adını yaz ve Katıl\'a bas.';
-  ($('onlineName').value ? $('joinBtn') : $('onlineName')).focus();
-} else {
-  toHome();
-}
-requestAnimationFrame(frame);
+// Linkle gelen: ?oda=KOD (online odaya katıl) ya da ?bolum=... (paylaşılan bölümü aç).
+// editor.js bu dosyadan sonra yüklendiği için açılış, sayfa hazır olunca yapılır.
+addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(location.search);
+  const linkCode = params.get('oda'), shared = params.get('bolum');
+  if (linkCode) {
+    toOnlineForm();
+    $('joinCode').value = linkCode.toUpperCase().slice(0, 4);
+    $('onlineError').textContent = $('onlineName').value ? '' : 'Takma adını yaz ve Katıl\'a bas.';
+    ($('onlineName').value ? $('joinBtn') : $('onlineName')).focus();
+  } else if (shared) {
+    const def = decodeLevel(shared);
+    history.replaceState(null, '', location.pathname);
+    if (def) { Editor.load(def); toEditor('Arkadaşının bölümü açıldı. DENE ile oyna ya da online odaya götür.'); }
+    else { toHome(); }
+  } else {
+    toHome();
+  }
+  requestAnimationFrame(frame);
+});

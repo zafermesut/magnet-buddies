@@ -1,0 +1,14 @@
+# Render Blueprint: oyunun tamamı (sayfa + oda sunucusu) tek bir web servisinde çalışır.
+# Render panelinde New → Blueprint → bu depoyu seç → Apply.
+services:
+  - type: web
+    name: magnet-buddies
+    runtime: node
+    plan: free
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

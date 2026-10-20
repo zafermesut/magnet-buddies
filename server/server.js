@@ -21,7 +21,7 @@ const sim = vm.createContext({ console, Math, Map, Set });
 for (const f of ['config.js', 'levels.js', 'game.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), sim, { filename: f });
 }
-const { Game, LEVELS } = vm.runInContext('({ Game, LEVELS })', sim);
+const { Game, LEVELS, validateLevel } = vm.runInContext('({ Game, LEVELS, validateLevel })', sim);
 
 // ---------- Statik dosyalar ----------
 
@@ -83,6 +83,7 @@ class Room {
     this.level = 0;
     this.game = null;
     this.inGame = [];        // bölüme katılan üyeler (sırası oyuncu numarasıdır)
+    this.custom = null;      // kurucunun editörde yaptığı bölüm (level -1)
     this.tick = 0;
     this.fxT = -1;
   }
@@ -97,22 +98,26 @@ class Room {
       this.send(m, {
         t: 'room', code: this.code, state: this.state, level: this.level,
         host: this.host.id, you: m.id,
+        custom: this.custom ? { name: this.custom.name, magnet: this.custom.magnet } : null,
         members: this.members.map(x => ({ id: x.id, name: x.name, playing: this.inGame.includes(x) })),
       });
     }
   }
 
+  // level: hazır bölüm sırası; -1 kurucunun kendi bölümü
   start(level) {
-    if (this.members.length < 2 || level < 0 || level >= LEVELS.length) return;
+    if (this.members.length < 2 || level >= LEVELS.length) return;
+    if (level < 0 && (level !== -1 || !this.custom)) return;
     this.level = level;
     this.inGame = this.members.slice(0, MAX_MEMBERS);
     for (const m of this.inGame) m.input = { left: false, right: false, jump: false, action: false, swap: false };
-    this.game = new Game(level, this.inGame.length);
+    this.game = new Game(level === -1 ? this.custom : level, this.inGame.length);
     this.state = 'playing';
     this.fxT = -1;
     this.tick = 0;
     const players = this.inGame.map(m => ({ id: m.id, name: m.name }));
-    for (const m of this.members) this.send(m, { t: 'start', level, players, you: this.inGame.indexOf(m) });
+    const def = level === -1 ? this.custom : undefined;
+    for (const m of this.members) this.send(m, { t: 'start', level, def, players, you: this.inGame.indexOf(m) });
     this.sendRoom();
   }
 
@@ -183,14 +188,29 @@ class Room {
         break;
       }
       case 'start':
-        if (m === this.host && this.state === 'lobby') this.start(msg.level | 0);
+        if (m === this.host && this.state === 'lobby') this.start(msg.custom ? -1 : msg.level | 0);
         break;
+      case 'custom': {
+        // Kurucunun editörde yaptığı bölüm: yalnızca bilinen alanlar alınır ve doğrulanır
+        if (m !== this.host || this.state !== 'lobby' || !msg.def) break;
+        const d = msg.def;
+        const def = {
+          name: String(d.name || '').slice(0, 24).trim(),
+          magnet: !!d.magnet,
+          map: Array.isArray(d.map) ? d.map.slice(0, 20).map(r => String(r).slice(0, 48)) : [],
+        };
+        const errs = validateLevel(def);
+        if (errs.length) { this.send(m, { t: 'error', msg: 'Bölüm geçersiz: ' + errs[0] }); break; }
+        this.custom = def;
+        this.sendRoom();
+        break;
+      }
       case 'restart':
         if (this.state !== 'lobby') this.start(this.level);
         break;
       case 'next':
         if (this.state === 'complete') {
-          if (this.level < LEVELS.length - 1) this.start(this.level + 1);
+          if (this.level >= 0 && this.level < LEVELS.length - 1) this.start(this.level + 1);
           else this.toLobby();
         }
         break;
@@ -203,7 +223,7 @@ class Room {
 
 // ---------- WebSocket ----------
 
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 2048 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8192 });
 
 function cleanName(s) {
   const n = String(s || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 16);

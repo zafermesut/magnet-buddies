@@ -57,10 +57,11 @@ class Renderer {
     ctx.globalAlpha = 1;
     if (!game) return;
 
-    // Bölümü ekrana sığdır (üstte HUD için pay bırak)
-    const padTop = 70, pad = 24;
-    const z = Math.min((this.w - pad * 2) / game.W, (this.h - padTop - pad) / game.H, 1.6);
-    const ox = (this.w - game.W * z) / 2, oy = padTop + (this.h - padTop - pad - game.H * z) / 2;
+    // Bölümü ekrana sığdır (üstte HUD için, editörde solda panel için pay bırak)
+    const padTop = this.padTop ?? 70, padLeft = this.padLeft || 0, pad = 24;
+    const z = Math.min((this.w - padLeft - pad * 2) / game.W, (this.h - padTop - pad) / game.H, 1.6);
+    const ox = padLeft + (this.w - padLeft - game.W * z) / 2, oy = padTop + (this.h - padTop - pad - game.H * z) / 2;
+    this.view = { z, ox, oy };   // editör fare konumunu karoya çevirmek için kullanır
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(z, z);

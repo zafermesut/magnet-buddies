@@ -18,9 +18,10 @@ function makeBody(kind, x, y, w, h, extra) {
 }
 
 class Game {
-  constructor(levelIndex, playerCount) {
-    this.levelIndex = levelIndex;
-    this.def = LEVELS[levelIndex];
+  // level: hazır bölümün sırası ya da kendi yapılmış bölüm nesnesi ({ name, map, magnet, ... })
+  constructor(level, playerCount) {
+    this.levelIndex = typeof level === 'number' ? level : -1;
+    this.def = typeof level === 'number' ? LEVELS[level] : level;
     this.t = 0;
     this.done = false;
     this.doneT = 0;

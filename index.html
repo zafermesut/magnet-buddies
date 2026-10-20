@@ -24,8 +24,30 @@
       <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
       <button id="homeOnline" class="primary">ONLİNE · LİNKLE OYNA</button>
       <button id="homeLocal">Aynı klavyede oyna</button>
+      <button id="homeEditor">Bölüm editörü</button>
     </div>
   </div>
+
+  <!-- Bölüm editörü -->
+  <aside id="editor" class="panel hidden">
+    <div class="edHead"><b>Bölüm editörü</b><span id="edSize"></span></div>
+    <input id="edName" maxlength="24" placeholder="Bölüm adı">
+    <div id="edTools"></div>
+    <label class="edCheck"><input type="checkbox" id="edMagnet"> 🧲 Mıknatıs açık</label>
+    <div class="edResize">
+      <span>Genişlik</span><button data-resize="-1,0">−</button><button data-resize="1,0">+</button>
+      <span>Yükseklik</span><button data-resize="0,-1">−</button><button data-resize="0,1">+</button>
+    </div>
+    <div id="edErrors" class="error"></div>
+    <button id="edTest" class="primary">DENE</button>
+    <button id="edOnline">Online odada oyna</button>
+    <button id="edShare">Linki kopyala</button>
+    <div class="edFoot">
+      <button id="edClear" class="link">Temizle</button>
+      <button id="edBack" class="link">← Ana menü</button>
+    </div>
+    <p class="small">Sol tık çizer, sağ tık siler.<br>Denerken iki topu WASD ve ok tuşlarıyla yönetebilirsin.</p>
+  </aside>
 
   <!-- Online: oda kur / katıl -->
   <div id="onlineForm" class="overlay hidden">
@@ -99,5 +121,6 @@
   <script src="js/net.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
+  <script src="js/editor.js"></script>
 </body>
 </html>

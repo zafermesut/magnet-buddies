@@ -1,6 +1,6 @@
 // Başsız fizik ve bölüm testleri: node test/sim.test.js
 const fs = require('fs'), vm = require('vm'), path = require('path');
-const ctx = { console, Math, Map, Set };
+const ctx = { console, Math, Map, Set, btoa, atob, TextEncoder, TextDecoder, Uint8Array };
 vm.createContext(ctx);
 for (const f of ['config.js', 'levels.js', 'game.js']) {
   vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', f), 'utf8'), ctx);
@@ -38,6 +38,31 @@ LEVELS.forEach((l, i) => {
   const g = new Game(i, 2);
   ok(g.spawn && g.exit && new Set(l.map.map(r => r.length)).size === 1, (i + 1) + '. ' + l.name + ': ayrıştırıldı, başlangıç ve çıkış var');
 });
+
+console.log('Kendi bölümün');
+{
+  ok(LEVELS.every(l => validateLevel(l).length === 0), 'bütün hazır bölümler doğrulamadan geçer');
+  const same = LEVELS.every(l => {
+    const d = decodeLevel(encodeLevel(l));
+    return d && d.name === l.name && d.magnet === !!l.magnet && d.map.join('|') === l.map.join('|');
+  });
+  ok(same, 'linke sığdırılıp geri açılan bölüm birebir aynı');
+  const longest = Math.max(...LEVELS.map(l => encodeLevel(l).length));
+  ok(longest < 600, 'bölüm linki kısa (en uzunu ' + longest + ' karakter)');
+  const base = { name: 'Deneme', map: LEVELS[0].map.slice() };
+  const bad = [
+    ['başlangıç yok', Object.assign({}, base, { map: base.map.map(r => r.replace(/S/g, '.')) })],
+    ['iki çıkış', Object.assign({}, base, { map: base.map.map((r, i) => (i === 5 ? '#E' + r.slice(2) : r)) })],
+    ['satırlar farklı uzunlukta', Object.assign({}, base, { map: base.map.map((r, i) => (i === 3 ? r + '.' : r)) })],
+    ['bilinmeyen karo', Object.assign({}, base, { map: base.map.map((r, i) => (i === 3 ? 'X' + r.slice(1) : r)) })],
+    ['kutuya yer yok', Object.assign({}, base, { map: base.map.map((r, i) => (i === 10 ? r.slice(0, 5) + 'H' + r.slice(6) : r)) })],
+    ['ad yok', Object.assign({}, base, { name: '' })],
+  ];
+  for (const [why, def] of bad) ok(validateLevel(def).length > 0, 'geçersiz bölüm reddedilir: ' + why);
+  ok(decodeLevel('bozuk-link') === null, 'bozuk link güvenle reddedilir');
+  const g = new Game({ name: 'Deneme', map: LEVELS[0].map, magnet: true }, 2);
+  ok(g.levelIndex === -1 && g.magnet && g.players.length === 2 && g.exit, 'kendi bölüm nesnesiyle oyun kurulur');
+}
 
 console.log('Fizik');
 {
