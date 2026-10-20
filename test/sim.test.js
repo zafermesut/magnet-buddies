@@ -157,5 +157,163 @@ console.log('Bölümleri otomatik geçme');
   ok(run(g, [a, b], 60, g => g.done), '6. Hepsi birden geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+console.log('Mıknatıs');
+// B, A'nın üstüne çıkar (A yerinde dururken)
+const climbOn = A => (g, p, t) => {
+  const d = A.x - p.x;
+  return I({ right: d > 4, left: d < -4, jump: Math.abs(d) < 45 && p.ground !== A && (t * 5 | 0) % 2 === 0 });
+};
+{
+  // Fırlatma: üstteki, alttakinin mıknatısıyla 5 karodan yükseğe çıkar
+  const g = new Game(6, 2); const [a, b] = g.players;
+  run(g, [idle, idle], 0.3);
+  b.x = a.x; b.y = a.y - b.h - 1;
+  run(g, [idle, idle], 0.5);
+  const y0 = b.y; let minY = b.y;
+  run(g, [() => I({ action: true }), idle], 1.5, () => { minY = Math.min(minY, b.y); return false; });
+  ok(y0 - minY > 5 * T, 'aynı kutup: alttaki mıknatısı açınca üstteki 5 karodan yükseğe fırlar (' + (y0 - minY).toFixed(0) + ' px)');
+}
+{
+  // Çekme: duvarın üstündeki, aşağıdaki zıt kutuplu arkadaşını yukarı çeker
+  const g = new Game(6, 2); const [a, b] = g.players;
+  b.x = 18 * T + 4; b.y = 6 * T - b.h; b.pol = -a.pol;   // B duvarın kenarında
+  a.x = 16 * T; a.y = 11 * T - a.h;
+  run(g, [idle, idle], 0.3);
+  let minY = a.y;
+  run(g, [(g, p, t) => I({ jump: (t * 4 | 0) % 2 === 0, right: p.y + p.h < 6 * T + 4 }), () => I({ action: true })], 3,
+    () => { minY = Math.min(minY, a.y); return false; });
+  ok(a.supported && a.y + a.h <= 6 * T + 1, 'zıt kutup: yukarıdaki arkadaş aşağıdakini duvarın üstüne çeker');
+}
+{
+  // Anahtar her iki kutba da çekilir
+  for (const pol of [1, -1]) {
+    const g = new Game(8, 2); const [a] = g.players; const key = g.keys[0];
+    a.pol = pol;
+    a.x = 10 * T + 3;
+    run(g, [(g, p, t) => I({ action: true, jump: (t * 3 | 0) % 2 === 0 }), idle], 4, () => key.holder === a);
+    ok(key.holder === a, 'anahtar ' + (pol > 0 ? '+' : '−') + ' kutupla mıknatısa çekilip alınır');
+  }
+}
+{
+  // Mıknatıssız bölümlerde eylem tuşunu basılı tutmak bir şey yapmaz
+  const g = new Game(0, 2); const [a, b] = g.players; const bx = b.x;
+  run(g, [() => I({ action: true }), idle], 1);
+  ok(Math.abs(b.x - bx) < 1, 'mıknatıssız bölümde mıknatıs çalışmaz');
+}
+
+// Mıknatıslı bölümleri geçme senaryoları
+// Uçurumu geçiş: B kenardan zıplar, A arkasından iter; karşıda B kutup değiştirip A'yı çeker
+function crossPit(g, A, B, edgeX, farX, done) {
+  let swapped = false;
+  const a = (g, p, t) => {
+    if (done()) return null;
+    if (B.x > farX - 10) {   // B karşıda: kenardan zıpla, çekilmeyi bekle
+      const cx = p.x + p.w / 2;
+      if (cx < edgeX - 6 && p.supported && p.x < farX) return I({ right: true });
+      return I({ right: true, jump: true });
+    }
+    // B'nin hemen arkasında dur, B havalanınca it
+    const target = B.x - p.w - 2;
+    if (!B.supported && B.x > p.x) return I({ action: true });
+    return I({ right: p.x < target - 2, left: p.x > target + 2 });
+  };
+  const b = (g, p, t) => {
+    if (done()) return null;
+    if (p.x > farX - 10 && p.supported) {
+      if (!swapped) { swapped = true; return I({ swap: true }); }
+      const cx = p.x + p.w / 2, at = farX + 20;
+      if (Math.abs(cx - at) > 8) return I({ right: cx < at, left: cx > at });
+      return I({ action: A.x < farX - 10 });
+    }
+    const cx = p.x + p.w / 2;
+    if (!p.supported) return I({ right: true, jump: p.vy < 0 });
+    if (cx < edgeX - 24) return I({ right: true });
+    // Kenarda: A hemen arkaya gelince zıpla
+    return A.x + A.w >= p.x - 6 ? I({ right: true, jump: true }) : idle();
+  };
+  return [a, b];
+}
+// Duvar aşma: B, A'nın üstüne çıkar; A fırlatır; yukarıda B kutup değiştirip A'yı çeker
+function climbWall(g, A, B, standX, wallX, topY, done) {
+  const onTop = p => p.supported && p.y + p.h <= topY + 1 && p.x + p.w > wallX;
+  const a = (g, p, t) => {
+    if (done()) return null;
+    if (onTop(B)) {
+      if (onTop(p)) return null;
+      const cx = p.x + p.w / 2, at = wallX - 60;
+      if (p.y + p.h < topY + 4) return I({ right: true, jump: true });
+      if (Math.abs(cx - at) > 8 && p.supported) return I({ right: cx < at, left: cx > at });
+      return I({ jump: true });
+    }
+    const cx = p.x + p.w / 2;
+    if (Math.abs(cx - standX) > 6) return I({ right: cx < standX, left: cx > standX });
+    return I({ action: B.ground === p || (!B.supported && B.y < p.y) });
+  };
+  const b = (g, p, t) => {
+    if (done()) return null;
+    // Fırlatılmak için A ile aynı kutupta, yukarıdan çekmek için zıt kutupta olmalı
+    const wantPol = onTop(p) ? -A.pol : A.pol;
+    if (p.pol !== wantPol) return I({ swap: (t * 10 | 0) % 2 === 0 });
+    if (onTop(p)) {
+      if (onTop(A)) return null;
+      const cx = p.x + p.w / 2, at = wallX + 20;
+      if (Math.abs(cx - at) > 8) return I({ right: cx < at, left: cx > at });
+      return I({ action: true, right: A.y + A.h < topY });
+    }
+    if (p.y + p.h < topY + 20 || (!p.supported && p.vy < 0 && p.y < A.y - T)) return I({ right: true });
+    if (p.ground === A) return idle();
+    return climbOn(A)(g, p, t);
+  };
+  return [a, b];
+}
+// Senaryoları sırayla çalıştır; bir aşama null dönerse sonrakine geç
+function phases(list) {
+  let i = 0;
+  return list[0].map((_, k) => (g, p, t) => {
+    while (i < list.length) {
+      const r = list[i][k](g, p, t);
+      if (r) return r;
+      if (list[i].every((f, j) => f(g, g.players[j], t) === null)) i++;
+      else return I();
+    }
+    return I();
+  });
+}
+{
+  const g = new Game(6, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 6 * T + 1);
+  const ctl = phases([climbWall(g, A, B, 16 * T, 18 * T, 6 * T, both), [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 40, g => g.done), '7. Fırlatma geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  const g = new Game(7, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const across = () => A.x > 18 * T - 10 && B.x > 18 * T - 10 && A.supported;
+  const ctl = phases([crossPit(g, A, B, 12 * T, 18 * T, across), [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 40, g => g.done), '8. Uçurum geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  const g = new Game(8, 2), [A, B] = g.players, ex = g.exit.x + T / 2, key = g.keys[0], door = g.doors[0];
+  const a = (g, p, t) => {
+    if (door.open) return goTo(ex)(g, p, t);
+    if (key.holder === p) return goTo(door.cells[0].c * T)(g, p, t);
+    const cx = p.x + p.w / 2, at = 10 * T + 20;
+    if (Math.abs(cx - at) > 8) return goTo(at)(g, p, t);
+    return I({ action: true, jump: (t * 3 | 0) % 2 === 0 });
+  };
+  const b = (g, p, t) => (door.open ? goTo(ex)(g, p, t) : idle());
+  ok(run(g, [a, b], 30, g => g.done), '9. Metal anahtar geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  const g = new Game(9, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const across = () => A.x > 18 * T - 10 && B.x > 18 * T - 10 && A.supported;
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 6 * T + 1);
+  const ctl = phases([
+    crossPit(g, A, B, 12 * T, 18 * T, across),
+    climbWall(g, A, B, 24 * T, 26 * T, 6 * T, both),
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), '10. Mıknatıs ustası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);

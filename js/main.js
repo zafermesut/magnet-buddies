@@ -51,7 +51,7 @@ function toSelect() {
     const b = document.createElement('button');
     b.className = 'lvl';
     const best = progress[i];
-    b.innerHTML = `<span class="num">${i + 1}</span><span>${l.name}</span><span class="best">${best ? '✓ ' + fmt(best) : ''}</span>`;
+    b.innerHTML = `<span class="num">${i + 1}</span><span>${l.magnet ? '🧲 ' : ''}${l.name}</span><span class="best">${best ? '✓ ' + fmt(best) : ''}</span>`;
     b.addEventListener('click', () => startLevel(i));
     grid.appendChild(b);
   });
@@ -68,7 +68,8 @@ function startLevel(i) {
   const sources = Input.sources();
   $('controls').innerHTML = joined.map((id, k) => {
     const s = sources.find(x => x.id === id);
-    return `<span><b style="color:${PLAYER_COLORS[k]}">${k + 1}P</b>${s ? s.hint : ''}</span>`;
+    const hint = s ? s.hint + (game.magnet ? ' · ' + s.magnetHint : '') : '';
+    return `<span><b style="color:${PLAYER_COLORS[k]}">${k + 1}P</b>${hint}</span>`;
   }).join('');
 }
 

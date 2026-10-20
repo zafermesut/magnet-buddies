@@ -21,7 +21,16 @@ const PHYS = {
   playerSize: 34,
   boxSpeed: 95,
   keySize: 22,
+  maxSpeed: 900,
+
+  // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
+  // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.
+  magnetRange: 280,
+  magnetForce: 5000,
+  magnetKeyForce: 3500,
 };
+
+const POLE_COLORS = { 1: '#ff8787', '-1': '#66d9e8' };
 
 const PLAYER_COLORS = ['#ff6b6b', '#4dabf7', '#ffd43b', '#69db7c'];
 const CHANNEL_COLORS = { 1: '#ff922b', 2: '#b197fc', 3: '#63e6be' };

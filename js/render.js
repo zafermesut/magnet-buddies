@@ -72,7 +72,8 @@ class Renderer {
     this.drawButtons(ctx, game);
     this.drawExit(ctx, game, t);
     for (const b of game.boxes) this.drawBox(ctx, b, game);
-    for (const p of game.players) if (!p.inExit) this.drawPlayer(ctx, p, t);
+    if (game.magnet) for (const p of game.players) if (p.magnetOn && !p.inExit) this.drawField(ctx, p, t);
+    for (const p of game.players) if (!p.inExit) this.drawPlayer(ctx, p, t, game.magnet);
     for (const k of game.keys) if (!k.used) this.drawKey(ctx, k, t);
     this.drawEffects(ctx, game);
     ctx.restore();
@@ -223,7 +224,41 @@ class Renderer {
     }
   }
 
-  drawPlayer(ctx, p, t) {
+  // Mıknatıs alanı: menzil halkası, içe/dışa akan dalgalar, etkilenenlere çizgiler
+  drawField(ctx, p, t) {
+    const col = POLE_COLORS[p.pol], R = PHYS.magnetRange;
+    const cx = p.x + p.w / 2, cy = p.y + p.h / 2;
+    ctx.strokeStyle = rgbaHex(col, 0.18);
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, R, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    for (let i = 0; i < 3; i++) {
+      const f = (t * 1.6 + i / 3) % 1;
+      ctx.strokeStyle = rgbaHex(col, 0.35 * (1 - f));
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(cx, cy, p.w / 2 + 6 + f * (R - p.w), 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    for (const a of p.affects || []) {
+      const o = a.o;
+      ctx.strokeStyle = rgbaHex(col, 0.6);
+      ctx.lineWidth = 3;
+      ctx.setLineDash(a.repel ? [8, 8] : []);
+      ctx.lineDashOffset = a.repel ? -t * 60 : 0;
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(o.x + o.w / 2, o.y + o.h / 2);
+      ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    ctx.lineDashOffset = 0;
+  }
+
+  drawPlayer(ctx, p, t, magnet) {
     const col = PLAYER_COLORS[p.index];
     const r = p.w / 2 + 1;
     const s = p.squash;
@@ -268,12 +303,29 @@ class Renderer {
     }
     ctx.restore();
 
+    // Kutup rozeti (mıknatıslı bölümlerde)
+    if (magnet) {
+      const bx = p.x + p.w - 2, by = p.y + 4, pc = POLE_COLORS[p.pol];
+      ctx.beginPath();
+      ctx.arc(bx, by, 9, 0, Math.PI * 2);
+      ctx.fillStyle = pc;
+      ctx.fill();
+      ctx.strokeStyle = '#1c1b3a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = '#1c1b3a';
+      ctx.font = '900 15px system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(p.pol > 0 ? '+' : '−', bx, by + 1);
+    }
+
     // Kim olduğu
     ctx.fillStyle = col;
     ctx.font = '800 13px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`${p.index + 1}P`, p.x + p.w / 2, p.y - 6 - (p.y > 0 ? 0 : 0));
+    ctx.fillText(`${p.index + 1}P`, p.x + p.w / 2, p.y - 6);
   }
 
   drawKey(ctx, k, t) {
@@ -310,6 +362,7 @@ class Renderer {
         }
       } else {
         const col = e.type === 'unlock' || e.type === 'pickup' ? PAL.key
+          : e.type === 'swap' ? e.color
           : e.type === 'enter' || e.type === 'win' ? PAL.exit
           : e.color || '#fff';
         const size = e.type === 'unlock' || e.type === 'win' ? 70 : 30;

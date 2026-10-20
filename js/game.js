@@ -3,7 +3,7 @@
 // Co-op top bulmacası: simülasyon. Çizimden ve giriş cihazından bağımsızdır.
 // Her adımda oyuncu başına { left, right, jump, action } alır; ileride aynen sunucuda çalışabilir.
 
-const NO_INPUT = { left: false, right: false, jump: false, action: false };
+const NO_INPUT = { left: false, right: false, jump: false, action: false, swap: false };
 
 const approach = (v, target, amount) => (v < target ? Math.min(v + amount, target) : Math.max(v - amount, target));
 const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -28,12 +28,15 @@ class Game {
     this.parse(this.def.map);
 
     const P = PHYS.playerSize, s = this.spawn;
+    this.magnet = !!this.def.magnet;
+    const pols = this.def.pols || [1, -1];
     this.players = [];
     for (let i = 0; i < playerCount; i++) {
       this.players.push(makeBody('player', s.x + 3 + i * (P + 6), s.y + T - P, P, P, {
         index: i, facing: 1, want: 0, coyote: 0, jumpBuf: 0, cut: true,
-        prevJump: true, prevAction: true,   // bölüm başında basılı tutulan tuş tetiklenmesin
+        prevJump: true, prevAction: true, prevSwap: true,   // bölüm başında basılı tutulan tuş tetiklenmesin
         squash: 0, inExit: false, exitCD: 0, blockedBy: null, boxHit: null,
+        pol: pols[i % pols.length], magnetOn: false, actT: 0, magT: 0,
       }));
     }
     this.boxNeed = Math.max(1, Math.min(this.def.boxNeed || 2, playerCount));
@@ -173,20 +176,36 @@ class Game {
     this.players.forEach((p, i) => {
       const inp = inputs[i] || NO_INPUT;
       const jumpEdge = inp.jump && !p.prevJump, actEdge = inp.action && !p.prevAction;
+      const actRelease = !inp.action && p.prevAction, swapEdge = inp.swap && !p.prevSwap;
       p.prevJump = inp.jump;
       p.prevAction = inp.action;
+      p.prevSwap = inp.swap;
       p.exitCD = Math.max(0, p.exitCD - dt);
+      p.magT = Math.max(0, p.magT - dt);
       if (p.inExit) {
+        p.magnetOn = false;
         if (jumpEdge || actEdge) this.leaveExit(p);
         return;
       }
+      if (this.magnet && swapEdge) {
+        p.pol = -p.pol;
+        this.fx('swap', p.x + p.w / 2, p.y + p.h / 2, { color: POLE_COLORS[p.pol] });
+      }
+      // Eylem: kısa dokunuş anahtarı bırakır, basılı tutmak mıknatısı açar
+      if (actEdge) p.actT = 0;
+      if (inp.action) p.actT += dt;
+      p.magnetOn = this.magnet && inp.action;
+      if (actRelease && p.actT < 0.2) this.dropKey(p);
+
       const want = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.want = want;
+      // Mıknatısla savrulurken kontrol azalır; yoksa savrulma hemen sönerdi
+      const ctl = p.magT > 0 ? 0.25 : 1;
       if (want) {
-        p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround ? ph.accel : ph.airAccel) * dt);
+        p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround && ctl === 1 ? ph.accel : ph.airAccel) * ctl * dt);
         p.facing = want;
       } else {
-        p.vx = approach(p.vx, 0, (p.onGround ? ph.friction : ph.airAccel * 0.4) * dt);
+        p.vx = approach(p.vx, 0, (p.onGround && ctl === 1 ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
       }
       p.coyote = p.supported ? ph.coyote : p.coyote - dt;
       p.jumpBuf = jumpEdge ? ph.jumpBuffer : p.jumpBuf - dt;
@@ -197,8 +216,9 @@ class Game {
         this.fx('jump', p.x + p.w / 2, p.y + p.h);
       }
       if (!inp.jump && p.vy < 0 && !p.cut) { p.vy *= ph.jumpCut; p.cut = true; }
-      if (actEdge) this.dropKey(p);
     });
+
+    this.applyMagnets(dt);
 
     // 2) Kutular: önceki adımda yeterince kişi ittiyse kayar
     for (const b of this.boxes) {
@@ -266,6 +286,40 @@ class Game {
     }
   }
 
+  // Mıknatısı açık olan her oyuncu, menzilindeki diğer oyuncuları ve serbest anahtarları etkiler.
+  applyMagnets(dt) {
+    if (!this.magnet) return;
+    const ph = PHYS, R = ph.magnetRange;
+    const push = (o, hx, hy, force) => {
+      const dx = o.x + o.w / 2 - hx, dy = o.y + o.h / 2 - hy, d = Math.hypot(dx, dy) || 1;
+      if (d > R) return false;
+      const a = force * (1 - (d / R) ** 2);
+      o.vx += dx / d * a * dt;
+      o.vy += dy / d * a * dt;
+      const sp = Math.hypot(o.vx, o.vy);
+      if (sp > ph.maxSpeed) { o.vx *= ph.maxSpeed / sp; o.vy *= ph.maxSpeed / sp; }
+      o.magT = 0.3;
+      return true;
+    };
+    for (const h of this.players) {
+      h.affects = [];
+      if (!h.magnetOn || h.inExit) continue;
+      const hx = h.x + h.w / 2, hy = h.y + h.h / 2;
+      for (const o of this.players) {
+        if (o === h || o.inExit) continue;
+        // aynı kutup iter (+), zıt kutup çeker (−)
+        if (push(o, hx, hy, ph.magnetForce * (o.pol === h.pol ? 1 : -1))) {
+          h.affects.push({ o, repel: o.pol === h.pol });
+          if (o.cut === false) o.cut = true;   // zıplama kesmesi mıknatısla fırlamayı bozmasın
+        }
+      }
+      for (const k of this.keys) {
+        if (k.used || k.holder) continue;
+        if (push(k, hx, hy, -ph.magnetKeyForce)) h.affects.push({ o: k, repel: false });
+      }
+    }
+  }
+
   updateKeys(dt) {
     const ph = PHYS;
     for (const k of this.keys) {
@@ -278,7 +332,8 @@ class Game {
         continue;
       }
       k.vy = Math.min(k.vy + ph.gravity * dt, ph.maxFall);
-      k.vx = approach(k.vx, 0, (k.onGround ? 1500 : 150) * dt);
+      k.magT = Math.max(0, (k.magT || 0) - dt);
+      k.vx = approach(k.vx, 0, (k.onGround && !k.magT ? 1500 : 150) * dt);
       k.onGround = false;
       this.moveX(k, k.vx * dt);
       this.moveY(k, k.vy * dt);

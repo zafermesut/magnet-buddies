@@ -2,7 +2,8 @@
 
 Arkadaşlarla aynı klavyede oynanan, birlikte çözülen bir top bulmaca oyunu (Pico Park tarzı).
 Bölümleri tek başına geçemezsin: üst üste binmek, düğme tutmak, kutuyu birlikte itmek ve anahtarı
-taşımak gerekir. Ölüm yok, acele yok.
+taşımak gerekir. İleri bölümlerde herkes bir mıknatısa dönüşür: aynı kutup iter, zıt kutup çeker.
+Ölüm yok, acele yok.
 
 ## Çalıştırma
 
@@ -16,13 +17,13 @@ Sonra http://localhost:5173 adresini aç. Oyuncular kendi zıplama tuşuna basar
 
 ## Kontroller
 
-| Oyuncu | Yürü | Zıpla | Bırak / at |
-| --- | --- | --- | --- |
-| 1P | A D | W (ya da Space) | S |
-| 2P | ← → | ↑ | ↓ |
-| 3P | J L | I | K |
-| 4P | Numpad 4 6 | Numpad 8 | Numpad 5 |
-| Gamepad | Sol çubuk / D-pad | A | B |
+| Oyuncu | Yürü | Zıpla | Eylem (dokun: anahtarı at · basılı tut: mıknatıs) | Kutup değiştir |
+| --- | --- | --- | --- | --- |
+| 1P | A D | W (ya da Space) | S | E |
+| 2P | ← → | ↑ | ↓ | sağ Shift |
+| 3P | J L | I | K | U |
+| 4P | Numpad 4 6 | Numpad 8 | Numpad 5 | Numpad 7 |
+| Gamepad | Sol çubuk / D-pad | A | B | X / Y |
 
 `R` bölümü yeniden başlatır, `Esc` bölüm seçimine döner.
 
@@ -38,6 +39,15 @@ Not: Bazı klavyeler aynı anda çok fazla tuşa basılınca bazı tuşları alg
 - Ağır kutunun üstündeki noktalar kaç kişinin itmesi gerektiğini gösterir.
 - Çukura düşen, ayakta duran bir arkadaşının üstünde yeniden doğar.
 
+### Mıknatıs (🧲 bölümler, 7-10)
+
+- Herkesin bir kutbu vardır (+ ya da −). Kutup tuşuyla istediğin an değiştirirsin.
+- Eylem tuşunu basılı tutan oyuncu mıknatıs olur. Kendisi etkilenmez, menzilindekileri etkiler:
+  - **Aynı kutup iter:** üstündeki arkadaşını fırlatır, kenardaki arkadaşını boşluğun karşısına iter.
+  - **Zıt kutup çeker:** aşağıdaki arkadaşını yukarı çeker, boşluktan atlayanı kendine çeker.
+- Anahtar metaldir: kutup ne olursa olsun mıknatısa gelir.
+- Ahşap kutu mıknatıstan etkilenmez.
+
 ## Yeni bölüm eklemek
 
 Bölümler `js/levels.js` içinde ASCII olarak yazılır. Lejant dosyanın başında. Yeni bölümün
@@ -49,7 +59,7 @@ Bölümler `js/levels.js` içinde ASCII olarak yazılır. Lejant dosyanın baş�
 node test/sim.test.js
 ```
 
-Fizik kurallarını ve 6 bölümün iki oyuncuyla otomatik geçilebildiğini kontrol eder.
+Fizik ve mıknatıs kurallarını, 10 bölümün hepsinin iki oyuncuyla otomatik geçilebildiğini kontrol eder.
 
 ## Yapı
 
