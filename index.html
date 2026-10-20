@@ -2,72 +2,56 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-  <title>Magnet.io</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Top Takımı</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <canvas id="game"></canvas>
 
-  <!-- Oyun içi arayüz -->
+  <!-- Oyun içi -->
   <div id="hud" class="hidden">
-    <div id="stats" class="panel"></div>
-    <div id="leaderboard" class="panel"></div>
-    <div id="feed"></div>
-    <div id="bars">
-      <div id="polarity"></div>
-      <div class="bar"><span>CAN</span><div class="track"><div id="hpFill" class="fill ok"></div></div></div>
-      <div class="bar"><span>ENERJİ</span><div class="track"><div id="energyFill" class="fill energy"></div></div></div>
-    </div>
-    <div id="touchButtons">
-      <button id="btnSwitch">±</button>
-      <button id="btnFire">●</button>
-      <button id="btnBurst">✷</button>
+    <div id="levelInfo" class="panel"><b id="levelName"></b><span id="levelHint"></span></div>
+    <div id="timer" class="panel">0:00</div>
+    <div id="controls"></div>
+    <div id="keysHelp">R yeniden başlat · Esc bölümler</div>
+  </div>
+
+  <!-- Katılım -->
+  <div id="lobby" class="overlay">
+    <div class="card wide">
+      <h1 id="title"></h1>
+      <p class="tagline">Arkadaşlarınla aynı klavyede, birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
+      <div id="slots"></div>
+      <p id="lobbyNote" class="note"></p>
+      <button id="startBtn" class="primary" disabled>BÖLÜMLERİ SEÇ</button>
+      <p class="small">Katılmak için kendi zıplama tuşuna bas. Ayrılmak için bırak tuşuna bas.<br>Gamepad takılıysa A tuşuyla katılabilirsin.</p>
     </div>
   </div>
 
-  <!-- Ana menü -->
-  <div id="menu" class="overlay">
+  <!-- Bölüm seçimi -->
+  <div id="select" class="overlay hidden">
+    <div class="card wide">
+      <h2>Bölüm seç</h2>
+      <div id="levelGrid"></div>
+      <button id="backBtn">← Oyuncular</button>
+    </div>
+  </div>
+
+  <!-- Bölüm sonu -->
+  <div id="complete" class="overlay hidden">
     <div class="card">
-      <h1 id="title"><span class="plus">+</span><span class="name"></span><span class="minus">−</span></h1>
-      <p class="tagline">Kendi rengindeki mermiyi em, zıt renktekinden kaç.<br>Rakibini vurmak için onun zıt rengine geç.</p>
-      <input id="nameInput" maxlength="16" placeholder="Takma adın" autocomplete="off">
-      <button id="playBtn" class="primary">OYNA</button>
-      <ul class="help">
-        <li><b>Fare / WASD</b> hareket</li>
-        <li><b>Sol tık (basılı)</b> ateş</li>
-        <li><b>Space</b> renk değiştir</li>
-        <li><b>Shift / Sağ tık</b> patlama</li>
-        <li><b>T</b> ayar paneli</li>
-      </ul>
-      <ul class="rules">
-        <li><b>Aynı renk</b> mermi ve küreleri <b>emersin</b>: enerji kazanırsın.</li>
-        <li><b>Zıt renk</b> mermi ve küreler <b>can götürür</b>.</li>
-        <li>Ateş ettiğin mermiler <b>senin rengindedir</b>. Rakibe kendi renginde ateş edersen onu beslersin.</li>
-        <li>Ateş etmek enerji harcar. Enerjin 50 olunca <b>patlama</b> çepeçevre mermi atar.</li>
-        <li><b>Kuleler</b> spiral mermi yağdırır ve ara sıra renk değiştirir (önce yanıp söner).</li>
-      </ul>
+      <h2 id="completeTitle">Bölüm tamam!</h2>
+      <p id="completeInfo"></p>
+      <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
+      <button id="toSelectBtn">Bölüm seçimi</button>
+      <p class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
     </div>
-  </div>
-
-  <!-- Ölüm ekranı -->
-  <div id="death" class="overlay hidden">
-    <div class="card">
-      <h2>Elendin</h2>
-      <p id="deathCause"></p>
-      <div id="deathStats"></div>
-      <button id="againBtn" class="primary">TEKRAR OYNA</button>
-      <button id="menuBtn">Ana menü</button>
-    </div>
-  </div>
-
-  <!-- Ayar paneli (T) -->
-  <div id="tweaks" class="panel hidden">
-    <div class="tweaks-head"><b>Ayarlar</b><button id="resetTweaks">Sıfırla</button></div>
-    <div id="tweakList"></div>
   </div>
 
   <script src="js/config.js"></script>
+  <script src="js/levels.js"></script>
+  <script src="js/input.js"></script>
   <script src="js/game.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>

@@ -1,26 +1,32 @@
 'use strict';
 
-// Canvas 2D çizimi: kamera, arena, kuleler, küreler, mermiler, gemiler, efektler, mini harita.
+// Canvas 2D çizimi. Bölüm her zaman ekrana sığdırılır; böylece herkes her şeyi görür.
 
-const COLORS = {
-  void: '#05070c',
-  arena: '#0d1120',
-  grid: 'rgba(120,140,190,0.07)',
-  wall: [150, 170, 220],
-  red: [255, 77, 94],
-  blue: [61, 155, 255],
+const PAL = {
+  skyTop: '#1c1b3a',
+  skyBottom: '#2e2a5e',
+  tile: '#3a3f72',
+  tileEdge: '#7d86e8',
+  tileLine: 'rgba(0,0,0,0.14)',
+  door: '#e0a84a',
+  doorDark: '#8a5a1c',
+  box: '#b67b4c',
+  boxDark: '#6e4527',
+  key: '#ffd43b',
+  exit: '#69db7c',
 };
 
-const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
-const polColor = pol => (pol > 0 ? COLORS.red : COLORS.blue);
+function hexToRgb(h) {
+  const n = parseInt(h.slice(1), 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+const rgbaHex = (h, a) => { const [r, g, b] = hexToRgb(h); return `rgba(${r},${g},${b},${a})`; };
 
 class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
-    this.cam = { x: 0, y: 0, z: 1 };
-    this.shake = 0;
-    this.lastDmgSeen = -99;
+    this.stars = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.4, p: Math.random() * 6 }));
     this.resize();
     addEventListener('resize', () => this.resize());
   }
@@ -33,311 +39,289 @@ class Renderer {
     this.canvas.height = this.h * this.dpr;
   }
 
-  screenToWorld(sx, sy) {
-    return { x: (sx - this.w / 2) / this.cam.z + this.cam.x, y: (sy - this.h / 2) / this.cam.z + this.cam.y };
-  }
-
-  focusOf(game) {
-    const p = game.player;
-    if (p && p.alive) return p;
-    if (p && p.killer && p.killer.alive) return p.killer;
-    if (p) return p;
-    return game.leaderboard(1)[0] || { x: 0, y: 0 };
-  }
-
-  draw(game, dt) {
-    const ctx = this.ctx, cam = this.cam;
-    const f = this.focusOf(game);
-    const tz = Math.min(this.w, this.h) / 900;
-    const k = Math.min(1, dt * 8);
-    cam.x += (f.x - cam.x) * k;
-    cam.y += (f.y - cam.y) * k;
-    cam.z += (tz - cam.z) * Math.min(1, dt * 3);
-
-    // Oyuncu hasar alınca ekran sarsıntısı
-    const p = game.player;
-    if (p && p.lastDmgT > this.lastDmgSeen) { this.lastDmgSeen = p.lastDmgT; this.shake = 6; }
-    this.shake = Math.max(0, this.shake - dt * 40);
-    const sx = (Math.random() - 0.5) * this.shake, sy = (Math.random() - 0.5) * this.shake;
-
+  draw(game, time) {
+    const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
-    ctx.fillStyle = COLORS.void;
+
+    // Gökyüzü
+    const sky = ctx.createLinearGradient(0, 0, 0, this.h);
+    sky.addColorStop(0, PAL.skyTop);
+    sky.addColorStop(1, PAL.skyBottom);
+    ctx.fillStyle = sky;
     ctx.fillRect(0, 0, this.w, this.h);
-
-    ctx.save();
-    ctx.translate(this.w / 2 + sx, this.h / 2 + sy);
-    ctx.scale(cam.z, cam.z);
-    ctx.translate(-cam.x, -cam.y);
-
-    const view = {
-      x0: cam.x - this.w / 2 / cam.z, x1: cam.x + this.w / 2 / cam.z,
-      y0: cam.y - this.h / 2 / cam.z, y1: cam.y + this.h / 2 / cam.z,
-    };
-    const visible = (x, y, r) => x + r > view.x0 && x - r < view.x1 && y + r > view.y0 && y - r < view.y1;
-
-    this.drawArena(ctx, game, view);
-    this.drawOrbs(ctx, game, visible);
-    for (const q of game.pylons) if (visible(q.x, q.y, 80)) this.drawPylon(ctx, q, game.t);
-    for (const s of game.ships) if (s.alive && visible(s.x, s.y, 80)) this.drawShip(ctx, s, game.t, s === p);
-    this.drawBullets(ctx, game, visible);
-    this.drawEffects(ctx, game);
-
-    ctx.restore();
-
-    // Hasar alınca kenarlarda kırmızı parlama
-    if (p && p.alive && game.t - p.lastDmgT < 0.25) {
-      const a = 0.35 * (1 - (game.t - p.lastDmgT) / 0.25);
-      const g = ctx.createRadialGradient(this.w / 2, this.h / 2, Math.min(this.w, this.h) * 0.35, this.w / 2, this.h / 2, Math.max(this.w, this.h) * 0.75);
-      g.addColorStop(0, 'rgba(255,40,60,0)');
-      g.addColorStop(1, `rgba(255,40,60,${a})`);
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, this.w, this.h);
+    for (const s of this.stars) {
+      ctx.globalAlpha = 0.3 + 0.3 * Math.sin(time * 1.5 + s.p);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(s.x * this.w, s.y * this.h, s.r, s.r);
     }
-
-    this.drawMinimap(ctx, game);
-  }
-
-  drawArena(ctx, game, view) {
-    const R = CONFIG.arenaRadius;
-    ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.arena;
-    ctx.fill();
-
-    ctx.save();
-    ctx.clip();
-    ctx.strokeStyle = COLORS.grid;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    const g = 90;
-    for (let x = Math.floor(view.x0 / g) * g; x < view.x1; x += g) { ctx.moveTo(x, view.y0); ctx.lineTo(x, view.y1); }
-    for (let y = Math.floor(view.y0 / g) * g; y < view.y1; y += g) { ctx.moveTo(view.x0, y); ctx.lineTo(view.x1, y); }
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.lineWidth = 10;
-    ctx.strokeStyle = rgba(COLORS.wall, 0.35);
-    ctx.beginPath();
-    ctx.arc(0, 0, R, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-
-  drawOrbs(ctx, game, visible) {
-    const pulse = 1 + Math.sin(game.t * 4) * 0.15;
-    for (const pol of [1, -1]) {
-      const col = polColor(pol);
-      ctx.fillStyle = rgba(col, 0.25);
-      ctx.beginPath();
-      for (const o of game.orbs) {
-        if (o.pol !== pol || !visible(o.x, o.y, 12)) continue;
-        ctx.moveTo(o.x + 9 * pulse, o.y);
-        ctx.arc(o.x, o.y, 9 * pulse, 0, Math.PI * 2);
-      }
-      ctx.fill();
-      ctx.fillStyle = rgba(col, 1);
-      ctx.beginPath();
-      for (const o of game.orbs) {
-        if (o.pol !== pol || !visible(o.x, o.y, 12)) continue;
-        ctx.moveTo(o.x + 4.5, o.y);
-        ctx.arc(o.x, o.y, 4.5, 0, Math.PI * 2);
-      }
-      ctx.fill();
-    }
-  }
-
-  drawPylon(ctx, q, t) {
-    // Renk değiştirmeden hemen önce yanıp söner (uyarı)
-    const warn = q.flipT < 0.8 && Math.sin(t * 30) > 0;
-    const col = polColor(warn ? -q.pol : q.pol);
-    ctx.save();
-    ctx.translate(q.x, q.y);
-    const g = ctx.createRadialGradient(0, 0, q.r * 0.5, 0, 0, q.r * 2.6);
-    g.addColorStop(0, rgba(col, 0.3));
-    g.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(0, 0, q.r * 2.6, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.rotate(q.ang);
-    ctx.beginPath();
-    for (let i = 0; i < 6; i++) {
-      const a = i / 6 * Math.PI * 2;
-      ctx.lineTo(Math.cos(a) * q.r, Math.sin(a) * q.r);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#1a2033';
-    ctx.fill();
-    ctx.lineWidth = 5;
-    ctx.strokeStyle = rgba(col, 1);
-    ctx.stroke();
-    // üç namlu
-    ctx.fillStyle = rgba(col, 1);
-    for (let arm = 0; arm < 3; arm++) {
-      ctx.save();
-      ctx.rotate(arm * Math.PI * 2 / 3);
-      ctx.fillRect(q.r * 0.4, -5, q.r * 0.75, 10);
-      ctx.restore();
-    }
-    ctx.beginPath();
-    ctx.arc(0, 0, q.r * 0.3, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  drawBullets(ctx, game, visible) {
-    for (const pol of [1, -1]) {
-      const col = polColor(pol);
-      ctx.fillStyle = rgba(col, 0.3);
-      ctx.beginPath();
-      for (const b of game.bullets) {
-        if (b.pol !== pol || !visible(b.x, b.y, 14)) continue;
-        ctx.moveTo(b.x + 11, b.y);
-        ctx.arc(b.x, b.y, 11, 0, Math.PI * 2);
-      }
-      ctx.fill();
-      ctx.fillStyle = rgba(col, 1);
-      ctx.beginPath();
-      for (const b of game.bullets) {
-        if (b.pol !== pol || !visible(b.x, b.y, 14)) continue;
-        ctx.moveTo(b.x + 6, b.y);
-        ctx.arc(b.x, b.y, 6, 0, Math.PI * 2);
-      }
-      ctx.fill();
-    }
-    // parlak çekirdek
-    ctx.fillStyle = 'rgba(255,255,255,0.85)';
-    ctx.beginPath();
-    for (const b of game.bullets) {
-      if (!visible(b.x, b.y, 4)) continue;
-      ctx.moveTo(b.x + 2.5, b.y);
-      ctx.arc(b.x, b.y, 2.5, 0, Math.PI * 2);
-    }
-    ctx.fill();
-  }
-
-  drawShip(ctx, s, t, isPlayer) {
-    const r = s.r, col = polColor(s.pol);
-    const absorbing = t - s.lastAbsorbT < 0.15;
-
-    // Aura (emerken büyür)
-    const ar = r * (absorbing ? 2.4 : 1.9);
-    const g = ctx.createRadialGradient(s.x, s.y, r * 0.7, s.x, s.y, ar);
-    g.addColorStop(0, rgba(col, absorbing ? 0.6 : 0.35));
-    g.addColorStop(1, rgba(col, 0));
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, ar, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Nişan yönü
-    const a = Math.atan2(s.aimY - s.y, s.aimX - s.x);
-    ctx.save();
-    ctx.translate(s.x, s.y);
-    ctx.rotate(a);
-    ctx.fillStyle = rgba(col, 1);
-    ctx.beginPath();
-    ctx.moveTo(r + 10, 0);
-    ctx.lineTo(r - 2, -8);
-    ctx.lineTo(r - 2, 8);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-
-    // Gövde (doğuş korumasında yanıp söner)
-    const hurt = t - s.lastDmgT < 0.1;
-    ctx.globalAlpha = s.spawnShield > 0 && Math.sin(t * 25) > 0 ? 0.5 : 1;
-    ctx.beginPath();
-    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = hurt ? '#ffffff' : rgba(col, 1);
-    ctx.fill();
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = isPlayer ? 'rgba(255,255,255,0.95)' : 'rgba(0,0,0,0.3)';
-    ctx.stroke();
-
-    ctx.fillStyle = hurt ? rgba(col, 1) : '#fff';
-    ctx.font = `800 ${r * 1.15}px system-ui, sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(s.pol > 0 ? '+' : '−', s.x, s.y + r * 0.04);
     ctx.globalAlpha = 1;
+    if (!game) return;
 
-    // Enerji halkası
-    const e = s.energy / CONFIG.maxEnergy;
-    if (e > 0) {
-      ctx.beginPath();
-      ctx.arc(s.x, s.y, r + 6, -Math.PI / 2, -Math.PI / 2 + e * Math.PI * 2);
-      ctx.strokeStyle = s.energy >= CONFIG.burstCost ? 'rgba(255,230,120,0.95)' : 'rgba(255,255,255,0.6)';
-      ctx.lineWidth = 3;
-      ctx.stroke();
-    }
+    // Bölümü ekrana sığdır (üstte HUD için pay bırak)
+    const padTop = 70, pad = 24;
+    const z = Math.min((this.w - pad * 2) / game.W, (this.h - padTop - pad) / game.H, 1.6);
+    const ox = (this.w - game.W * z) / 2, oy = padTop + (this.h - padTop - pad - game.H * z) / 2;
+    ctx.save();
+    ctx.translate(ox, oy);
+    ctx.scale(z, z);
 
-    // Can çubuğu
-    const w = r * 2.2, hy = s.y + r + 12;
-    ctx.fillStyle = 'rgba(0,0,0,0.5)';
-    ctx.fillRect(s.x - w / 2, hy, w, 5);
-    const hp = Math.max(0, s.hp / CONFIG.maxHp);
-    ctx.fillStyle = hp > 0.5 ? '#4ade80' : hp > 0.25 ? '#facc15' : '#ef4444';
-    ctx.fillRect(s.x - w / 2, hy, w * hp, 5);
-
-    // İsim
-    ctx.font = '600 14px system-ui, sans-serif';
-    ctx.textBaseline = 'top';
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-    ctx.strokeText(s.name, s.x, hy + 9);
-    ctx.fillStyle = isPlayer ? '#fff' : 'rgba(230,235,245,0.85)';
-    ctx.fillText(s.name, s.x, hy + 9);
+    const t = game.t;
+    this.drawTiles(ctx, game);
+    this.drawDoors(ctx, game);
+    this.drawGates(ctx, game, t);
+    this.drawButtons(ctx, game);
+    this.drawExit(ctx, game, t);
+    for (const b of game.boxes) this.drawBox(ctx, b, game);
+    for (const p of game.players) if (!p.inExit) this.drawPlayer(ctx, p, t);
+    for (const k of game.keys) if (!k.used) this.drawKey(ctx, k, t);
+    this.drawEffects(ctx, game);
+    ctx.restore();
   }
 
-  drawEffects(ctx, game) {
-    for (const e of game.effects) {
-      const p = e.t / e.life;
-      const col = polColor(e.pol);
-      ctx.beginPath();
-      if (e.type === 'absorb') {
-        ctx.arc(e.x, e.y, e.r * (1 - p * 0.7), 0, Math.PI * 2);
-        ctx.strokeStyle = rgba(col, 1 - p);
-        ctx.lineWidth = 3;
-      } else if (e.type === 'hit') {
-        ctx.arc(e.x, e.y, e.r * (1 + p * 2), 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255,255,255,${1 - p})`;
-        ctx.lineWidth = 3;
-      } else if (e.type === 'pulse') {
-        ctx.arc(e.x, e.y, e.r * (1 + p * 1.8), 0, Math.PI * 2);
-        ctx.strokeStyle = rgba(col, 1 - p);
-        ctx.lineWidth = 5 * (1 - p);
-      } else {
-        ctx.arc(e.x, e.y, e.r * (1 + p * 4), 0, Math.PI * 2);
-        ctx.strokeStyle = rgba(col, 1 - p);
-        ctx.lineWidth = 10 * (1 - p);
+  drawTiles(ctx, g) {
+    for (let r = 0; r < g.rows; r++) {
+      for (let c = 0; c < g.cols; c++) {
+        if (!g.grid[r][c]) continue;
+        const x = c * T, y = r * T;
+        ctx.fillStyle = PAL.tile;
+        ctx.fillRect(x, y, T, T);
+        ctx.strokeStyle = PAL.tileLine;
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, T - 1, T - 1);
+        if (r > 0 && !g.grid[r - 1][c]) {
+          ctx.fillStyle = PAL.tileEdge;
+          ctx.fillRect(x, y, T, 5);
+        }
       }
+    }
+  }
+
+  drawDoors(ctx, g) {
+    for (const d of g.doors) {
+      const alpha = d.open ? Math.max(0, 1 - d.openT * 2.5) : 1;
+      if (alpha <= 0) continue;
+      ctx.globalAlpha = alpha;
+      for (const q of d.cells) {
+        const x = q.c * T, y = q.r * T;
+        ctx.fillStyle = PAL.door;
+        ctx.fillRect(x + 4, y, T - 8, T);
+        ctx.fillStyle = PAL.doorDark;
+        ctx.fillRect(x + 4, y, 3, T);
+        ctx.fillRect(x + T - 7, y, 3, T);
+        ctx.fillRect(x + 4, y + T - 3, T - 8, 3);
+      }
+      // Anahtar deliği ortadaki hücrede
+      const mid = d.cells.slice().sort((a, b) => a.r - b.r)[Math.floor(d.cells.length / 2)];
+      const cx = mid.c * T + T / 2, cy = mid.r * T + T / 2;
+      ctx.fillStyle = PAL.doorDark;
+      ctx.beginPath();
+      ctx.arc(cx, cy - 4, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(cx - 4, cy);
+      ctx.lineTo(cx + 4, cy);
+      ctx.lineTo(cx + 2, cy + 10);
+      ctx.lineTo(cx - 2, cy + 10);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  drawGates(ctx, g, t) {
+    for (const gate of g.gates) {
+      const col = CHANNEL_COLORS[gate.channel];
+      for (const q of gate.cells) {
+        const x = q.c * T, y = q.r * T;
+        if (gate.open) {
+          ctx.strokeStyle = rgbaHex(col, 0.25);
+          ctx.setLineDash([4, 6]);
+          ctx.lineWidth = 2;
+          ctx.strokeRect(x + 6, y + 1, T - 12, T - 2);
+          ctx.setLineDash([]);
+        } else {
+          ctx.fillStyle = rgbaHex(col, 0.18);
+          ctx.fillRect(x + 4, y, T - 8, T);
+          ctx.fillStyle = rgbaHex(col, 0.9);
+          for (let i = 0; i < 3; i++) ctx.fillRect(x + 8 + i * 10, y, 4, T);
+        }
+      }
+    }
+  }
+
+  drawButtons(ctx, g) {
+    for (const b of g.buttons) {
+      const col = CHANNEL_COLORS[b.channel];
+      ctx.fillStyle = '#20233f';
+      ctx.fillRect(b.x - 2, b.y + b.h - 3, b.w + 4, 3);
+      const h = b.pressed ? 3 : 8;
+      if (b.pressed) {
+        ctx.fillStyle = rgbaHex(col, 0.35);
+        ctx.fillRect(b.x - 6, b.y - 10, b.w + 12, 18);
+      }
+      ctx.fillStyle = col;
+      ctx.fillRect(b.x + 3, b.y + b.h - 3 - h, b.w - 6, h);
+    }
+  }
+
+  drawExit(ctx, g, t) {
+    const e = g.exit;
+    if (!e) return;
+    const glow = 0.25 + 0.1 * Math.sin(t * 3);
+    ctx.fillStyle = rgbaHex(PAL.exit, glow);
+    ctx.beginPath();
+    ctx.ellipse(e.x + T / 2, e.y + e.h - 4, T, 14, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Kemerli kapı
+    ctx.fillStyle = '#15172e';
+    ctx.strokeStyle = PAL.exit;
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(e.x + 4, e.y + e.h);
+    ctx.lineTo(e.x + 4, e.y + T * 0.6);
+    ctx.arc(e.x + T / 2, e.y + T * 0.6, T / 2 - 4, Math.PI, 0);
+    ctx.lineTo(e.x + T - 4, e.y + e.h);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // İçeri girenler kapıda küçük noktalar olarak görünür
+    const inside = g.players.filter(p => p.inExit);
+    inside.forEach((p, i) => {
+      ctx.fillStyle = PLAYER_COLORS[p.index];
+      ctx.beginPath();
+      ctx.arc(e.x + 12 + (i % 2) * 16, e.y + T * 0.75 + Math.floor(i / 2) * 16, 6, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    ctx.fillStyle = '#fff';
+    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${inside.length}/${g.players.length}`, e.x + T / 2, e.y - 4);
+  }
+
+  drawBox(ctx, b, g) {
+    const { x, y, w, h } = b;
+    ctx.fillStyle = PAL.box;
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = PAL.boxDark;
+    ctx.lineWidth = 5;
+    ctx.strokeRect(x + 2.5, y + 2.5, w - 5, h - 5);
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.moveTo(x + 6, y + 6); ctx.lineTo(x + w - 6, y + h - 6);
+    ctx.moveTo(x + w - 6, y + 6); ctx.lineTo(x + 6, y + h - 6);
+    ctx.stroke();
+    // Kaç kişi gerektiği: dolu daireler şu an itenler
+    const n = g.boxNeed, r = 6, gap = 16, sx = x + w / 2 - (n - 1) * gap / 2;
+    for (let i = 0; i < n; i++) {
+      ctx.beginPath();
+      ctx.arc(sx + i * gap, y - 12, r, 0, Math.PI * 2);
+      ctx.fillStyle = i < b.pushers ? '#fff' : 'rgba(255,255,255,0.15)';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+      ctx.lineWidth = 1.5;
       ctx.stroke();
     }
   }
 
-  drawMinimap(ctx, game) {
-    const size = Math.min(150, this.w * 0.28), pad = 16;
-    const cx = pad + size / 2, cy = this.h - pad - size / 2;
-    const s = size / 2 / CONFIG.arenaRadius;
+  drawPlayer(ctx, p, t) {
+    const col = PLAYER_COLORS[p.index];
+    const r = p.w / 2 + 1;
+    const s = p.squash;
+    ctx.save();
+    ctx.translate(p.x + p.w / 2, p.y + p.h);
+    ctx.scale(1 + s, 1 - s);
+
+    // Gövde
+    const grad = ctx.createRadialGradient(-r * 0.35, -r * 1.35, r * 0.2, 0, -r, r * 1.1);
+    grad.addColorStop(0, '#ffffff');
+    grad.addColorStop(0.18, col);
+    grad.addColorStop(1, rgbaHex(col, 0.85));
+    ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(cx, cy, size / 2, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(13,17,32,0.85)';
+    ctx.arc(0, -r, r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = rgba(COLORS.wall, 0.4);
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+    ctx.lineWidth = 2;
     ctx.stroke();
-    for (const q of game.pylons) {
-      ctx.fillStyle = rgba(polColor(q.pol), 0.5);
-      ctx.fillRect(cx + q.x * s - 3, cy + q.y * s - 3, 6, 6);
+
+    // Gözler: baktığı yöne kayar, ara sıra kırpar
+    const look = p.facing * 3, lookY = clampN(p.vy / 300, -2, 2);
+    const blink = ((t + p.index * 1.7) % 4) < 0.12;
+    for (const ex of [-r * 0.32, r * 0.32]) {
+      const exx = ex + look, eyy = -r * 1.12;
+      if (blink) {
+        ctx.strokeStyle = '#1c1b3a';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(exx - 4, eyy); ctx.lineTo(exx + 4, eyy);
+        ctx.stroke();
+      } else {
+        ctx.fillStyle = '#fff';
+        ctx.beginPath();
+        ctx.ellipse(exx, eyy, 5, 6.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1c1b3a';
+        ctx.beginPath();
+        ctx.arc(exx + p.facing * 1.5, eyy + lookY, 2.8, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-    for (const m of game.ships) {
-      if (!m.alive) continue;
-      const me = m === game.player;
-      ctx.beginPath();
-      ctx.arc(cx + m.x * s, cy + m.y * s, me ? 4 : 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = me ? '#fff' : rgba(polColor(m.pol), 0.9);
-      ctx.fill();
+    ctx.restore();
+
+    // Kim olduğu
+    ctx.fillStyle = col;
+    ctx.font = '800 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(`${p.index + 1}P`, p.x + p.w / 2, p.y - 6 - (p.y > 0 ? 0 : 0));
+  }
+
+  drawKey(ctx, k, t) {
+    const bob = k.holder ? 0 : Math.sin(t * 3) * 2;
+    const x = k.x + k.w / 2, y = k.y + k.h / 2 + bob;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.shadowColor = PAL.key;
+    ctx.shadowBlur = 12;
+    ctx.strokeStyle = PAL.key;
+    ctx.fillStyle = PAL.key;
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.arc(-5, 0, 6, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.fillRect(0, -2, 13, 4);
+    ctx.fillRect(8, 2, 3, 5);
+    ctx.fillRect(12, 2, 3, 4);
+    ctx.restore();
+  }
+
+  drawEffects(ctx, g) {
+    for (const e of g.effects) {
+      const age = g.t - e.t;
+      if (age < 0 || age > 0.8) continue;
+      const p = age / 0.8;
+      ctx.globalAlpha = 1 - p;
+      if (e.type === 'jump') {
+        ctx.fillStyle = 'rgba(255,255,255,0.6)';
+        for (const dx of [-10, 10]) {
+          ctx.beginPath();
+          ctx.arc(e.x + dx * (1 + p * 2), e.y - 2, 3 * (1 - p) + 1, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      } else {
+        const col = e.type === 'unlock' || e.type === 'pickup' ? PAL.key
+          : e.type === 'enter' || e.type === 'win' ? PAL.exit
+          : e.color || '#fff';
+        const size = e.type === 'unlock' || e.type === 'win' ? 70 : 30;
+        ctx.strokeStyle = col;
+        ctx.lineWidth = 4 * (1 - p) + 1;
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, 6 + size * p, 0, Math.PI * 2);
+        ctx.stroke();
+      }
     }
+    ctx.globalAlpha = 1;
   }
 }
+
+function clampN(v, a, b) { return v < a ? a : v > b ? b : v; }

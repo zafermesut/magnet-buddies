@@ -1,501 +1,373 @@
 'use strict';
 
-// Oyun simülasyonu: gemiler, mermiler, emme, kuleler, enerji küreleri ve bot zekâsı.
-// Çizimden bağımsızdır; ileride aynen sunucuda (Node.js) çalıştırılabilir.
-//
-// Kurallar: herkes kırmızı (+) ya da mavi (−) kutuptadır ve anında değiştirebilir.
-// Kendi rengindeki mermiyi emer (enerji kazanır), zıt renk mermiden hasar alır.
-// Ateş ettiğin mermi o anki rengini taşır: rakibi vurmak için onun zıt rengine geçmelisin,
-// ama o zaman onun mermileri de sana işler.
+// Co-op top bulmacası: simülasyon. Çizimden ve giriş cihazından bağımsızdır.
+// Her adımda oyuncu başına { left, right, jump, action } alır; ileride aynen sunucuda çalışabilir.
 
-const BOT_NAMES = [
-  'Tesla', 'Neodim', 'Ferro', 'Pusula', 'Bobin', 'Volt', 'Amper', 'Gauss',
-  'Faraday', 'Demirci', 'Elektron', 'Proton', 'Manyetar', 'Dinamo', 'Ohm',
-  'Kuzey', 'Güney', 'Kıvılcım', 'Sarmal', 'Kutupçu', 'Nikel', 'Kobalt',
-  'Hematit', 'Manyetit', 'Akım', 'Rezistans', 'Solenoid', 'Ferrit', 'Zıtlık', 'Prizma',
-];
+const NO_INPUT = { left: false, right: false, jump: false, action: false };
 
-const rand = (a, b) => a + Math.random() * (b - a);
-const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
+const approach = (v, target, amount) => (v < target ? Math.min(v + amount, target) : Math.max(v - amount, target));
+const overlap = (a, b) => a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+const grow = (r, n) => ({ x: r.x - n, y: r.y - n, w: r.w + 2 * n, h: r.h + 2 * n });
+const cellRect = q => ({ x: q.c * T, y: q.r * T, w: T, h: T });
 
-function shuffle(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = (Math.random() * (i + 1)) | 0;
-    [arr[i], arr[j]] = [arr[j], arr[i]];
-  }
-  return arr;
-}
-
-class Ship {
-  constructor(id, name, isBot, x, y) {
-    this.id = id;
-    this.name = name;
-    this.isBot = isBot;
-    this.x = x; this.y = y;
-    this.vx = 0; this.vy = 0;
-    this.r = CONFIG.shipRadius;
-    this.pol = Math.random() < 0.5 ? 1 : -1;   // +1 = kırmızı (+), -1 = mavi (−)
-    this.polT = -99;                           // son renk değişim zamanı
-    this.hp = CONFIG.maxHp;
-    this.energy = CONFIG.startEnergy;
-    this.switchCD = 0;
-    this.fireCD = 0;
-    this.firing = false;
-    this.moveX = x; this.moveY = y;           // hareket hedefi
-    this.aimX = x + 1; this.aimY = y;         // nişan noktası
-    this.throttle = 0;
-    this.frags = 0;
-    this.score = 0;
-    this.absorbed = 0;
-    this.alive = true;
-    this.lastHitBy = null;
-    this.lastHitT = -99;
-    this.lastDmgT = -99;
-    this.lastAbsorbT = -99;
-    this.spawnShield = 2;
-    this.bornT = 0;
-    // bot durumu
-    this.skill = rand(0.35, 0.95);
-    this.reactJitter = rand(0.75, 1.3);
-    this.thinkT = 0;
-    this.strafe = Math.random() < 0.5 ? 1 : -1;
-    this.wander = null;
-  }
+function makeBody(kind, x, y, w, h, extra) {
+  return Object.assign({
+    kind, x, y, w, h, vx: 0, vy: 0, ox: x, oy: y,
+    onGround: false, ground: null, supported: false, dx: 0,
+  }, extra);
 }
 
 class Game {
-  constructor(playerName, spectator = false) {
+  constructor(levelIndex, playerCount) {
+    this.levelIndex = levelIndex;
+    this.def = LEVELS[levelIndex];
     this.t = 0;
-    this.nextId = 1;
-    this.ships = [];
-    this.bullets = [];
-    this.orbs = [];
-    this.pylons = [];
+    this.done = false;
+    this.doneT = 0;
     this.effects = [];
-    this.feed = [];
-    this.respawnQueue = [];
-    this.orbAcc = 0;
-    this.botTarget = Math.round(CONFIG.botCount);
+    this.parse(this.def.map);
 
-    this.genPylons();
-    for (let i = 0; i < CONFIG.orbCount; i++) this.spawnOrb();
-
-    const names = shuffle(BOT_NAMES.slice());
-    for (let i = 0; i < this.botTarget; i++) this.addShip(names[i % names.length], true);
-    this.player = spectator ? null : this.addShip(playerName || 'Sen', false);
-  }
-
-  // ---------- Kurulum ----------
-
-  randomPoint(margin) {
-    const a = Math.random() * Math.PI * 2;
-    const d = Math.sqrt(Math.random()) * (CONFIG.arenaRadius - margin);
-    return { x: Math.cos(a) * d, y: Math.sin(a) * d };
-  }
-
-  safePoint() {
-    for (let k = 0; k < 40; k++) {
-      const p = this.randomPoint(150);
-      if (this.pylons.some(q => Math.hypot(p.x - q.x, p.y - q.y) < 320)) continue;
-      if (this.ships.some(s => s.alive && Math.hypot(p.x - s.x, p.y - s.y) < 450)) continue;
-      return p;
+    const P = PHYS.playerSize, s = this.spawn;
+    this.players = [];
+    for (let i = 0; i < playerCount; i++) {
+      this.players.push(makeBody('player', s.x + 3 + i * (P + 6), s.y + T - P, P, P, {
+        index: i, facing: 1, want: 0, coyote: 0, jumpBuf: 0, cut: true,
+        prevJump: true, prevAction: true,   // bölüm başında basılı tutulan tuş tetiklenmesin
+        squash: 0, inExit: false, exitCD: 0, blockedBy: null, boxHit: null,
+      }));
     }
-    return this.randomPoint(150);
+    this.boxNeed = Math.max(1, Math.min(this.def.boxNeed || 2, playerCount));
+    this.solids = [];
   }
 
-  genPylons() {
-    const n = CONFIG.pylonCount;
-    const R = CONFIG.arenaRadius;
-    for (let i = 0; i < n; i++) {
-      const a = i / n * Math.PI * 2 + rand(-0.3, 0.3);
-      const d = i === 0 ? 0 : R * rand(0.45, 0.65);
-      this.pylons.push({
-        x: Math.cos(a) * d, y: Math.sin(a) * d, r: 34,
-        pol: Math.random() < 0.5 ? 1 : -1,
-        ang: rand(0, 6.28), spin: rand(0.9, 1.4) * (Math.random() < 0.5 ? 1 : -1),
-        flipT: rand(1, CONFIG.pylonFlipEvery), acc: 0,
-      });
+  // ---------- Bölüm okuma ----------
+
+  parse(map) {
+    const rows = map.length, cols = map[0].length;
+    this.rows = rows; this.cols = cols;
+    this.W = cols * T; this.H = rows * T;
+    this.grid = [];
+    this.blockers = [];
+    this.keys = []; this.doors = []; this.buttons = []; this.gates = []; this.boxes = [];
+    this.spawn = null; this.exit = null;
+    const doorCells = [], gateCells = {};
+
+    for (let r = 0; r < rows; r++) {
+      this.grid.push([]);
+      this.blockers.push([]);
+      for (let c = 0; c < cols; c++) {
+        const ch = map[r][c];
+        const x = c * T, y = r * T;
+        this.grid[r].push(ch === '#');
+        this.blockers[r].push(null);
+        if (ch === 'S' && !this.spawn) this.spawn = { x, y };
+        else if (ch === 'E') this.exit = { x, y: y - T, w: T, h: 2 * T };
+        else if (ch === 'K') {
+          const k = PHYS.keySize;
+          this.keys.push(makeBody('key', x + (T - k) / 2, y + T - k, k, k, { holder: null, used: false, noPick: new Map() }));
+        } else if (ch === 'D') doorCells.push({ r, c });
+        else if ('123'.includes(ch)) this.buttons.push({ channel: +ch, x: x + 3, y: y + T - 8, w: T - 6, h: 8, pressed: false });
+        else if ('abc'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
+        else if (ch === 'H') this.boxes.push(makeBody('box', x, y, 2 * T, 2 * T, { push: { 1: 0, '-1': 0 }, pushers: 0 }));
+      }
+    }
+
+    // Komşu kapı hücreleri tek kapıdır
+    const seen = new Set();
+    for (const start of doorCells) {
+      if (seen.has(start.r * cols + start.c)) continue;
+      const door = { kind: 'door', cells: [], open: false, openT: 0 };
+      const stack = [start];
+      seen.add(start.r * cols + start.c);
+      while (stack.length) {
+        const q = stack.pop();
+        door.cells.push(q);
+        this.blockers[q.r][q.c] = door;
+        for (const n of doorCells) {
+          const id = n.r * cols + n.c;
+          if (!seen.has(id) && Math.abs(n.r - q.r) + Math.abs(n.c - q.c) === 1) { seen.add(id); stack.push(n); }
+        }
+      }
+      this.doors.push(door);
+    }
+
+    for (const ch in gateCells) {
+      const gate = { kind: 'gate', channel: 'abc'.indexOf(ch) + 1, cells: gateCells[ch], open: false };
+      for (const q of gate.cells) this.blockers[q.r][q.c] = gate;
+      this.gates.push(gate);
     }
   }
 
-  spawnOrb(x, y, pol) {
-    if (x === undefined) {
-      const p = this.randomPoint(40);
-      x = p.x; y = p.y;
+  blocked(c, r) {
+    if (c < 0 || c >= this.cols || r < 0) return true;
+    if (r >= this.rows) return false;   // haritanın altı çukurdur
+    if (this.grid[r][c]) return true;
+    const b = this.blockers[r][c];
+    return !!b && !b.open;
+  }
+
+  fx(type, x, y, extra) {
+    this.effects.push(Object.assign({ type, x, y, t: this.t }, extra));
+  }
+
+  // ---------- Çarpışmalı hareket ----------
+
+  moveX(b, dx) {
+    if (dx === 0) return null;
+    b.x += dx;
+    let hit = null;
+    const r0 = Math.floor(b.y / T), r1 = Math.floor((b.y + b.h - 0.001) / T);
+    const c = dx > 0 ? Math.floor((b.x + b.w - 0.001) / T) : Math.floor(b.x / T);
+    for (let r = r0; r <= r1; r++) {
+      if (this.blocked(c, r)) { b.x = dx > 0 ? c * T - b.w : (c + 1) * T; hit = 'tile'; break; }
     }
-    const a = Math.random() * Math.PI * 2, s = rand(5, 25);
-    this.orbs.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, pol: pol || (Math.random() < 0.5 ? 1 : -1), dead: false });
-  }
-
-  addShip(name, isBot) {
-    const p = this.safePoint();
-    const s = new Ship(this.nextId++, name, isBot, p.x, p.y);
-    s.bornT = this.t;
-    this.ships.push(s);
-    return s;
-  }
-
-  effect(type, x, y, r, pol) {
-    this.effects.push({ type, x, y, r, pol, t: 0, life: type === 'boom' ? 0.7 : type === 'absorb' ? 0.25 : 0.3 });
-  }
-
-  // ---------- Aksiyonlar ----------
-
-  switchPolarity(s) {
-    if (!s.alive || s.switchCD > 0) return false;
-    s.pol = -s.pol;
-    s.polT = this.t;
-    s.switchCD = CONFIG.switchCooldown;
-    this.effect('pulse', s.x, s.y, s.r, s.pol);
-    return true;
-  }
-
-  shoot(s, angle, speed, life, dmg) {
-    this.bullets.push({
-      x: s.x + Math.cos(angle) * (s.r + 4), y: s.y + Math.sin(angle) * (s.r + 4),
-      vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed,
-      pol: s.pol, owner: s, life, age: 0, dmg, dead: false,
-    });
-  }
-
-  burst(s) {
-    const C = CONFIG;
-    if (!s.alive || s.energy < C.burstCost) return false;
-    s.energy -= C.burstCost;
-    for (let i = 0; i < C.burstCount; i++) {
-      this.shoot(s, i / C.burstCount * Math.PI * 2, C.bulletSpeed * 0.85, C.bulletLife, C.bulletDamage);
+    for (const o of this.solids) {
+      if (o === b || !overlap(b, o)) continue;
+      b.x = dx > 0 ? o.x - b.w : o.x + o.w;
+      hit = o;
     }
-    this.effect('boom', s.x, s.y, s.r * 1.2, s.pol);
-    return true;
+    if (hit) b.vx = 0;
+    return hit;
   }
 
-  damage(s, amount, by) {
-    if (s.spawnShield > 0) return;
-    s.hp -= amount;
-    s.lastDmgT = this.t;
-    if (by && by !== s && by instanceof Ship) { s.lastHitBy = by; s.lastHitT = this.t; }
-    if (s.hp <= 0) this.kill(s, by);
-  }
-
-  kill(s, by) {
-    if (!s.alive) return;
-    s.alive = false;
-    s.deathT = this.t;
-    let killer = by instanceof Ship && by.alive && by !== s ? by : null;
-    if (!killer && s.lastHitBy && s.lastHitBy.alive && this.t - s.lastHitT < 3) killer = s.lastHitBy;
-    s.killer = killer;
-    s.killedByPylon = !killer && by && !(by instanceof Ship);
-    if (killer) { killer.frags++; killer.score += 50; }
-
-    // Enerjisi küre olarak saçılır
-    const n = 6 + Math.round(s.energy / 8);
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, d = rand(0, 50);
-      this.spawnOrb(s.x + Math.cos(a) * d, s.y + Math.sin(a) * d, i % 2 ? 1 : -1);
+  moveY(b, dy, depth = 0) {
+    if (dy === 0) return null;
+    const vy0 = b.vy;
+    b.y += dy;
+    let hit = null;
+    const c0 = Math.floor(b.x / T), c1 = Math.floor((b.x + b.w - 0.001) / T);
+    const r = dy > 0 ? Math.floor((b.y + b.h - 0.001) / T) : Math.floor(b.y / T);
+    for (let c = c0; c <= c1; c++) {
+      if (this.blocked(c, r)) { b.y = dy > 0 ? r * T - b.h : (r + 1) * T; hit = 'tile'; break; }
     }
-    this.effect('boom', s.x, s.y, s.r, s.pol);
-
-    const text = killer ? `${killer.name} ▸ ${s.name}` : `${s.name} · kuleye yakalandı`;
-    const mine = !!this.player && (s === this.player || killer === this.player);
-    this.feed.push({ text, t: this.t, mine });
-    if (this.feed.length > 6) this.feed.shift();
-
-    if (s.isBot) this.respawnQueue.push({ name: s.name, t: this.t + rand(2, 4) });
+    for (const o of this.solids) {
+      if (o === b || !overlap(b, o)) continue;
+      // Alttaki oyuncu zıplarsa üstündekini de kaldırır
+      if (dy < 0 && depth < 4 && b.kind === 'player' && o.kind === 'player') {
+        this.moveY(o, b.y - (o.y + o.h), depth + 1);
+        if (!overlap(b, o)) continue;
+      }
+      b.y = dy > 0 ? o.y - b.h : o.y + o.h;
+      hit = o;
+    }
+    if (hit) {
+      if (dy > 0) {
+        b.onGround = true;
+        b.ground = hit === 'tile' ? null : hit;
+        if (b.kind === 'player' && vy0 > 350) b.squash = Math.min(0.32, vy0 / 2600);
+      }
+      b.vy = 0;
+    }
+    return hit;
   }
 
-  // ---------- Simülasyon ----------
+  // ---------- Simülasyon adımı ----------
 
-  step(dt) {
-    const C = CONFIG;
+  step(dt, inputs) {
+    if (this.done) return;
     this.t += dt;
-    const R = C.arenaRadius;
+    const ph = PHYS;
+    this.solids = this.players.filter(p => !p.inExit).concat(this.boxes);
 
-    // Gemiler
-    for (const s of this.ships) {
-      if (!s.alive) continue;
-      s.switchCD = Math.max(0, s.switchCD - dt);
-      s.fireCD = Math.max(0, s.fireCD - dt);
-      s.spawnShield = Math.max(0, s.spawnShield - dt);
-      if (this.t - s.lastDmgT > C.regenDelay) s.hp = Math.min(C.maxHp, s.hp + C.hpRegen * dt);
-
-      if (s.isBot) this.botThink(s, dt);
-
-      const dx = s.moveX - s.x, dy = s.moveY - s.y, d = Math.hypot(dx, dy) || 1;
-      const sp = C.baseSpeed * s.throttle;
-      const k = Math.min(1, C.steer * dt);
-      s.vx += (dx / d * sp - s.vx) * k;
-      s.vy += (dy / d * sp - s.vy) * k;
-      s.x += s.vx * dt; s.y += s.vy * dt;
-
-      // Duvar
-      const dc = Math.hypot(s.x, s.y);
-      if (dc > R - s.r) {
-        const nx = s.x / dc, ny = s.y / dc;
-        s.x = nx * (R - s.r); s.y = ny * (R - s.r);
-        const vn = s.vx * nx + s.vy * ny;
-        if (vn > 0) { s.vx -= vn * nx * 1.5; s.vy -= vn * ny * 1.5; }
+    // 1) Oyuncu girişleri
+    this.players.forEach((p, i) => {
+      const inp = inputs[i] || NO_INPUT;
+      const jumpEdge = inp.jump && !p.prevJump, actEdge = inp.action && !p.prevAction;
+      p.prevJump = inp.jump;
+      p.prevAction = inp.action;
+      p.exitCD = Math.max(0, p.exitCD - dt);
+      if (p.inExit) {
+        if (jumpEdge || actEdge) this.leaveExit(p);
+        return;
       }
-      // Kule gövdesi engeldir
-      for (const q of this.pylons) {
-        const ex = s.x - q.x, ey = s.y - q.y, ed = Math.hypot(ex, ey) || 1, lim = s.r + q.r;
-        if (ed < lim) { s.x = q.x + ex / ed * lim; s.y = q.y + ey / ed * lim; }
+      const want = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+      p.want = want;
+      if (want) {
+        p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround ? ph.accel : ph.airAccel) * dt);
+        p.facing = want;
+      } else {
+        p.vx = approach(p.vx, 0, (p.onGround ? ph.friction : ph.airAccel * 0.4) * dt);
       }
+      p.coyote = p.supported ? ph.coyote : p.coyote - dt;
+      p.jumpBuf = jumpEdge ? ph.jumpBuffer : p.jumpBuf - dt;
+      if (p.jumpBuf > 0 && p.coyote > 0) {
+        p.vy = -ph.jumpV;
+        p.jumpBuf = 0; p.coyote = 0; p.cut = false;
+        p.squash = -0.22;
+        this.fx('jump', p.x + p.w / 2, p.y + p.h);
+      }
+      if (!inp.jump && p.vy < 0 && !p.cut) { p.vy *= ph.jumpCut; p.cut = true; }
+      if (actEdge) this.dropKey(p);
+    });
 
-      // Ateş
-      if (s.firing && s.fireCD <= 0 && s.energy >= C.fireCost) {
-        const a = Math.atan2(s.aimY - s.y, s.aimX - s.x) + rand(-0.04, 0.04);
-        this.shoot(s, a, C.bulletSpeed, C.bulletLife, C.bulletDamage);
-        s.energy -= C.fireCost;
-        s.fireCD = 1 / C.fireRate;
-      }
+    // 2) Kutular: önceki adımda yeterince kişi ittiyse kayar
+    for (const b of this.boxes) {
+      const dir = b.push[1] >= this.boxNeed ? 1 : b.push[-1] >= this.boxNeed ? -1 : 0;
+      b.vx = dir * ph.boxSpeed;
+      b.pushers = Math.max(b.push[1], b.push[-1]);
+      b.push[1] = 0; b.push[-1] = 0;
     }
 
-    // Gemiler birbirinin içinden geçmez
-    const ss = this.ships;
-    for (let i = 0; i < ss.length; i++) {
-      const a = ss[i];
-      if (!a.alive) continue;
-      for (let j = i + 1; j < ss.length; j++) {
-        const b = ss[j];
-        if (!b.alive) continue;
-        const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy) || 0.01, lim = a.r + b.r;
-        if (d < lim) {
-          const o = (lim - d) / 2, nx = dx / d, ny = dy / d;
-          a.x -= nx * o; a.y -= ny * o; b.x += nx * o; b.y += ny * o;
-        }
+    // 3) Yerçekimi ve hareket: alttakiler önce hareket eder, üstündekiler onunla taşınır
+    const movers = this.solids.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h));
+    for (const b of movers) { b.dx = 0; b.blockedBy = null; b.boxHit = null; }
+    for (const b of movers) {
+      b.vy = Math.min(b.vy + ph.gravity * dt, ph.maxFall);
+      const g = b.ground;
+      const carry = g && this.solids.includes(g) ? g.dx : 0;
+      const x0 = b.x;
+      b.onGround = false;
+      b.ground = null;
+      this.moveX(b, b.vx * dt + carry);
+      this.moveY(b, b.vy * dt);
+      b.dx = b.x - x0;
+    }
+    // Kime yaslanıyor? Kutu kaydıkça temas bir kare kopabildiği için küçük bir yoklama payı bırakılır
+    for (const p of this.players) {
+      if (!p.want || p.inExit) continue;
+      const probe = { x: p.x + p.want * 3, y: p.y + 2, w: p.w, h: p.h - 4 };
+      for (const o of this.solids) {
+        if (o === p || !overlap(probe, o)) continue;
+        if (o.kind === 'box') p.boxHit = o; else p.blockedBy = o;
       }
     }
+    for (const b of movers) b.supported = b.onGround && (!b.ground || b.ground.supported);
 
-    // Kuleler: dönen spiral mermi kolları, belli aralıkla renk değiştirir
-    for (const q of this.pylons) {
-      q.ang += q.spin * dt;
-      q.flipT -= dt;
-      if (q.flipT <= 0) {
-        q.pol = -q.pol;
-        q.flipT = C.pylonFlipEvery * rand(0.8, 1.2);
-        this.effect('pulse', q.x, q.y, q.r, q.pol);
-      }
-      q.acc += C.pylonFireRate * dt;
-      while (q.acc >= 1) {
-        q.acc -= 1;
-        for (let arm = 0; arm < 3; arm++) {
-          const a = q.ang + arm * Math.PI * 2 / 3;
-          this.bullets.push({
-            x: q.x + Math.cos(a) * q.r, y: q.y + Math.sin(a) * q.r,
-            vx: Math.cos(a) * C.pylonBulletSpeed, vy: Math.sin(a) * C.pylonBulletSpeed,
-            pol: q.pol, owner: q, life: C.pylonBulletLife, age: 0, dmg: C.pylonDamage, dead: false,
-          });
-        }
-      }
+    // 4) İtme zinciri: kutuya yaslanan oyuncuyu aynı yöne iten herkes iten sayılır
+    for (const p of this.players) {
+      if (!p.want || p.inExit) continue;
+      let q = p, guard = 0;
+      while (q && !q.boxHit && q.blockedBy && q.blockedBy.want === p.want && guard++ < 4) q = q.blockedBy;
+      if (q && q.boxHit) q.boxHit.push[p.want]++;
     }
 
-    this.updateBullets(dt);
-    this.updateOrbs(dt);
+    this.updateKeys(dt);
+    this.updateDoors(dt);
+    this.updateButtons();
 
-    for (const e of this.effects) e.t += dt;
-    this.effects = this.effects.filter(e => e.t < e.life);
+    // 5) Çıkış, çukur
+    for (const p of this.players) {
+      p.squash += (0 - p.squash) * Math.min(1, dt * 10);
+      if (!p.inExit && this.exit && p.exitCD <= 0 && p.supported && overlap(p, this.exit)) this.enterExit(p);
+      if (!p.inExit && p.y > this.H + 150) this.respawn(p);
+    }
+    for (const b of this.boxes) {
+      if (b.y > this.H + 150) { b.x = b.ox; b.y = b.oy; b.vx = b.vy = 0; }
+    }
 
-    if (this.ships.some(s => !s.alive)) this.ships = this.ships.filter(s => s.alive);
+    if (this.players.length && this.players.every(p => p.inExit)) {
+      this.done = true;
+      this.doneT = this.t;
+      this.fx('win', this.exit.x + T / 2, this.exit.y);
+    }
 
-    for (let i = this.respawnQueue.length - 1; i >= 0; i--) {
-      const q = this.respawnQueue[i];
-      if (this.t >= q.t) {
-        this.respawnQueue.splice(i, 1);
-        if (this.ships.filter(s => s.isBot).length < this.botTarget) this.addShip(q.name, true);
-      }
+    if (this.effects.length > 40 || (this.effects.length && this.t - this.effects[0].t > 1.2)) {
+      this.effects = this.effects.filter(e => this.t - e.t < 1.2);
     }
   }
 
-  updateBullets(dt) {
-    const C = CONFIG, R2 = C.arenaRadius ** 2;
-    for (const b of this.bullets) {
-      b.age += dt;
-      b.x += b.vx * dt; b.y += b.vy * dt;
-      if (b.age > b.life || b.x * b.x + b.y * b.y > R2) { b.dead = true; continue; }
-      for (const s of this.ships) {
-        if (!s.alive || s === b.owner) continue;
-        const dx = s.x - b.x, dy = s.y - b.y, lim = s.r + 5;
-        if (dx > lim || dx < -lim || dy > lim || dy < -lim || dx * dx + dy * dy > lim * lim) continue;
-        b.dead = true;
-        if (s.pol === b.pol) {
-          // Aynı renk: emilir
-          s.energy = Math.min(C.maxEnergy, s.energy + C.absorbGain);
-          s.score += 1;
-          s.absorbed++;
-          s.lastAbsorbT = this.t;
-          this.effect('absorb', b.x, b.y, 10, b.pol);
-        } else {
-          this.damage(s, b.dmg, b.owner);
-          this.effect('hit', b.x, b.y, 10, b.pol);
-        }
-        break;
+  updateKeys(dt) {
+    const ph = PHYS;
+    for (const k of this.keys) {
+      if (k.used) continue;
+      if (k.holder) {
+        const h = k.holder;
+        k.x = h.x + h.w / 2 - k.w / 2;
+        k.y = h.y - k.h - 4;
+        k.vx = k.vy = 0;
+        continue;
       }
-    }
-    this.bullets = this.bullets.filter(b => !b.dead);
-  }
-
-  updateOrbs(dt) {
-    const C = CONFIG, R = C.arenaRadius;
-    const damp = Math.pow(0.4, dt);
-    for (const o of this.orbs) {
-      for (const s of this.ships) {
-        if (!s.alive) continue;
-        const dx = s.x - o.x, dy = s.y - o.y;
-        if (dx > 160 || dx < -160 || dy > 160 || dy < -160) continue;
-        const d = Math.hypot(dx, dy) || 0.01;
-        if (d < s.r + 6) {
-          o.dead = true;
-          if (o.pol === s.pol) {
-            s.energy = Math.min(C.maxEnergy, s.energy + C.orbGain);
-            s.score += 1;
-            this.effect('absorb', o.x, o.y, 12, o.pol);
-          } else {
-            this.damage(s, C.orbDamage, null);
-            this.effect('hit', o.x, o.y, 12, o.pol);
-          }
+      k.vy = Math.min(k.vy + ph.gravity * dt, ph.maxFall);
+      k.vx = approach(k.vx, 0, (k.onGround ? 1500 : 150) * dt);
+      k.onGround = false;
+      this.moveX(k, k.vx * dt);
+      this.moveY(k, k.vy * dt);
+      if (k.y > this.H + 150) { k.x = k.ox; k.y = k.oy; k.vx = k.vy = 0; this.fx('respawn', k.x + k.w / 2, k.y, { color: '#ffd43b' }); }
+      for (const p of this.players) {
+        if (p.inExit || this.keys.some(o => o.holder === p)) continue;
+        if ((k.noPick.get(p) || 0) > this.t) continue;
+        if (overlap(grow(p, 4), k)) {
+          k.holder = p;
+          this.fx('pickup', k.x + k.w / 2, k.y + k.h / 2);
           break;
         }
-        if (d < 160) {
-          // Mıknatıs gibi: aynı renk küre gemiye akar, zıt renk kaçar
-          const f = (1 - d / 160) * 900 * (o.pol === s.pol ? 1 : -0.6);
-          o.vx += dx / d * f * dt;
-          o.vy += dy / d * f * dt;
+      }
+    }
+  }
+
+  dropKey(p) {
+    const k = this.keys.find(o => o.holder === p);
+    if (!k) return;
+    k.holder = null;
+    k.vx = p.facing * 280 + p.vx * 0.4;
+    k.vy = -480;
+    k.noPick.set(p, this.t + 0.5);
+  }
+
+  updateDoors(dt) {
+    for (const d of this.doors) {
+      if (d.open) { d.openT += dt; continue; }
+      for (const k of this.keys) {
+        if (k.used) continue;
+        const probe = grow(k.holder || k, 3);
+        if (d.cells.some(q => overlap(probe, cellRect(q)))) {
+          d.open = true;
+          k.used = true;
+          k.holder = null;
+          const mid = d.cells[Math.floor(d.cells.length / 2)];
+          this.fx('unlock', mid.c * T + T / 2, mid.r * T + T / 2);
+          break;
         }
       }
-      o.vx *= damp; o.vy *= damp;
-      o.x += o.vx * dt; o.y += o.vy * dt;
-      const dc = Math.hypot(o.x, o.y);
-      if (dc > R - 10) { o.x *= (R - 10) / dc; o.y *= (R - 10) / dc; o.vx *= -0.5; o.vy *= -0.5; }
-    }
-    this.orbs = this.orbs.filter(o => !o.dead);
-    this.orbAcc += C.orbRespawn * dt;
-    while (this.orbAcc >= 1) {
-      this.orbAcc -= 1;
-      if (this.orbs.length < C.orbCount) this.spawnOrb();
     }
   }
 
-  leaderboard(n = 10) {
-    return this.ships.filter(s => s.alive).sort((a, b) => b.score - a.score).slice(0, n);
-  }
-
-  // ---------- Bot zekâsı ----------
-
-  reactionOf(b) {
-    return CONFIG.botReaction * b.reactJitter * (1.6 - b.skill);
-  }
-
-  // Bot rakibin renk değişimini tepki süresi kadar geç fark eder
-  seenPol(b, o) {
-    return this.t - o.polT < this.reactionOf(b) ? -o.pol : o.pol;
-  }
-
-  botThink(b, dt) {
-    const C = CONFIG;
-    b.throttle = 1;
-    b.thinkT -= dt;
-    if (b.thinkT > 0) return;
-    b.thinkT = rand(0.08, 0.2) + (1 - b.skill) * 0.15;
-    const react = this.reactionOf(b);
-
-    // 1) Gelen tehlike: yakında bana doğru gelen ve fark ettiğim mermiler
-    let threat = { 1: 0, '-1': 0 }, dodgeX = 0, dodgeY = 0;
-    for (const m of this.bullets) {
-      if (m.owner === b || m.age < react) continue;
-      const rx = m.x - b.x, ry = m.y - b.y;
-      if (rx > 350 || rx < -350 || ry > 350 || ry < -350) continue;
-      const v2 = m.vx * m.vx + m.vy * m.vy;
-      const tc = -(rx * m.vx + ry * m.vy) / v2;          // en yakın geçiş zamanı
-      if (tc < 0 || tc > 0.9) continue;
-      const mx = rx + m.vx * tc, my = ry + m.vy * tc;
-      const miss = Math.hypot(mx, my);
-      if (miss > b.r + 18) continue;
-      const w = 1 / (tc + 0.15);
-      threat[m.pol] += w;
-      if (m.pol !== b.pol) {
-        // dik yönde kaç
-        const vl = Math.sqrt(v2);
-        const px = -m.vy / vl, py = m.vx / vl;
-        const side = (px * -rx + py * -ry) >= 0 ? 1 : -1;
-        dodgeX += px * side * w; dodgeY += py * side * w;
+  updateButtons() {
+    const weights = this.players.filter(p => !p.inExit).concat(this.boxes);
+    for (const b of this.buttons) {
+      const was = b.pressed;
+      b.pressed = weights.some(w => overlap(w, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }));
+      if (b.pressed && !was) this.fx('click', b.x + b.w / 2, b.y, { color: CHANNEL_COLORS[b.channel] });
+    }
+    for (const g of this.gates) {
+      const want = this.buttons.some(b => b.channel === g.channel && b.pressed);
+      if (want) g.open = true;
+      else if (g.open) {
+        // İçinde biri varken kapanmaz
+        const occupied = this.solids.some(w => g.cells.some(q => overlap(w, cellRect(q))));
+        if (!occupied) g.open = false;
       }
     }
-    const tRed = threat[1], tBlue = threat[-1];
-    const danger = tRed + tBlue;
-
-    // 2) Hedef: menzildeki en uygun rakip (yakın ve canı az olan)
-    let target = null, best = -1e9;
-    for (const o of this.ships) {
-      if (!o.alive || o === b) continue;
-      const d = Math.hypot(o.x - b.x, o.y - b.y);
-      if (d > 700) continue;
-      const score = -d - o.hp * 2;
-      if (score > best) { best = score; target = o; }
-    }
-
-    let wantPol = 0, vx = 0, vy = 0;
-    b.firing = false;
-
-    if (danger > 1.5) {
-      // Savunma: tehlikenin çoğunluğunun rengine geç ki emilsin
-      wantPol = tRed >= tBlue ? 1 : -1;
-      vx += dodgeX * 0.5; vy += dodgeY * 0.5;
-    }
-
-    if (target) {
-      const tx = target.x - b.x, ty = target.y - b.y, td = Math.hypot(tx, ty) || 1;
-      const attackPol = -this.seenPol(b, target);
-      if (!wantPol && b.energy >= 10) wantPol = attackPol;
-      // Mesafe koru ve yanlama hareket et
-      const ideal = 300;
-      const radial = td > ideal + 60 ? 1 : td < ideal - 60 ? -1 : 0;
-      if (Math.random() < 0.02) b.strafe = -b.strafe;
-      vx += tx / td * radial + (-ty / td) * b.strafe * 0.8;
-      vy += ty / td * radial + (tx / td) * b.strafe * 0.8;
-      // Ateş: yalnızca hedefin (bildiğim) rengine zıt renkteyken
-      if (b.pol === attackPol && b.energy >= C.fireCost && td < 600) {
-        b.firing = true;
-        const lead = td / C.bulletSpeed * (0.4 + b.skill * 0.6);
-        const err = rand(-1, 1) * (1 - b.skill) * 0.3;
-        const ax = target.x + target.vx * lead, ay = target.y + target.vy * lead;
-        const a = Math.atan2(ay - b.y, ax - b.x) + err;
-        b.aimX = b.x + Math.cos(a) * 100; b.aimY = b.y + Math.sin(a) * 100;
-      }
-      if (b.energy >= C.burstCost + 15 && td < 200 && Math.random() < b.skill * 0.4) this.burst(b);
-    }
-
-    if (!target || b.energy < 10) {
-      // Kendi rengimdeki küreleri topla; enerji azsa kulelerden beslen
-      let best = null, bd = 600 * 600;
-      for (const o of this.orbs) {
-        if (o.pol !== b.pol) continue;
-        const d = (o.x - b.x) ** 2 + (o.y - b.y) ** 2;
-        if (d < bd) { bd = d; best = o; }
-      }
-      if (best) {
-        const d = Math.sqrt(bd) || 1;
-        vx += (best.x - b.x) / d; vy += (best.y - b.y) / d;
-      } else {
-        if (!b.wander || Math.hypot(b.wander.x - b.x, b.wander.y - b.y) < 150) b.wander = this.randomPoint(250);
-        const d = Math.hypot(b.wander.x - b.x, b.wander.y - b.y) || 1;
-        vx += (b.wander.x - b.x) / d; vy += (b.wander.y - b.y) / d;
-      }
-    }
-
-    // Duvardan uzak dur
-    const dc = Math.hypot(b.x, b.y) || 1;
-    const edge = C.arenaRadius - 180;
-    if (dc > edge) { const w = (dc - edge) / 100; vx -= b.x / dc * w; vy -= b.y / dc * w; }
-
-    const len = Math.hypot(vx, vy);
-    if (len > 0.01) { b.moveX = b.x + vx / len * 200; b.moveY = b.y + vy / len * 200; }
-    else { b.moveX = b.x; b.moveY = b.y; b.throttle = 0; }
-
-    // Beceriye göre bazen yanlış karar / geç kalma
-    // Saldırı için renk değiştirmede biraz kararlı dur; savunmada ise hemen tepki ver
-    const hold = danger > 1.5 ? 0 : 0.6 + (1 - b.skill) * 0.6;
-    if (wantPol && wantPol !== b.pol && this.t - b.polT > hold && Math.random() < 0.4 + b.skill * 0.6) {
-      this.switchPolarity(b);
-    }
   }
+
+  enterExit(p) {
+    p.inExit = true;
+    p.vx = p.vy = 0;
+    const k = this.keys.find(o => o.holder === p);
+    if (k) { k.holder = null; k.vy = -200; }
+    this.fx('enter', this.exit.x + T / 2, this.exit.y + T);
+  }
+
+  leaveExit(p) {
+    p.inExit = false;
+    p.exitCD = 0.8;
+    p.x = this.exit.x + (T - p.w) / 2;
+    p.y = this.exit.y + this.exit.h - p.h;
+    p.vy = -250;
+  }
+
+  respawn(p) {
+    const mate = this.players.find(o => o !== p && !o.inExit && o.supported);
+    if (mate) {
+      p.x = mate.x;
+      p.y = mate.y - p.h - 6;
+    } else {
+      p.x = this.spawn.x + 3;
+      p.y = this.spawn.y + T - p.h;
+    }
+    p.vx = p.vy = 0;
+    this.fx('respawn', p.x + p.w / 2, p.y + p.h / 2, { color: PLAYER_COLORS[p.index] });
+  }
+
+  get inExitCount() { return this.players.filter(p => p.inExit).length; }
 }
