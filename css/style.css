@@ -76,6 +76,37 @@ button.primary {
 }
 button.primary:disabled { opacity: 0.35; cursor: default; }
 
+button.link { border: none; color: #8e92c0; padding: 6px; }
+button.link:hover { color: #dfe1ff; background: none; }
+
+input {
+  font: inherit; font-size: 16px; text-align: center;
+  padding: 11px; border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: #14132c; color: #fff;
+  outline: none; user-select: text; -webkit-user-select: text; min-width: 0;
+}
+input:focus { border-color: #4dabf7; }
+#joinCode { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; flex: 1; }
+.row { display: flex; gap: 8px; }
+.row button { min-width: 90px; }
+.or { display: flex; align-items: center; gap: 10px; color: #8e92c0; font-size: 12px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.12); }
+.error { margin: 0; min-height: 18px; color: #ff8787; font-size: 13px; }
+
+#roomCode { letter-spacing: .15em; color: #ffd43b; }
+.share { display: flex; gap: 8px; }
+.share input { flex: 1; font-size: 13px; text-align: left; }
+#roomMembers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.member { border-radius: 12px; padding: 10px 6px; border: 2px solid rgba(255, 255, 255, 0.1);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; min-height: 84px; justify-content: center; }
+.member .ball { width: 30px; height: 30px; border-radius: 50%; }
+.member .tag { font-size: 11px; color: #8e92c0; }
+.member.empty { border-style: dashed; color: #5d6090; }
+#roomLevels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+#roomLevels .lvl { padding: 10px 4px; }
+#roomLevels .lvl .num { font-size: 20px; }
+#roomLevels .lvl:disabled { opacity: 0.45; cursor: default; }
+
 #slots { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
 .slot {
   border-radius: 14px; padding: 12px 6px; border: 2px dashed rgba(255, 255, 255, 0.15);
@@ -92,7 +123,40 @@ button.primary:disabled { opacity: 0.35; cursor: default; }
 .lvl .best { font-size: 12px; color: #69db7c; min-height: 15px; }
 
 @media (max-width: 560px) {
-  #slots { grid-template-columns: repeat(2, 1fr); }
+  #roomMembers { grid-template-columns: repeat(2, 1fr); }
+  #roomLevels { grid-template-columns: repeat(3, 1fr); }
+  button.link { border: none; color: #8e92c0; padding: 6px; }
+button.link:hover { color: #dfe1ff; background: none; }
+
+input {
+  font: inherit; font-size: 16px; text-align: center;
+  padding: 11px; border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: #14132c; color: #fff;
+  outline: none; user-select: text; -webkit-user-select: text; min-width: 0;
+}
+input:focus { border-color: #4dabf7; }
+#joinCode { text-transform: uppercase; letter-spacing: .3em; font-weight: 800; flex: 1; }
+.row { display: flex; gap: 8px; }
+.row button { min-width: 90px; }
+.or { display: flex; align-items: center; gap: 10px; color: #8e92c0; font-size: 12px; }
+.or::before, .or::after { content: ''; flex: 1; height: 1px; background: rgba(255, 255, 255, 0.12); }
+.error { margin: 0; min-height: 18px; color: #ff8787; font-size: 13px; }
+
+#roomCode { letter-spacing: .15em; color: #ffd43b; }
+.share { display: flex; gap: 8px; }
+.share input { flex: 1; font-size: 13px; text-align: left; }
+#roomMembers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.member { border-radius: 12px; padding: 10px 6px; border: 2px solid rgba(255, 255, 255, 0.1);
+  display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 13px; min-height: 84px; justify-content: center; }
+.member .ball { width: 30px; height: 30px; border-radius: 50%; }
+.member .tag { font-size: 11px; color: #8e92c0; }
+.member.empty { border-style: dashed; color: #5d6090; }
+#roomLevels { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+#roomLevels .lvl { padding: 10px 4px; }
+#roomLevels .lvl .num { font-size: 20px; }
+#roomLevels .lvl:disabled { opacity: 0.45; cursor: default; }
+
+#slots { grid-template-columns: repeat(2, 1fr); }
   #levelGrid { grid-template-columns: repeat(2, 1fr); }
   #levelInfo { max-width: calc(100vw - 120px); }
 }

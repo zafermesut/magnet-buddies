@@ -320,12 +320,26 @@ class Renderer {
       ctx.fillText(p.pol > 0 ? '+' : '−', bx, by + 1);
     }
 
-    // Kim olduğu
-    ctx.fillStyle = col;
+    // Kim olduğu: online'da takma ad, kendi topunun üstünde küçük bir ok
+    const label = p.name || `${p.index + 1}P`;
+    let ly = p.y - 6;
+    if (p.isMe) {
+      ctx.fillStyle = '#fff';
+      ctx.beginPath();
+      ctx.moveTo(p.x + p.w / 2 - 6, ly - 8);
+      ctx.lineTo(p.x + p.w / 2 + 6, ly - 8);
+      ctx.lineTo(p.x + p.w / 2, ly - 1);
+      ctx.fill();
+      ly -= 11;
+    }
     ctx.font = '800 13px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`${p.index + 1}P`, p.x + p.w / 2, p.y - 6);
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(20,20,45,0.8)';
+    ctx.strokeText(label, p.x + p.w / 2, ly);
+    ctx.fillStyle = col;
+    ctx.fillText(label, p.x + p.w / 2, ly);
   }
 
   drawKey(ctx, k, t) {

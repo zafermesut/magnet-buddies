@@ -17,15 +17,58 @@
     <div id="keysHelp">R yeniden başlat · Esc bölümler</div>
   </div>
 
-  <!-- Katılım -->
-  <div id="lobby" class="overlay">
+  <!-- Ana menü -->
+  <div id="home" class="overlay">
+    <div class="card">
+      <h1 class="gameTitle"></h1>
+      <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
+      <button id="homeOnline" class="primary">ONLİNE · LİNKLE OYNA</button>
+      <button id="homeLocal">Aynı klavyede oyna</button>
+    </div>
+  </div>
+
+  <!-- Online: oda kur / katıl -->
+  <div id="onlineForm" class="overlay hidden">
+    <div class="card">
+      <h2>Online</h2>
+      <input id="onlineName" maxlength="16" placeholder="Takma adın" autocomplete="off">
+      <button id="createBtn" class="primary">ODA KUR</button>
+      <div class="or"><span>ya da</span></div>
+      <div class="row">
+        <input id="joinCode" maxlength="4" placeholder="KOD" autocomplete="off">
+        <button id="joinBtn">Katıl</button>
+      </div>
+      <p id="onlineError" class="error"></p>
+      <button id="onlineBack" class="link">← Ana menü</button>
+    </div>
+  </div>
+
+  <!-- Online oda -->
+  <div id="room" class="overlay hidden">
     <div class="card wide">
-      <h1 id="title"></h1>
-      <p class="tagline">Arkadaşlarınla aynı klavyede, birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
+      <h2>Oda <span id="roomCode"></span></h2>
+      <div class="share">
+        <input id="roomLink" readonly>
+        <button id="copyBtn">Kopyala</button>
+      </div>
+      <p class="small">Linki arkadaşlarına gönder. En fazla 4 kişi.</p>
+      <div id="roomMembers"></div>
+      <p id="roomNote" class="note"></p>
+      <div id="roomLevels"></div>
+      <p class="small">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
+      <button id="roomLeave" class="link">← Odadan çık</button>
+    </div>
+  </div>
+
+  <!-- Aynı klavye: katılım -->
+  <div id="lobby" class="overlay hidden">
+    <div class="card wide">
+      <h2>Aynı klavyede</h2>
       <div id="slots"></div>
       <p id="lobbyNote" class="note"></p>
       <button id="startBtn" class="primary" disabled>BÖLÜMLERİ SEÇ</button>
       <p class="small">Katılmak için kendi zıplama tuşuna bas. Ayrılmak için bırak tuşuna bas.<br>Gamepad takılıysa A tuşuyla katılabilirsin.</p>
+      <button id="lobbyBack" class="link">← Ana menü</button>
     </div>
   </div>
 
@@ -45,7 +88,7 @@
       <p id="completeInfo"></p>
       <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
       <button id="toSelectBtn">Bölüm seçimi</button>
-      <p class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
+      <p id="completeHint" class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
     </div>
   </div>
 
@@ -53,6 +96,7 @@
   <script src="js/levels.js"></script>
   <script src="js/input.js"></script>
   <script src="js/game.js"></script>
+  <script src="js/net.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
 </body>

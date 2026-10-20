@@ -7,13 +7,30 @@ taşımak gerekir. İleri bölümlerde herkes bir mıknatısa dönüşür: aynı
 
 ## Çalıştırma
 
-Kurulum gerekmez. `index.html` dosyasını tarayıcıda açman yeterli. Ya da yerel bir sunucuyla:
+İlk seferde bağımlılıkları kur:
 
 ```bash
-python3 -m http.server 5173
+npm install
 ```
 
-Sonra http://localhost:5173 adresini aç. Oyuncular kendi zıplama tuşuna basarak katılır (en az 2 kişi).
+Sonra sunucuyu başlat:
+
+```bash
+npm start
+```
+
+http://localhost:3000 adresini aç.
+
+- **Online · linkle oyna:** Takma adını yaz, **Oda kur**'a bas ve çıkan linki arkadaşlarına gönder (en fazla 4 kişi).
+  Linke tıklayan doğrudan odaya gelir. Bölümü oda kurucusu seçer; yeniden başlatmak (R) ve devam etmek herkese açıktır.
+- **Aynı klavyede oyna:** Herkes kendi zıplama tuşuna basarak katılır (en az 2 kişi).
+
+Oyunu kendi bilgisayarından (`localhost`) açtığında oda linki otomatik olarak bilgisayarının yerel ağ
+adresini kullanır (`http://192.168…:3000`). Böylece **aynı Wi-Fi'deki** arkadaşların hemen katılabilir.
+macOS ilk seferde Node için gelen bağlantılara izin isteyebilir.
+Farklı evlerden oynamak için sunucunun internete açık bir yerde çalışması gerekir (bkz. yol haritası).
+
+Sunucu olmadan `index.html` dosyasını doğrudan açarsan yalnızca aynı klavye modu çalışır.
 
 ## Kontroller
 
@@ -56,10 +73,11 @@ Bölümler `js/levels.js` içinde ASCII olarak yazılır. Lejant dosyanın baş�
 ## Testler
 
 ```bash
-node test/sim.test.js
+npm test
 ```
 
-Fizik ve mıknatıs kurallarını, 10 bölümün hepsinin iki oyuncuyla otomatik geçilebildiğini kontrol eder.
+- `test/sim.test.js`: fizik ve mıknatıs kuralları, 10 bölümün hepsinin iki oyuncuyla otomatik geçilebildiği
+- `test/server.test.js`: sunucuyu başlatıp iki istemciyle oda kurar, katılır, bölüm oynar ve bitirir
 
 ## Yapı
 
@@ -69,18 +87,23 @@ css/style.css     Arayüz stilleri
 js/config.js      Oyun adı (GAME_TITLE), fizik sabitleri, renkler
 js/levels.js      Bölümler
 js/input.js       Klavye şemaları ve gamepad
+js/net.js         Online bağlantı: tuşları gönderir, sunucudan gelen durumu uygular
 js/game.js        Simülasyon: fizik, anahtar, kapı, düğme, kutu, çıkış
 js/render.js      Canvas çizimi
 js/main.js        Ekranlar ve oyun döngüsü
-test/sim.test.js  Başsız testler
+server/server.js  Oda sunucusu: dosyaları sunar, odaları yönetir, simülasyonu çalıştırır
+test/             Başsız testler
 ```
 
-`game.js` yalnızca oyuncu başına `{ left, right, jump, action }` girişini alır ve çizimden bağımsızdır.
-Online sürümde aynı dosya sunucuda çalışacak.
+`game.js` yalnızca oyuncu başına `{ left, right, jump, action, swap }` girişini alır ve çizimden bağımsızdır.
+Online modda aynı dosya sunucuda çalışır: tarayıcılar yalnızca tuş durumunu gönderir, sunucu saniyede
+30 kez durumu yayınlar, tarayıcılar bunu yumuşatarak çizer.
 
 ## Yol haritası
 
-- [ ] Online oda: link paylaşıp herkes kendi cihazından (Node.js + WebSocket)
+- [x] Online oda: link paylaşıp herkes kendi cihazından (Node.js + WebSocket)
+- [ ] İnternete açmak (farklı evlerden oynamak için bir sunucuya yüklemek)
+- [ ] Gecikmeyi azaltmak için kendi topunu anında hareket ettirme (istemci tarafı tahmin)
 - [ ] Daha fazla bölüm
 - [ ] Ses ve müzik
 - [ ] Oyun adı
