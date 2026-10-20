@@ -23,6 +23,8 @@ const DEFAULT_CONFIG = {
   switchCooldown: 0.6,   // Kutup değiştirme bekleme süresi (sn)
   switchNeutral: 0.15,   // Değişim sırasında nötr (savunmasız) kalınan süre (sn)
 
+  botReaction: 0.5,      // Botların kutup değişimini fark etme süresi (sn, ortalama)
+
   dashCooldown: 3,       // Dash bekleme süresi (sn)
   dashSpeed: 750,        // Dash hızı
 
@@ -52,5 +54,6 @@ const TWEAKS = [
   { key: 'baseSpeed', label: 'Hız', min: 150, max: 500, step: 10 },
   { key: 'dashCooldown', label: 'Dash bekleme (sn)', min: 0.5, max: 8, step: 0.5 },
   { key: 'spikeMassLoss', label: 'Diken hasarı', min: 0.1, max: 0.9, step: 0.05 },
+  { key: 'botReaction', label: 'Bot tepki süresi (sn)', min: 0, max: 1.5, step: 0.05 },
   { key: 'botCount', label: 'Bot sayısı (yeni oyun)', min: 0, max: 35, step: 1 },
 ];

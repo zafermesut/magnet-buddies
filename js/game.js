@@ -38,6 +38,7 @@ class Magnet {
     this.maxMass = mass;
     this.alive = true;
     this.pol = Math.random() < 0.5 ? 1 : -1;   // +1 = Artı (kırmızı), -1 = Eksi (mavi)
+    this.polT = -99;                           // son kutup değişim zamanı
     this.switchCD = 0;
     this.neutralT = 0;
     this.dashCD = 0;
@@ -53,6 +54,7 @@ class Magnet {
     this.bornT = 0;
     // bot durumu
     this.skill = rand(0.35, 0.95);
+    this.reactJitter = rand(0.75, 1.3);
     this.thinkT = 0;
     this.wander = null;
   }
@@ -157,6 +159,7 @@ class Game {
   switchPolarity(m) {
     if (!m.alive || m.switchCD > 0 || m.locked) return false;
     m.pol = -m.pol;
+    m.polT = this.t;
     m.neutralT = CONFIG.switchNeutral;
     m.switchCD = CONFIG.switchCooldown;
     this.effect('pulse', m.x, m.y, m.r, m.pol > 0 ? 'red' : 'blue');
@@ -436,6 +439,16 @@ class Game {
     return best;
   }
 
+  // Bot, başkasının kutup değişimini ancak tepki süresi kadar sonra fark eder.
+  // Böylece oyuncunun ani kutup değişimi gerçek bir avantaj sağlar.
+  reactionOf(b) {
+    return CONFIG.botReaction * b.reactJitter * (1.6 - b.skill);
+  }
+
+  seenPol(b, o) {
+    return this.t - o.polT < this.reactionOf(b) ? -o.pol : o.pol;
+  }
+
   botThink(b, dt) {
     b.throttle = 1;
     b.thinkT -= dt;
@@ -462,13 +475,13 @@ class Game {
       // Kaç ve aynı kutba geç ki itsin
       vx += (b.x - threat.x) / threatD * 2;
       vy += (b.y - threat.y) / threatD * 2;
-      wantPol = threat.pol;
+      wantPol = this.seenPol(b, threat);
     } else if (prey) {
       // Kovala ve zıt kutba geç ki çeksin
       const d = Math.hypot(prey.x - b.x, prey.y - b.y) || 1;
       vx += (prey.x - b.x) / d * 1.6;
       vy += (prey.y - b.y) / d * 1.6;
-      wantPol = -prey.pol;
+      wantPol = -this.seenPol(b, prey);
     } else {
       const p = this.findDust(b);
       if (p) {
@@ -480,7 +493,7 @@ class Game {
         vx += (b.wander.x - b.x) / d; vy += (b.wander.y - b.y) / d;
       }
       if (near) {
-        wantPol = near.pol;   // varsayılan: mesafe koru
+        wantPol = this.seenPol(b, near);   // varsayılan: mesafe koru
         // Fırsat: tehlikeye yakın rakibi it
         if (b.mass > near.mass * 0.7 && b.skill > 0.55 && this.nearHazard(near)) {
           vx += (near.x - b.x) / nearD * 1.5;
@@ -511,7 +524,7 @@ class Game {
     if (wantPol && wantPol !== b.pol && Math.random() < 0.35 + b.skill * 0.65) this.switchPolarity(b);
 
     if (threat && threatD < b.r + threat.r + 90 && Math.random() < b.skill * 0.5) this.dash(b);
-    else if (prey && b.pol === -prey.pol && Math.hypot(prey.x - b.x, prey.y - b.y) < b.r + prey.r + 130 &&
+    else if (prey && b.pol === -this.seenPol(b, prey) && Math.hypot(prey.x - b.x, prey.y - b.y) < b.r + prey.r + 130 &&
       Math.random() < b.skill * 0.3) this.dash(b);
   }
 }
