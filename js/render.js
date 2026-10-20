@@ -167,11 +167,24 @@ class Renderer {
     ctx.fillStyle = COLORS.dust;
     ctx.beginPath();
     for (const p of game.dust) {
-      if (!visible(p.x, p.y, 8)) continue;
-      const s = 4 + Math.sqrt(p.v) * 2.5;
-      ctx.rect(p.x - s / 2, p.y - s / 2, s, s);
+      if (p.hot > 0 || !visible(p.x, p.y, 8)) continue;
+      ctx.rect(p.x - 2.5, p.y - 2.5, 5, 5);
     }
     ctx.fill();
+
+    // Uçan saçmalar: hız yönünde parlak çizgiler
+    ctx.lineWidth = 4;
+    ctx.lineCap = 'round';
+    for (const p of game.dust) {
+      if (p.hot <= 0 || !visible(p.x, p.y, 30)) continue;
+      const col = p.owner ? polColor(p.owner.pol) : COLORS.neutral;
+      ctx.strokeStyle = rgba(col, 0.95);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x - p.vx * 0.025, p.y - p.vy * 0.025);
+      ctx.stroke();
+    }
+    ctx.lineCap = 'butt';
   }
 
   drawSpike(ctx, s) {
@@ -199,7 +212,7 @@ class Renderer {
   }
 
   drawRange(ctx, p) {
-    const r = rangeOf(p.r, radiusOf(CONFIG.startMass));
+    const r = rangeOf(p.r, radiusOf(CONFIG.coreMass));
     ctx.beginPath();
     ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
     ctx.strokeStyle = rgba(polColor(p.sign), 0.12);
@@ -211,6 +224,19 @@ class Renderer {
 
   drawMagnet(ctx, m, t, isPlayer) {
     const r = m.r, col = polColor(m.sign);
+
+    // Etrafında dönen demir bulutu (zırh + cephane)
+    if (m.ammo > 0) {
+      ctx.fillStyle = COLORS.dust;
+      ctx.beginPath();
+      for (let i = 0; i < m.ammo; i++) {
+        const ring = i % 3;
+        const a = t * (1.6 - ring * 0.4) * (ring === 1 ? -1 : 1) + i * 2.39996;
+        const d = r + 6 + ring * 6 + Math.sin(t * 3 + i) * 2;
+        ctx.rect(m.x + Math.cos(a) * d - 2, m.y + Math.sin(a) * d - 2, 4, 4);
+      }
+      ctx.fill();
+    }
 
     // Aura
     const g = ctx.createRadialGradient(m.x, m.y, r * 0.7, m.x, m.y, r * 1.9);
@@ -280,6 +306,16 @@ class Renderer {
       const p = e.t / e.life;
       const col = e.col === 'red' ? COLORS.red : e.col === 'blue' ? COLORS.blue : [255, 77, 109];
       ctx.beginPath();
+      if (e.type === 'blast') {
+        // Saçma ağız patlaması: kısa bir koni
+        const sp = CONFIG.blastSpread;
+        ctx.moveTo(e.x, e.y);
+        ctx.arc(e.x, e.y, e.r * (1.6 + p * 2.5), e.ang - sp, e.ang + sp);
+        ctx.closePath();
+        ctx.fillStyle = rgba(col, 0.35 * (1 - p));
+        ctx.fill();
+        continue;
+      }
       if (e.type === 'pulse') {
         ctx.arc(e.x, e.y, e.r * (1 + p * 1.8), 0, Math.PI * 2);
         ctx.lineWidth = 5 * (1 - p);

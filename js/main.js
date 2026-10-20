@@ -18,7 +18,7 @@ document.querySelector('#title .name').textContent = GAME_TITLE;
 
 function loadTweaks() {
   try {
-    const saved = JSON.parse(localStorage.getItem('tweaks') || '{}');
+    const saved = JSON.parse(localStorage.getItem('tweaks-v2') || '{}');
     for (const t of TWEAKS) if (typeof saved[t.key] === 'number') CONFIG[t.key] = saved[t.key];
   } catch (e) { /* depolama yoksa varsayılanlar */ }
 }
@@ -27,7 +27,7 @@ function saveTweaks() {
   try {
     const out = {};
     for (const t of TWEAKS) out[t.key] = CONFIG[t.key];
-    localStorage.setItem('tweaks', JSON.stringify(out));
+    localStorage.setItem('tweaks-v2', JSON.stringify(out));
   } catch (e) { /* yoksay */ }
 }
 
@@ -72,7 +72,7 @@ canvas.addEventListener('mousedown', e => {
   const p = player();
   if (!p) return;
   if (e.button === 0) game.switchPolarity(p);
-  if (e.button === 2) game.dash(p);
+  if (e.button === 2) game.blast(p);
 });
 canvas.addEventListener('contextmenu', e => e.preventDefault());
 
@@ -88,7 +88,7 @@ canvas.addEventListener('touchmove', e => {
 }, { passive: false });
 canvas.addEventListener('touchend', e => { if (e.touches.length === 0) input.touching = false; });
 
-for (const [id, fn] of [['btnSwitch', p => game.switchPolarity(p)], ['btnDash', p => game.dash(p)]]) {
+for (const [id, fn] of [['btnSwitch', p => game.switchPolarity(p)], ['btnBlast', p => game.blast(p)]]) {
   $(id).addEventListener('touchstart', e => { e.preventDefault(); const p = player(); if (p) fn(p); }, { passive: false });
   $(id).addEventListener('mousedown', e => { e.preventDefault(); const p = player(); if (p) fn(p); });
 }
@@ -106,7 +106,7 @@ addEventListener('keydown', e => {
   const p = player();
   if (!p || e.repeat) return;
   if (e.code === 'Space') { e.preventDefault(); game.switchPolarity(p); }
-  if (e.key === 'Shift') game.dash(p);
+  if (e.key === 'Shift') game.blast(p);
 });
 addEventListener('keyup', e => input.keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => input.keys.clear());
@@ -163,9 +163,9 @@ function onDeath() {
   };
   $('deathCause').innerHTML = causes[p.deathCause] || '';
   const secs = Math.round(p.deathT - p.bornT);
-  const rank = 1 + game.magnets.filter(m => m.alive && m.maxMass > p.maxMass).length;
+  const rank = 1 + game.magnets.filter(m => m.alive && m.frags > p.frags).length;
   $('deathStats').innerHTML = `
-    <div>En yüksek kütle<b>${Math.round(p.maxMass)}</b></div>
+    <div>En çok demir<b>${p.maxAmmo}</b></div>
     <div>Frag<b>${p.frags}</b></div>
     <div>Hayatta kalma<b>${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}</b></div>
     <div>Sıralama<b>#${rank}</b></div>`;
@@ -196,33 +196,34 @@ function updateHud(dt) {
   pol.className = p.sign > 0 ? 'pos' : p.sign < 0 ? 'neg' : 'neu';
   pol.textContent = p.sign > 0 ? '+' : p.sign < 0 ? '−' : '•';
   const sw = CONFIG.switchCooldown > 0 ? 1 - p.switchCD / CONFIG.switchCooldown : 1;
-  const ds = 1 - p.dashCD / CONFIG.dashCooldown;
+  const ds = p.ammo > 0 ? 1 - p.blastCD / CONFIG.blastCooldown : 0;
   $('switchFill').style.width = (p.locked ? 0 : sw * 100) + '%';
   $('switchFill').classList.toggle('ready', sw >= 1 && !p.locked);
-  $('dashFill').style.width = ds * 100 + '%';
-  $('dashFill').classList.toggle('ready', ds >= 1);
+  $('blastFill').style.width = ds * 100 + '%';
+  $('blastFill').classList.toggle('ready', ds >= 1);
 
   // Liste ve metinler saniyede ~8 kez yeterli
   hudT -= dt;
   if (hudT > 0) return;
   hudT = 0.12;
 
-  $('stats').innerHTML = `Kütle <b>${Math.round(p.mass)}</b><br>Frag ${p.frags}` +
+  const armor = p.ammo >= CONFIG.spikeArmor ? '' : '<br><span class="lock">Zırh yok: dikenler öldürür</span>';
+  $('stats').innerHTML = `Frag <b>${p.frags}</b><br>Demir ${p.ammo}/${CONFIG.ammoCap}` + armor +
     (p.boosted ? '<br><span class="boost">2× güç bölgesi</span>' : '') +
     (p.locked ? '<br><span class="lock">Kutup kilitli</span>' : '');
 
   const top = game.leaderboard(10);
-  let html = '<h3>LİDERLİK</h3><ol>';
+  let html = '<h3>LİDERLİK · frag · demir</h3><ol>';
   top.forEach((m, i) => {
     html += `<li class="${m === p ? 'me' : ''}"><span>${i + 1}.</span>` +
       `<span class="dot" style="background:${m.pol > 0 ? '#ff4d5e' : '#3d9bff'}"></span>` +
-      `<span class="n">${esc(m.name)}</span><span class="m">${Math.round(m.mass)}</span></li>`;
+      `<span class="n">${esc(m.name)}</span><span class="m">${m.frags} · ${m.ammo}</span></li>`;
   });
   html += '</ol>';
   if (p.alive && !top.includes(p)) {
-    const rank = 1 + game.magnets.filter(m => m.alive && m.mass > p.mass).length;
+    const rank = 1 + game.magnets.filter(m => m.alive && (m.frags > p.frags || (m.frags === p.frags && m.ammo > p.ammo))).length;
     html += `<ol><li class="me"><span>${rank}.</span><span class="n">${esc(p.name)}</span>` +
-      `<span class="m">${Math.round(p.mass)}</span></li></ol>`;
+      `<span class="m">${p.frags} · ${p.ammo}</span></li></ol>`;
   }
   $('leaderboard').innerHTML = html;
 

@@ -20,18 +20,26 @@ Sonra http://localhost:5173 adresini aç.
 | --- | --- |
 | Fare / WASD | Hareket |
 | Space / Sol tık | Kutup değiştir (+ / −) |
-| Shift / Sağ tık | Dash |
-| T | Ayar paneli (kuvvet, bekleme süreleri, hız…) |
+| Shift / Sağ tık | Demir saçması |
+| T | Ayar paneli (kuvvet, bekleme süreleri, bot tepkisi…) |
 
-Mobilde ekrana dokunarak yön verilir; sağ alttaki butonlar kutup değiştirir ve dash atar.
+Mobilde ekrana dokunarak yön verilir; sağ alttaki butonlar kutup değiştirir ve saçma atar.
 
-## Kurallar
+## Kurallar (mıknatıs sumosu)
 
-- **Metal tozu** her iki kutba da çekilir; topladıkça büyürsün.
-- **Zıt kutuplar çeker:** senden en az %20 küçük olanı çekip yutabilirsin.
-- **Aynı kutuplar iter:** rakipleri **dikenlere** ya da **arena dışındaki boşluğa** iterek frag al.
-- Kutup değiştirmenin bekleme süresi var ve geçiş anında kısa bir süre **nötr** (savunmasız) kalırsın.
+- **Kimse kimseyi yiyemez.** Rakip yalnızca **dikenlere** ya da **arena dışındaki boşluğa** itilerek elenir. Puan = frag.
+- **Aynı kutuplar iter, zıt kutuplar çeker.** Kutup değiştirmenin bekleme süresi var ve geçişte kısa bir an **nötr** kalırsın.
+- **Demir tozu** her iki kutba da çekilir ve etrafında döner:
+  - **Ağırlık:** çok demir = daha güçlü ama daha hantal mıknatıs.
+  - **Zırh:** en az 10 demirin varsa dikene çarpınca ölmezsin, demirinin yarısını kaybedersin.
+  - **Cephane:** saçma, demirini koni şeklinde fırlatır. İsabet alan savrulur, kısa süre sersemler ve demir kaybeder.
 - **Mor fırtına** bölgesinde manyetik güç 2 katına çıkar, **sarı fırtına** kutbunu kilitler.
+- Botlar kutup değişimini insan gibi gecikmeli fark eder; ani kutup değişimi avantaj sağlar.
+
+## Yol haritası
+
+- [ ] Raund sistemi: 2-3 dakikalık maçlar, daralan arena, son kalan kazanır
+- [ ] Gerçek multiplayer (Node.js + Socket.io, sunucu tarafında aynı `game.js`)
 
 ## Yapı
 

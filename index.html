@@ -17,11 +17,11 @@
     <div id="bars">
       <div id="polarity"></div>
       <div class="bar"><span>KUTUP</span><div class="track"><div id="switchFill" class="fill"></div></div></div>
-      <div class="bar"><span>DASH</span><div class="track"><div id="dashFill" class="fill"></div></div></div>
+      <div class="bar"><span>SAÇMA</span><div class="track"><div id="blastFill" class="fill"></div></div></div>
     </div>
     <div id="touchButtons">
       <button id="btnSwitch">±</button>
-      <button id="btnDash">»</button>
+      <button id="btnBlast">✷</button>
     </div>
   </div>
 
@@ -29,19 +29,20 @@
   <div id="menu" class="overlay">
     <div class="card">
       <h1 id="title"><span class="plus">+</span><span class="name"></span><span class="minus">−</span></h1>
-      <p class="tagline">Aynı kutuplar iter, zıt kutuplar çeker. Kutbunu doğru anda değiştir.</p>
+      <p class="tagline">Mıknatıs sumosu. Aynı kutuplar iter, zıt kutuplar çeker.<br>Rakiplerini dikenlere ya da boşluğa it.</p>
       <input id="nameInput" maxlength="16" placeholder="Takma adın" autocomplete="off">
       <button id="playBtn" class="primary">OYNA</button>
       <ul class="help">
         <li><b>Fare / WASD</b> hareket</li>
         <li><b>Space / Sol tık</b> kutup değiştir</li>
-        <li><b>Shift / Sağ tık</b> dash</li>
+        <li><b>Shift / Sağ tık</b> demir saçması</li>
         <li><b>T</b> ayar paneli</li>
       </ul>
       <ul class="rules">
-        <li>Metal tozu topla, büyü.</li>
-        <li>Senden küçükleri zıt kutupla çek ve yut.</li>
-        <li>Rakipleri aynı kutupla <b>dikenlere</b> ya da <b>arena dışına</b> it.</li>
+        <li>Kimse kimseyi yiyemez. Rakibi <b>dikenlere</b> ya da <b>arena dışına</b> iterek elersin.</li>
+        <li>Topladığın <b>demir tozu</b> etrafında döner: seni ağırlaştırır ve güçlendirir.</li>
+        <li>Demir aynı zamanda <b>zırh</b>: 10 demirin varsa dikene çarpınca ölmez, demirinin yarısını kaybedersin.</li>
+        <li><b>Saçma</b> demirini fırlatır: isabet alan savrulur, sersemler ve demir kaybeder.</li>
         <li><span class="boost">Mor bölge</span> gücü 2'ye katlar, <span class="lock">sarı bölge</span> kutbunu kilitler.</li>
       </ul>
     </div>

@@ -1,7 +1,10 @@
 'use strict';
 
-// Oyun simülasyonu: fizik, çarpışmalar, toz, diken, fırtına ve bot zekâsı.
+// Oyun simülasyonu: fizik, çarpışmalar, demir tozu, saçma, diken, fırtına ve bot zekâsı.
 // Çizimden bağımsızdır; ileride aynen sunucuda (Node.js) çalıştırılabilir.
+//
+// Kurallar: kimse kimseyi yutmaz. Rakip yalnızca dikene ya da arena dışındaki boşluğa
+// itilerek elenir. Toplanan demir tozu mıknatısın etrafında döner: ağırlık, zırh ve cephanedir.
 
 const BOT_NAMES = [
   'Tesla', 'Neodim', 'Ferro', 'Pusula', 'Bobin', 'Volt', 'Amper', 'Gauss',
@@ -27,23 +30,23 @@ function chargeOf(mass) { return Math.pow(mass, 0.7); }
 function rangeOf(ra, rb) { return Math.max(CONFIG.minRange, CONFIG.rangeMul * (ra + rb)); }
 
 class Magnet {
-  constructor(id, name, isBot, x, y, mass) {
+  constructor(id, name, isBot, x, y, ammo) {
     this.id = id;
     this.name = name;
     this.isBot = isBot;
     this.x = x; this.y = y;
     this.vx = 0; this.vy = 0;
     this.ax = 0; this.ay = 0;
-    this.mass = mass;
-    this.maxMass = mass;
+    this.ammo = ammo;
+    this.maxAmmo = ammo;
     this.alive = true;
     this.pol = Math.random() < 0.5 ? 1 : -1;   // +1 = Artı (kırmızı), -1 = Eksi (mavi)
     this.polT = -99;                           // son kutup değişim zamanı
     this.switchCD = 0;
     this.neutralT = 0;
-    this.dashCD = 0;
-    this.dashT = 0;
+    this.blastCD = 0;
     this.spikeImmune = 0;
+    this.stunT = 0;
     this.aimX = x; this.aimY = y;
     this.throttle = 0;
     this.frags = 0;
@@ -58,10 +61,11 @@ class Magnet {
     this.thinkT = 0;
     this.wander = null;
   }
+  get mass() { return CONFIG.coreMass + this.ammo * CONFIG.ammoWeight; }
   get r() { return radiusOf(this.mass); }
   // Nötr geçişteyken kuvvet uygulamaz/almaz
   get sign() { return this.neutralT > 0 ? 0 : this.pol; }
-  get maxSpeed() { return CONFIG.baseSpeed * Math.pow(CONFIG.startMass / this.mass, 0.2); }
+  get maxSpeed() { return CONFIG.baseSpeed * Math.pow(CONFIG.coreMass / this.mass, 0.25); }
 }
 
 class Game {
@@ -76,6 +80,7 @@ class Game {
     this.feed = [];
     this.links = [];
     this.respawnQueue = [];
+    this.dustAcc = 0;
     this.stormTimer = CONFIG.stormEvery * 0.4;
     this.botTarget = Math.round(CONFIG.botCount);
 
@@ -123,35 +128,35 @@ class Game {
     }
   }
 
-  spawnDust(x, y, vx = 0, vy = 0, v = 1) {
+  // Serbest demir tozu. hot > 0 iken fırlatılmış mermidir; cool > 0 iken toplanamaz.
+  spawnDust(x, y, vx = 0, vy = 0, cool = 0) {
     if (x === undefined) {
       const p = this.randomPoint(30);
       x = p.x; y = p.y;
     }
-    this.dust.push({ x, y, vx, vy, v, dead: false });
+    this.dust.push({ x, y, vx, vy, cool, hot: 0, owner: null, dead: false });
   }
 
-  burstDust(x, y, amount, r) {
-    const n = clamp(Math.round(amount / 1.5), 3, 50);
-    const v = amount / n;
+  burstDust(x, y, n, r) {
+    n = Math.min(Math.round(n), 70);
     for (let i = 0; i < n; i++) {
       const a = Math.random() * Math.PI * 2, s = rand(150, 480);
-      this.spawnDust(x + Math.cos(a) * r * 0.6, y + Math.sin(a) * r * 0.6, Math.cos(a) * s, Math.sin(a) * s, v);
+      this.spawnDust(x + Math.cos(a) * r * 0.8, y + Math.sin(a) * r * 0.8, Math.cos(a) * s, Math.sin(a) * s, 0.35);
     }
   }
 
   addMagnet(name, isBot) {
-    const mass = isBot ? CONFIG.startMass * rand(1, 3.5) : CONFIG.startMass;
-    const p = this.safePoint(radiusOf(mass));
-    const m = new Magnet(this.nextId++, name, isBot, p.x, p.y, mass);
+    const ammo = isBot ? Math.round(rand(0, 30)) : CONFIG.startAmmo;
+    const p = this.safePoint(radiusOf(CONFIG.coreMass + ammo * CONFIG.ammoWeight));
+    const m = new Magnet(this.nextId++, name, isBot, p.x, p.y, ammo);
     m.bornT = this.t;
     m.spikeImmune = 1.5;
     this.magnets.push(m);
     return m;
   }
 
-  effect(type, x, y, r, col) {
-    this.effects.push({ type, x, y, r, col, t: 0, life: type === 'boom' ? 0.7 : 0.4 });
+  effect(type, x, y, r, col, ang = 0) {
+    this.effects.push({ type, x, y, r, col, ang, t: 0, life: type === 'boom' ? 0.7 : type === 'blast' ? 0.25 : 0.4 });
   }
 
   // ---------- Aksiyonlar ----------
@@ -166,15 +171,29 @@ class Game {
     return true;
   }
 
-  dash(m) {
-    if (!m.alive || m.dashCD > 0) return false;
-    let dx = m.aimX - m.x, dy = m.aimY - m.y, d = Math.hypot(dx, dy);
-    if (d < 1) { dx = m.vx; dy = m.vy; d = Math.hypot(dx, dy) || 1; }
-    const s = CONFIG.dashSpeed * Math.pow(CONFIG.startMass / m.mass, 0.12);
-    m.vx = dx / d * s;
-    m.vy = dy / d * s;
-    m.dashT = 0.25;
-    m.dashCD = CONFIG.dashCooldown;
+  // Demir saçması: bulutun bir kısmını hedefe doğru koni şeklinde fırlatır.
+  blast(m, tx = m.aimX, ty = m.aimY) {
+    const C = CONFIG;
+    if (!m.alive || m.blastCD > 0 || m.ammo <= 0) return false;
+    let dx = tx - m.x, dy = ty - m.y, d = Math.hypot(dx, dy);
+    if (d < 1) { dx = 1; dy = 0; d = 1; }
+    const a0 = Math.atan2(dy, dx);
+    const n = Math.min(m.ammo, C.blastCount);
+    m.ammo -= n;
+    for (let i = 0; i < n; i++) {
+      const a = a0 + (n > 1 ? (i / (n - 1) - 0.5) * 2 * C.blastSpread : 0) + rand(-0.05, 0.05);
+      const s = C.blastSpeed * rand(0.85, 1.1);
+      this.dust.push({
+        x: m.x + Math.cos(a) * (m.r + 4), y: m.y + Math.sin(a) * (m.r + 4),
+        vx: Math.cos(a) * s + m.vx * 0.5, vy: Math.sin(a) * s + m.vy * 0.5,
+        cool: 0, hot: C.hotTime, owner: m, dead: false,
+      });
+    }
+    const rec = C.blastRecoil * C.coreMass / m.mass;
+    m.vx -= dx / d * rec;
+    m.vy -= dy / d * rec;
+    m.blastCD = C.blastCooldown;
+    this.effect('blast', m.x, m.y, m.r, m.pol > 0 ? 'red' : 'blue', a0);
     return true;
   }
 
@@ -190,14 +209,11 @@ class Game {
     m.deathCause = cause;
     m.killer = killer;
     m.deathT = this.t;
-    if (cause === 'spike') this.burstDust(m.x, m.y, m.mass * 0.6, m.r);
-    if (killer) {
-      killer.frags++;
-      if (cause !== 'eat') killer.mass += CONFIG.fragBonus;
-    }
+    if (cause === 'spike') this.burstDust(m.x, m.y, m.ammo + 6, m.r);
+    if (killer) killer.frags++;
     this.effect('boom', m.x, m.y, m.r, m.pol > 0 ? 'red' : 'blue');
 
-    const verb = { eat: 'yuttu', spike: 'dikene itti', void: 'boşluğa itti' }[cause];
+    const verb = { spike: 'dikene itti', void: 'boşluğa itti' }[cause];
     const self = { spike: 'dikene çarptı', void: 'boşluğa düştü' }[cause];
     const text = killer ? `${killer.name} ▸ ${m.name} · ${verb}` : `${m.name} · ${self}`;
     const mine = !!this.player && (m === this.player || killer === this.player);
@@ -207,11 +223,12 @@ class Game {
     if (m.isBot) this.respawnQueue.push({ name: m.name, t: this.t + rand(2, 5) });
   }
 
+  // Yeterli demiri olan zırhı sayesinde hayatta kalır ama demirinin bir kısmını saçar.
   hitSpike(m, s, nx, ny) {
-    const killer = this.recentHitter(m);
-    if (m.mass < CONFIG.spikeKillBelow) { this.kill(m, killer, 'spike'); return; }
-    const lost = m.mass * CONFIG.spikeMassLoss;
-    m.mass -= lost;
+    const C = CONFIG;
+    if (m.ammo < C.spikeArmor) { this.kill(m, this.recentHitter(m), 'spike'); return; }
+    const lost = Math.max(C.spikeArmor, Math.round(m.ammo * C.spikeAmmoLoss));
+    m.ammo -= lost;
     this.burstDust(m.x, m.y, lost, m.r);
     m.vx = nx * 520; m.vy = ny * 520;
     m.spikeImmune = 0.8;
@@ -233,9 +250,9 @@ class Game {
       if (!m.alive) continue;
       m.switchCD = Math.max(0, m.switchCD - dt);
       m.neutralT = Math.max(0, m.neutralT - dt);
-      m.dashCD = Math.max(0, m.dashCD - dt);
-      m.dashT = Math.max(0, m.dashT - dt);
+      m.blastCD = Math.max(0, m.blastCD - dt);
       m.spikeImmune = Math.max(0, m.spikeImmune - dt);
+      m.stunT = Math.max(0, m.stunT - dt);
 
       m.locked = false; m.boosted = false;
       for (const z of this.storms) {
@@ -247,13 +264,14 @@ class Game {
 
       if (m.isBot) this.botThink(m, dt);
 
-      if (m.dashT <= 0) {
-        const dx = m.aimX - m.x, dy = m.aimY - m.y, d = Math.hypot(dx, dy) || 1;
-        const sp = m.maxSpeed * m.throttle;
-        const k = Math.min(1, C.steer * dt);
-        m.vx += (dx / d * sp - m.vx) * k;
-        m.vy += (dy / d * sp - m.vy) * k;
-      }
+      const dx = m.aimX - m.x, dy = m.aimY - m.y, d = Math.hypot(dx, dy) || 1;
+      const sp = m.maxSpeed * m.throttle;
+      let k = Math.min(1, C.steer * dt);
+      // Savrulurken kontrol azalır: darbelerin momentumu hissedilsin
+      if (m.stunT > 0) k *= 0.12;
+      else if (Math.hypot(m.vx, m.vy) > m.maxSpeed * 1.25) k *= 0.3;
+      m.vx += (dx / d * sp - m.vx) * k;
+      m.vy += (dy / d * sp - m.vy) * k;
       m.ax = 0; m.ay = 0;
     }
 
@@ -272,12 +290,13 @@ class Game {
         if (d > range) continue;
         const dd = Math.max(d, (ra + rb) * 0.9) / 100;
         const q = d / range;
-        let F = C.forceK * chargeOf(a.mass) * chargeOf(b.mass) / (dd * dd) * (1 - q * q);
+        const ma = a.mass, mb = b.mass;
+        let F = C.forceK * chargeOf(ma) * chargeOf(mb) / (dd * dd) * (1 - q * q);
         if (a.boosted || b.boosted) F *= 2;
         const s = a.sign * b.sign;   // +1 itme, -1 çekme
         const nx = dx / d, ny = dy / d;
-        const accA = Math.min(F / a.mass, C.maxMagAccel);
-        const accB = Math.min(F / b.mass, C.maxMagAccel);
+        const accA = Math.min(F / ma, C.maxMagAccel);
+        const accB = Math.min(F / mb, C.maxMagAccel);
         a.ax -= nx * accA * s; a.ay -= ny * accA * s;
         b.ax += nx * accB * s; b.ay += ny * accB * s;
         // Kim kimi savurdu? Diken/boşluk frag'ı için kayıt
@@ -292,40 +311,29 @@ class Game {
       if (!m.alive) continue;
       m.vx += m.ax * dt; m.vy += m.ay * dt;
       m.x += m.vx * dt; m.y += m.vy * dt;
-      if (m.mass > C.decayAbove) m.mass -= (m.mass - C.decayAbove) * C.decayRate * dt;
     }
 
-    // Mıknatıs-mıknatıs çarpışma ve yutma
+    // Mıknatıs-mıknatıs çarpışma: sumo gibi seker
     for (let i = 0; i < ms.length; i++) {
       const a = ms[i];
       if (!a.alive) continue;
       for (let j = i + 1; j < ms.length; j++) {
-        if (!a.alive) break;
         const b = ms[j];
         if (!b.alive) continue;
         const dx = b.x - a.x, dy = b.y - a.y;
         const d = Math.hypot(dx, dy) || 0.001;
         const ra = a.r, rb = b.r;
         if (d >= ra + rb) continue;
-        const big = a.mass >= b.mass ? a : b, small = big === a ? b : a;
-        if (big.mass >= C.eatRatio * small.mass) {
-          // Yeterince büyükse küçük olan içine girebilir; derin girince yutulur
-          if (d < big.r - small.r * 0.35 && small.spikeImmune <= 0) {
-            big.mass += small.mass * C.eatGain;
-            this.kill(small, big, 'eat');
-          }
-          continue;
-        }
-        // Benzer boyutlar: sekerek ayrılır
-        const nx = dx / d, ny = dy / d, overlap = ra + rb - d, tot = a.mass + b.mass;
-        a.x -= nx * overlap * (b.mass / tot); a.y -= ny * overlap * (b.mass / tot);
-        b.x += nx * overlap * (a.mass / tot); b.y += ny * overlap * (a.mass / tot);
+        const ma = a.mass, mb = b.mass;
+        const nx = dx / d, ny = dy / d, overlap = ra + rb - d, tot = ma + mb;
+        a.x -= nx * overlap * (mb / tot); a.y -= ny * overlap * (mb / tot);
+        b.x += nx * overlap * (ma / tot); b.y += ny * overlap * (ma / tot);
         const rel = (b.vx - a.vx) * nx + (b.vy - a.vy) * ny;
         if (rel < 0) {
-          const imp = -1.6 * rel / (1 / a.mass + 1 / b.mass);
-          a.vx -= imp * nx / a.mass; a.vy -= imp * ny / a.mass;
-          b.vx += imp * nx / b.mass; b.vy += imp * ny / b.mass;
-          if (-rel > 120) {
+          const imp = -(1 + C.bounce) * rel / (1 / ma + 1 / mb);
+          a.vx -= imp * nx / ma; a.vy -= imp * ny / ma;
+          b.vx += imp * nx / mb; b.vy += imp * ny / mb;
+          if (-rel > 100) {
             a.lastHitBy = b; a.lastHitT = this.t;
             b.lastHitBy = a; b.lastHitT = this.t;
           }
@@ -349,7 +357,7 @@ class Game {
       if (m.alive && Math.hypot(m.x, m.y) > C.arenaRadius + m.r * 0.3) {
         this.kill(m, this.recentHitter(m), 'void');
       }
-      if (m.alive) m.maxMass = Math.max(m.maxMass, m.mass);
+      if (m.alive) m.maxAmmo = Math.max(m.maxAmmo, m.ammo);
     }
 
     this.updateDust(dt);
@@ -373,30 +381,60 @@ class Game {
 
   updateDust(dt) {
     const C = CONFIG, ms = this.magnets;
-    const damp = Math.pow(0.08, dt);
+    const damp = Math.pow(0.08, dt), hotDamp = Math.pow(0.5, dt);
     const R2 = (C.arenaRadius + 10) ** 2;
     for (const p of this.dust) {
-      for (const m of ms) {
-        if (!m.alive) continue;
-        const pull = m.r * 3 + 80;
-        const dx = m.x - p.x, dy = m.y - p.y;
-        if (dx > pull || dx < -pull || dy > pull || dy < -pull) continue;
-        const d = Math.hypot(dx, dy) || 0.001;
-        if (d < m.r) { m.mass += p.v; p.dead = true; break; }
-        if (d < pull) {
-          // Nötr metal her iki kutba da çekilir
-          const acc = 250 + 1400 * (1 - d / pull);
-          p.vx += dx / d * acc * dt;
-          p.vy += dy / d * acc * dt;
+      if (p.hot > 0) {
+        // Mermi: sahibi dışındaki ilk mıknatısa çarpar, savurur ve zırhından demir koparır
+        p.hot -= dt;
+        for (const m of ms) {
+          if (m === p.owner || !m.alive) continue;
+          const dx = m.x - p.x, dy = m.y - p.y, lim = m.r + 4;
+          if (dx > lim || dx < -lim || dy > lim || dy < -lim || dx * dx + dy * dy > lim * lim) continue;
+          const sp = Math.hypot(p.vx, p.vy) || 1;
+          const k = C.blastImpulse * C.coreMass / m.mass;
+          m.vx += p.vx / sp * k;
+          m.vy += p.vy / sp * k;
+          m.stunT = C.stunTime;
+          if (p.owner && p.owner.alive) { m.lastHitBy = p.owner; m.lastHitT = this.t; }
+          if (m.ammo > 0) {
+            m.ammo--;
+            const a = Math.random() * Math.PI * 2;
+            this.spawnDust(m.x + Math.cos(a) * m.r, m.y + Math.sin(a) * m.r, Math.cos(a) * 250, Math.sin(a) * 250, 0.4);
+          }
+          p.vx *= 0.15; p.vy *= 0.15;
+          p.hot = 0;
+          p.cool = 0.3;
+          break;
         }
+        p.vx *= hotDamp; p.vy *= hotDamp;
+      } else {
+        if (p.cool > 0) p.cool -= dt;
+        else {
+          for (const m of ms) {
+            if (!m.alive || m.ammo >= C.ammoCap) continue;
+            const pull = m.r * 3 + 90;
+            const dx = m.x - p.x, dy = m.y - p.y;
+            if (dx > pull || dx < -pull || dy > pull || dy < -pull) continue;
+            const d = Math.hypot(dx, dy) || 0.001;
+            if (d < m.r + 6) { m.ammo++; p.dead = true; break; }
+            if (d < pull) {
+              // Nötr demir her iki kutba da çekilir
+              const acc = 250 + 1400 * (1 - d / pull);
+              p.vx += dx / d * acc * dt;
+              p.vy += dy / d * acc * dt;
+            }
+          }
+        }
+        p.vx *= damp; p.vy *= damp;
       }
-      p.vx *= damp; p.vy *= damp;
       p.x += p.vx * dt; p.y += p.vy * dt;
       if (p.x * p.x + p.y * p.y > R2) p.dead = true;
     }
     this.dust = this.dust.filter(p => !p.dead);
-    // Toz yavaşça yeniden doğar (haritayı kütleyle boğmamak için)
-    this.dustAcc = (this.dustAcc || 0) + C.dustRespawn * dt;
+
+    // Toz yavaşça yeniden doğar
+    this.dustAcc += C.dustRespawn * dt;
     while (this.dustAcc >= 1) {
       this.dustAcc -= 1;
       if (this.dust.length < C.dustCount) this.spawnDust();
@@ -420,19 +458,28 @@ class Game {
   }
 
   leaderboard(n = 10) {
-    return this.magnets.filter(m => m.alive).sort((a, b) => b.mass - a.mass).slice(0, n);
+    return this.magnets.filter(m => m.alive)
+      .sort((a, b) => b.frags - a.frags || b.ammo - a.ammo)
+      .slice(0, n);
   }
 
   // ---------- Bot zekâsı ----------
 
-  nearHazard(o) {
-    if (Math.hypot(o.x, o.y) > CONFIG.arenaRadius - o.r - 260) return true;
-    return this.spikes.some(s => Math.hypot(o.x - s.x, o.y - s.y) < o.r + s.r + 160);
+  // Bir mıknatısa en yakın tehlike noktası (arena kenarı ya da diken) ve aradaki boşluk
+  hazardOf(o) {
+    const R = CONFIG.arenaRadius, dc = Math.hypot(o.x, o.y) || 1;
+    let best = { x: o.x / dc * R, y: o.y / dc * R, d: R - dc - o.r };
+    for (const s of this.spikes) {
+      const d = Math.hypot(o.x - s.x, o.y - s.y) - s.r - o.r;
+      if (d < best.d) best = { x: s.x, y: s.y, d };
+    }
+    return best;
   }
 
   findDust(b) {
-    let best = null, bestD = 600 * 600;
+    let best = null, bestD = 700 * 700;
     for (const p of this.dust) {
+      if (p.hot > 0) continue;
       const d = (p.x - b.x) ** 2 + (p.y - b.y) ** 2;
       if (d < bestD) { bestD = d; best = p; }
     }
@@ -456,33 +503,43 @@ class Game {
     b.thinkT = rand(0.12, 0.28) + (1 - b.skill) * 0.25;   // tepki süresi
     const C = CONFIG;
 
-    let threat = null, threatD = 1e9, prey = null, preyScore = 0, near = null, nearD = 1e9;
+    let enemy = null, ed = 1e9;
     for (const o of this.magnets) {
       if (!o.alive || o === b) continue;
       const d = Math.hypot(o.x - b.x, o.y - b.y);
-      const range = rangeOf(o.r, b.r);
-      if (d < range && d < nearD) { near = o; nearD = d; }
-      if (o.mass >= b.mass * 1.1) {
-        if (d < range * 1.15 && d < threatD) { threat = o; threatD = d; }
-      } else if (b.mass >= o.mass * C.eatRatio * 1.05 && d < 650 + b.r) {
-        const s = o.mass / (d + 50);
-        if (s > preyScore) { preyScore = s; prey = o; }
-      }
+      if (d < ed) { enemy = o; ed = d; }
     }
+    const engaged = enemy && ed < rangeOf(enemy.r, b.r) * 1.2;
+    const myHaz = this.hazardOf(b);
 
-    let vx = 0, vy = 0, wantPol = 0;
-    if (threat) {
-      // Kaç ve aynı kutba geç ki itsin
-      vx += (b.x - threat.x) / threatD * 2;
-      vy += (b.y - threat.y) / threatD * 2;
-      wantPol = this.seenPol(b, threat);
-    } else if (prey) {
-      // Kovala ve zıt kutba geç ki çeksin
-      const d = Math.hypot(prey.x - b.x, prey.y - b.y) || 1;
-      vx += (prey.x - b.x) / d * 1.6;
-      vy += (prey.y - b.y) / d * 1.6;
-      wantPol = -this.seenPol(b, prey);
+    let vx = 0, vy = 0, wantPol = 0, blastAt = null;
+
+    if (engaged && myHaz.d < 220) {
+      // Savunma: tehlikeden uzaklaş; kuvvet beni tehlikeden uzağa itsin
+      const hx = myHaz.x - b.x, hy = myHaz.y - b.y, hl = Math.hypot(hx, hy) || 1;
+      vx -= hx / hl * 2; vy -= hy / hl * 2;
+      const onHazSide = ((enemy.x - b.x) * hx + (enemy.y - b.y) * hy) / (ed * hl) > 0;
+      const sp = this.seenPol(b, enemy);
+      wantPol = onHazSide ? sp : -sp;   // tehlike tarafındaysa it, değilse ona doğru çek
+      if (onHazSide) blastAt = enemy;
+    } else if (enemy && ed < 750 && b.ammo >= 8) {
+      // Saldırı: rakibin tehlikeye göre arkasına geç, aynı kutupla it, saçmayla vur
+      const eh = this.hazardOf(enemy);
+      const hx = eh.x - enemy.x, hy = eh.y - enemy.y, hl = Math.hypot(hx, hy) || 1;
+      const gap = enemy.r + b.r + 110;
+      const tx = enemy.x - hx / hl * gap, ty = enemy.y - hy / hl * gap;
+      const dx = tx - b.x, dy = ty - b.y, dl = Math.hypot(dx, dy) || 1;
+      vx += dx / dl * 1.6; vy += dy / dl * 1.6;
+      const lined = ((enemy.x - b.x) * hx + (enemy.y - b.y) * hy) / (ed * hl) > 0.6;
+      const sp = this.seenPol(b, enemy);
+      if (lined) {
+        wantPol = sp;
+        if (eh.d < 500) blastAt = enemy;
+      } else if (engaged) {
+        wantPol = sp;   // pozisyon alırken temas etme
+      }
     } else {
+      // Demir topla
       const p = this.findDust(b);
       if (p) {
         const d = Math.hypot(p.x - b.x, p.y - b.y) || 1;
@@ -492,28 +549,23 @@ class Game {
         const d = Math.hypot(b.wander.x - b.x, b.wander.y - b.y) || 1;
         vx += (b.wander.x - b.x) / d; vy += (b.wander.y - b.y) / d;
       }
-      if (near) {
-        wantPol = this.seenPol(b, near);   // varsayılan: mesafe koru
-        // Fırsat: tehlikeye yakın rakibi it
-        if (b.mass > near.mass * 0.7 && b.skill > 0.55 && this.nearHazard(near)) {
-          vx += (near.x - b.x) / nearD * 1.5;
-          vy += (near.y - b.y) / nearD * 1.5;
-        }
-      }
+      if (engaged) wantPol = this.seenPol(b, enemy);
     }
 
     // Kenardan ve dikenlerden kaçın
     const dc = Math.hypot(b.x, b.y) || 1;
-    const edge = C.arenaRadius - b.r - 280;
+    const care = 0.4 + b.skill * 0.6;
+    const edge = C.arenaRadius - b.r - 220 * care;
     if (dc > edge) {
-      const w = (dc - edge) / 150 * 2.5;
+      const w = (dc - edge) / 150 * 2.5 * care;
       vx -= b.x / dc * w; vy -= b.y / dc * w;
     }
     for (const s of this.spikes) {
       const dx = b.x - s.x, dy = b.y - s.y, d = Math.hypot(dx, dy) || 1;
       const gap = d - s.r - b.r;
-      if (gap < 140) {
-        const w = (140 - gap) / 140 * 3;
+      const zone = 110 * care;
+      if (gap < zone) {
+        const w = (zone - gap) / zone * 3 * care;
         vx += dx / d * w; vy += dy / d * w;
       }
     }
@@ -523,8 +575,9 @@ class Game {
 
     if (wantPol && wantPol !== b.pol && Math.random() < 0.35 + b.skill * 0.65) this.switchPolarity(b);
 
-    if (threat && threatD < b.r + threat.r + 90 && Math.random() < b.skill * 0.5) this.dash(b);
-    else if (prey && b.pol === -this.seenPol(b, prey) && Math.hypot(prey.x - b.x, prey.y - b.y) < b.r + prey.r + 130 &&
-      Math.random() < b.skill * 0.3) this.dash(b);
+    if (blastAt && b.ammo >= 6 && Math.hypot(blastAt.x - b.x, blastAt.y - b.y) < 420 &&
+      Math.random() < b.skill * 0.6) {
+      this.blast(b, blastAt.x, blastAt.y);
+    }
   }
 }
