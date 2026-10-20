@@ -4,6 +4,7 @@
 const GAME_TITLE = 'Top Takımı';
 
 const T = 40;   // karo boyutu (px)
+const EXIT_W = 70;   // çıkış kapısının genişliği: iki top yan yana sığar
 
 // Fizik sabitleri. Tek başına zıplama ~109 px (2 karo aşılır, 3 karo aşılamaz);
 // bir arkadaşının üstünden zıplayınca ~143 px (3 karo aşılır).

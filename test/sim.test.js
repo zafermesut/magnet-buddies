@@ -74,12 +74,12 @@ console.log('Fizik');
 console.log('Bölümleri otomatik geçme');
 {
   // 1. Merhaba: ikisi de sağa gider, engelde/çukurda zıplar
-  const g = new Game(0, 2), ex = g.exit.x + T / 2;
+  const g = new Game(0, 2), ex = g.exit.x + g.exit.w / 2;
   ok(run(g, [goTo(ex), goTo(ex)], 20, g => g.done), '1. Merhaba geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 {
   // 2. Anahtar: A anahtarı alır, kapıya götürür; sonra ikisi çıkışa
-  const g = new Game(1, 2), ex = g.exit.x + T / 2, key = g.keys[0];
+  const g = new Game(1, 2), ex = g.exit.x + g.exit.w / 2, key = g.keys[0];
   const keyX = key.x + key.w / 2;
   const a = (g, p, t) => (!key.used && key.holder !== p ? goTo(keyX, { hopAtEnd: true })(g, p, t) : goTo(ex)(g, p, t));
   const b = (g, p, t) => (g.doors[0].open ? goTo(ex)(g, p, t) : idle());
@@ -87,7 +87,7 @@ console.log('Bölümleri otomatik geçme');
 }
 {
   // 3. Kule: A çıkıntının yanında bekler, B onun üstüne çıkıp çıkıntıya zıplar, anahtarı alır
-  const g = new Game(2, 2), ex = g.exit.x + T / 2, key = g.keys[0];
+  const g = new Game(2, 2), ex = g.exit.x + g.exit.w / 2, key = g.keys[0];
   const baseX = 7 * T + 10;
   let phase = 0;
   const a = (g, p, t) => (g.doors[0].open ? goTo(ex)(g, p, t) : goTo(baseX)(g, p, t));
@@ -107,7 +107,7 @@ console.log('Bölümleri otomatik geçme');
 }
 {
   // 4. Nöbetçi: A sol düğmede bekler, B geçip sağ düğmeye basar, A geçer
-  const g = new Game(3, 2), ex = g.exit.x + T / 2;
+  const g = new Game(3, 2), ex = g.exit.x + g.exit.w / 2;
   const [b1, b2] = g.buttons;
   const gateX = g.gates[0].cells[0].c * T;
   const a = (g, p, t) => (b2.pressed || p.x > gateX ? goTo(ex)(g, p, t) : goTo(b1.x + b1.w / 2)(g, p, t));
@@ -119,14 +119,14 @@ console.log('Bölümleri otomatik geçme');
 }
 {
   // 5. Ağır kutu: ikisi birlikte iter, kutunun üstünden duvara çıkarlar
-  const g = new Game(4, 2), ex = g.exit.x + T / 2, box = g.boxes[0];
+  const g = new Game(4, 2), ex = g.exit.x + g.exit.w / 2, box = g.boxes[0];
   const c = (g, p, t) => (box.x + box.w < 20 * T - 2 ? I({ right: true }) : goTo(ex)(g, p, t));
   ok(run(g, [c, c], 40, g => g.done), '5. Ağır kutu geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 {
   // 6. Hepsi birden: kutuyu duvara it → üst kata çık → kule ile anahtar → kapı → düğmelerle geçiş → çıkış
-  const g = new Game(5, 2), ex = g.exit.x + T / 2, box = g.boxes[0], key = g.keys[0], door = g.doors[0];
+  const g = new Game(5, 2), ex = g.exit.x + g.exit.w / 2, box = g.boxes[0], key = g.keys[0], door = g.doors[0];
   const [b1, b2] = g.buttons, gateX = g.gates[0].cells[0].c * T;
   const ledgeR = 24 * T;            // anahtar çıkıntısının sağ kenarı
   const baseX = ledgeR + 30;         // A'nın kule için durduğu yer
@@ -291,19 +291,19 @@ function phases(list) {
   });
 }
 {
-  const g = new Game(6, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const g = new Game(6, 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
   const both = () => [A, B].every(p => p.supported && p.y + p.h <= 6 * T + 1);
   const ctl = phases([climbWall(g, A, B, 16 * T, 18 * T, 6 * T, both), [goTo(ex), goTo(ex)]]);
   ok(run(g, ctl, 40, g => g.done), '7. Fırlatma geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 {
-  const g = new Game(7, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const g = new Game(7, 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
   const across = () => A.x > 18 * T - 10 && B.x > 18 * T - 10 && A.supported;
   const ctl = phases([crossPit(g, A, B, 12 * T, 18 * T, across), [goTo(ex), goTo(ex)]]);
   ok(run(g, ctl, 40, g => g.done), '8. Uçurum geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 {
-  const g = new Game(8, 2), [A, B] = g.players, ex = g.exit.x + T / 2, key = g.keys[0], door = g.doors[0];
+  const g = new Game(8, 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
   const a = (g, p, t) => {
     if (door.open) return goTo(ex)(g, p, t);
     if (key.holder === p) return goTo(door.cells[0].c * T)(g, p, t);
@@ -315,7 +315,7 @@ function phases(list) {
   ok(run(g, [a, b], 30, g => g.done), '9. Metal anahtar geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 {
-  const g = new Game(9, 2), [A, B] = g.players, ex = g.exit.x + T / 2;
+  const g = new Game(9, 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
   const across = () => A.x > 18 * T - 10 && B.x > 18 * T - 10 && A.supported;
   const both = () => [A, B].every(p => p.supported && p.y + p.h <= 6 * T + 1);
   const ctl = phases([

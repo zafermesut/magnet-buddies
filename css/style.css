@@ -72,8 +72,9 @@ button {
 button:hover { background: rgba(255, 255, 255, 0.06); }
 button.primary {
   border: none; font-size: 17px; font-weight: 800; letter-spacing: .06em; color: #1c1b3a;
-  background: linear-gradient(90deg, #ff6b6b, #ffd43b, #69db7c, #4dabf7);
+  background: #69db7c;
 }
+button.primary:hover { background: #8ce99a; }
 button.primary:disabled { opacity: 0.35; cursor: default; }
 
 button.link { border: none; color: #8e92c0; padding: 6px; }

@@ -64,7 +64,13 @@ class Game {
         this.grid[r].push(ch === '#');
         this.blockers[r].push(null);
         if (ch === 'S' && !this.spawn) this.spawn = { x, y };
-        else if (ch === 'E') this.exit = { x, y: y - T, w: T, h: 2 * T };
+        else if (ch === 'E') {
+          // Kapı karodan geniştir; yanında duvar varsa duvara taşmasın diye o tarafa yaslanır
+          let ex = x + (T - EXIT_W) / 2;
+          if (map[r][c + 1] === '#') ex = x + T - EXIT_W;
+          else if (map[r][c - 1] === '#') ex = x;
+          this.exit = { x: ex, y: y - T, w: EXIT_W, h: 2 * T };
+        }
         else if (ch === 'K') {
           const k = PHYS.keySize;
           this.keys.push(makeBody('key', x + (T - k) / 2, y + T - k, k, k, { holder: null, used: false, noPick: new Map() }));
@@ -294,7 +300,7 @@ class Game {
     if (this.players.length && this.players.every(p => p.inExit)) {
       this.done = true;
       this.doneT = this.t;
-      this.fx('win', this.exit.x + T / 2, this.exit.y);
+      this.fx('win', this.exit.x + this.exit.w / 2, this.exit.y);
     }
 
     if (this.effects.length > 40 || (this.effects.length && this.t - this.effects[0].t > 1.2)) {
@@ -419,13 +425,13 @@ class Game {
     p.vx = p.vy = 0;
     const k = this.keys.find(o => o.holder === p);
     if (k) { k.holder = null; k.vy = -200; }
-    this.fx('enter', this.exit.x + T / 2, this.exit.y + T);
+    this.fx('enter', this.exit.x + this.exit.w / 2, this.exit.y + T);
   }
 
   leaveExit(p) {
     p.inExit = false;
     p.exitCD = 0.8;
-    p.x = this.exit.x + (T - p.w) / 2;
+    p.x = this.exit.x + (this.exit.w - p.w) / 2;
     p.y = this.exit.y + this.exit.h - p.h;
     p.vy = -250;
   }

@@ -170,7 +170,8 @@ class Renderer {
     const glow = 0.25 + 0.1 * Math.sin(t * 3);
     ctx.fillStyle = rgbaHex(PAL.exit, glow);
     ctx.beginPath();
-    ctx.ellipse(e.x + T / 2, e.y + e.h - 4, T, 14, 0, 0, Math.PI * 2);
+    const cx = e.x + e.w / 2, ar = e.w / 2 - 4;
+    ctx.ellipse(cx, e.y + e.h - 4, e.w * 0.8, 14, 0, 0, Math.PI * 2);
     ctx.fill();
     // Kemerli kapı
     ctx.fillStyle = '#15172e';
@@ -178,25 +179,25 @@ class Renderer {
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(e.x + 4, e.y + e.h);
-    ctx.lineTo(e.x + 4, e.y + T * 0.6);
-    ctx.arc(e.x + T / 2, e.y + T * 0.6, T / 2 - 4, Math.PI, 0);
-    ctx.lineTo(e.x + T - 4, e.y + e.h);
+    ctx.lineTo(e.x + 4, e.y + 4 + ar);
+    ctx.arc(cx, e.y + 4 + ar, ar, Math.PI, 0);
+    ctx.lineTo(e.x + e.w - 4, e.y + e.h);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-    // İçeri girenler kapıda küçük noktalar olarak görünür
+    // İçeri girenler kapıda küçük toplar olarak görünür
     const inside = g.players.filter(p => p.inExit);
     inside.forEach((p, i) => {
       ctx.fillStyle = PLAYER_COLORS[p.index];
       ctx.beginPath();
-      ctx.arc(e.x + 12 + (i % 2) * 16, e.y + T * 0.75 + Math.floor(i / 2) * 16, 6, 0, Math.PI * 2);
+      ctx.arc(cx + (i % 2 ? 11 : -11), e.y + e.h - 14 - Math.floor(i / 2) * 22, 9, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.fillStyle = '#fff';
     ctx.font = '700 16px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
-    ctx.fillText(`${inside.length}/${g.players.length}`, e.x + T / 2, e.y - 4);
+    ctx.fillText(`${inside.length}/${g.players.length}`, cx, e.y - 4);
   }
 
   drawBox(ctx, b, g) {
