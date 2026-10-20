@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Magnet.io</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- Oyun içi arayüz -->
+  <div id="hud" class="hidden">
+    <div id="stats" class="panel"></div>
+    <div id="leaderboard" class="panel"></div>
+    <div id="feed"></div>
+    <div id="bars">
+      <div id="polarity"></div>
+      <div class="bar"><span>KUTUP</span><div class="track"><div id="switchFill" class="fill"></div></div></div>
+      <div class="bar"><span>DASH</span><div class="track"><div id="dashFill" class="fill"></div></div></div>
+    </div>
+    <div id="touchButtons">
+      <button id="btnSwitch">±</button>
+      <button id="btnDash">»</button>
+    </div>
+  </div>
+
+  <!-- Ana menü -->
+  <div id="menu" class="overlay">
+    <div class="card">
+      <h1 id="title"><span class="plus">+</span><span class="name"></span><span class="minus">−</span></h1>
+      <p class="tagline">Aynı kutuplar iter, zıt kutuplar çeker. Kutbunu doğru anda değiştir.</p>
+      <input id="nameInput" maxlength="16" placeholder="Takma adın" autocomplete="off">
+      <button id="playBtn" class="primary">OYNA</button>
+      <ul class="help">
+        <li><b>Fare / WASD</b> hareket</li>
+        <li><b>Space / Sol tık</b> kutup değiştir</li>
+        <li><b>Shift / Sağ tık</b> dash</li>
+        <li><b>T</b> ayar paneli</li>
+      </ul>
+      <ul class="rules">
+        <li>Metal tozu topla, büyü.</li>
+        <li>Senden küçükleri zıt kutupla çek ve yut.</li>
+        <li>Rakipleri aynı kutupla <b>dikenlere</b> ya da <b>arena dışına</b> it.</li>
+        <li><span class="boost">Mor bölge</span> gücü 2'ye katlar, <span class="lock">sarı bölge</span> kutbunu kilitler.</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Ölüm ekranı -->
+  <div id="death" class="overlay hidden">
+    <div class="card">
+      <h2>Elendin</h2>
+      <p id="deathCause"></p>
+      <div id="deathStats"></div>
+      <button id="againBtn" class="primary">TEKRAR OYNA</button>
+      <button id="menuBtn">Ana menü</button>
+    </div>
+  </div>
+
+  <!-- Ayar paneli (T) -->
+  <div id="tweaks" class="panel hidden">
+    <div class="tweaks-head"><b>Ayarlar</b><button id="resetTweaks">Sıfırla</button></div>
+    <div id="tweakList"></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/game.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
