@@ -185,6 +185,16 @@ const climbOn = A => (g, p, t) => {
   ok(a.supported && a.y + a.h <= 6 * T + 1, 'zıt kutup: yukarıdaki arkadaş aşağıdakini duvarın üstüne çeker');
 }
 {
+  // Üstteki zıt kutupta mıknatısı açınca ikisi birlikte uçmamalı (alttaki üsttekini kaldıramaz)
+  const g = new Game(6, 2); const [a, b] = g.players;
+  run(g, [idle, idle], 0.3);
+  b.x = a.x; b.y = a.y - b.h - 1; b.pol = -a.pol;
+  run(g, [idle, idle], 0.5);
+  const ya = a.y, yb = b.y; let minA = a.y, minB = b.y;
+  run(g, [idle, () => I({ action: true })], 2, () => { minA = Math.min(minA, a.y); minB = Math.min(minB, b.y); return false; });
+  ok(ya - minA < 5 && yb - minB < 5, 'üstteki zıt kutupta çekince ikisi birlikte uçmaz (yükselme ' + (ya - minA).toFixed(0) + ' / ' + (yb - minB).toFixed(0) + ' px)');
+}
+{
   // Anahtar her iki kutba da çekilir
   for (const pol of [1, -1]) {
     const g = new Game(8, 2); const [a] = g.players; const key = g.keys[0];
@@ -243,7 +253,8 @@ function climbWall(g, A, B, standX, wallX, topY, done) {
       const cx = p.x + p.w / 2, at = wallX - 60;
       if (p.y + p.h < topY + 4) return I({ right: true, jump: true });
       if (Math.abs(cx - at) > 8 && p.supported) return I({ right: cx < at, left: cx > at });
-      return I({ jump: true });
+      // Duvarın kenarında B'ye yapışıkken ondan destek alıp zıpla ve üste geç
+      return I({ jump: (t * 5 | 0) % 2 === 0 || p.vy < 0, right: p.y + p.h < topY + 40 && !p.supported });
     }
     const cx = p.x + p.w / 2;
     if (Math.abs(cx - standX) > 6) return I({ right: cx < standX, left: cx > standX });

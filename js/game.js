@@ -36,7 +36,7 @@ class Game {
         index: i, facing: 1, want: 0, coyote: 0, jumpBuf: 0, cut: true,
         prevJump: true, prevAction: true, prevSwap: true,   // bölüm başında basılı tutulan tuş tetiklenmesin
         squash: 0, inExit: false, exitCD: 0, blockedBy: null, boxHit: null,
-        pol: pols[i % pols.length], magnetOn: false, actT: 0, magT: 0,
+        pol: pols[i % pols.length], magnetOn: false, actT: 0, magT: 0, gripT: 0,
       }));
     }
     this.boxNeed = Math.max(1, Math.min(this.def.boxNeed || 2, playerCount));
@@ -109,6 +109,13 @@ class Game {
     return !!b && !b.open;
   }
 
+  rectBlocked(x, y, w, h) {
+    const c0 = Math.floor(x / T), c1 = Math.floor((x + w - 0.001) / T);
+    const r0 = Math.floor(y / T), r1 = Math.floor((y + h - 0.001) / T);
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (this.blocked(c, r)) return true;
+    return false;
+  }
+
   fx(type, x, y, extra) {
     this.effects.push(Object.assign({ type, x, y, t: this.t }, extra));
   }
@@ -145,8 +152,15 @@ class Game {
     }
     for (const o of this.solids) {
       if (o === b || !overlap(b, o)) continue;
-      // Alttaki oyuncu zıplarsa üstündekini de kaldırır
-      if (dy < 0 && depth < 4 && b.kind === 'player' && o.kind === 'player') {
+      // Köşe düzeltmesi: yukarı çıkarken birinin kenarına birkaç piksel takıldıysan yana kay
+      if (dy < 0) {
+        const fromLeft = b.x + b.w - o.x, fromRight = o.x + o.w - b.x;
+        const nudge = fromLeft < fromRight ? -fromLeft : fromRight;
+        if (Math.abs(nudge) <= 6 && !this.rectBlocked(b.x + nudge, b.y, b.w, b.h)) { b.x += nudge; continue; }
+      }
+      // Alttaki oyuncu zıplarsa üstündekini de kaldırır. Mıknatısı açık olan sabittir:
+      // yoksa çektiği arkadaşı onu yukarı iter, ikisi birbirini sonsuza dek taşırdı.
+      if (dy < 0 && depth < 4 && b.kind === 'player' && o.kind === 'player' && !o.magnetOn) {
         this.moveY(o, b.y - (o.y + o.h), depth + 1);
         if (!overlap(b, o)) continue;
       }
@@ -207,7 +221,9 @@ class Game {
       } else {
         p.vx = approach(p.vx, 0, (p.onGround && ctl === 1 ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
       }
-      p.coyote = p.supported ? ph.coyote : p.coyote - dt;
+      // Zıt kutuplu mıknatısa yapışıkken arkadaşından destek alıp zıplayabilir
+      p.gripT = Math.max(0, p.gripT - dt);
+      p.coyote = p.supported || p.gripT > 0 ? ph.coyote : p.coyote - dt;
       p.jumpBuf = jumpEdge ? ph.jumpBuffer : p.jumpBuf - dt;
       if (p.jumpBuf > 0 && p.coyote > 0) {
         p.vy = -ph.jumpV;
@@ -310,6 +326,9 @@ class Game {
         // aynı kutup iter (+), zıt kutup çeker (−)
         if (push(o, hx, hy, ph.magnetForce * (o.pol === h.pol ? 1 : -1))) {
           h.affects.push({ o, repel: o.pol === h.pol });
+          // Çekildiği mıknatısın dibindeyse (değmese bile) ona tutunmuş sayılır
+          const gap = Math.hypot(o.x - h.x, o.y - h.y) - (o.w + h.w) / 2;
+          if (o.pol !== h.pol && gap < 20) o.gripT = 0.1;
           if (o.cut === false) o.cut = true;   // zıplama kesmesi mıknatısla fırlamayı bozmasın
         }
       }
