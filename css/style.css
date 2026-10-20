@@ -67,15 +67,18 @@ canvas { display: block; width: 100vw; height: 100vh; cursor: crosshair; }
 }
 #polarity.pos { background: #ff4d5e; box-shadow: 0 0 24px rgba(255, 77, 94, .6); }
 #polarity.neg { background: #3d9bff; box-shadow: 0 0 24px rgba(61, 155, 255, .6); }
-#polarity.neu { background: #e8ecf3; color: #5b6475; }
 .bar { display: flex; flex-direction: column; gap: 4px; font-size: 11px; letter-spacing: .1em; color: #8b95a8; }
 .track { width: 110px; height: 8px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
 .fill { height: 100%; width: 100%; background: #e8ecf3; border-radius: 4px; }
-.fill.ready { background: #4ade80; }
+.fill.ok { background: #4ade80; }
+.fill.warn { background: #facc15; }
+.fill.low { background: #ef4444; }
+.fill.energy { background: #e8ecf3; }
+.fill.energy.ready { background: #ffe678; box-shadow: 0 0 8px rgba(255, 230, 120, .8); }
 
 #touchButtons { display: none; position: absolute; right: 18px; bottom: 18px; gap: 14px; pointer-events: auto; }
 #touchButtons button {
-  width: 72px; height: 72px; border-radius: 50%;
+  width: 64px; height: 64px; border-radius: 50%;
   border: 2px solid rgba(255, 255, 255, .4); background: rgba(20, 26, 44, .7);
   color: #fff; font-size: 30px; font-weight: 800;
 }

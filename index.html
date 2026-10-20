@@ -16,12 +16,13 @@
     <div id="feed"></div>
     <div id="bars">
       <div id="polarity"></div>
-      <div class="bar"><span>KUTUP</span><div class="track"><div id="switchFill" class="fill"></div></div></div>
-      <div class="bar"><span>SAÇMA</span><div class="track"><div id="blastFill" class="fill"></div></div></div>
+      <div class="bar"><span>CAN</span><div class="track"><div id="hpFill" class="fill ok"></div></div></div>
+      <div class="bar"><span>ENERJİ</span><div class="track"><div id="energyFill" class="fill energy"></div></div></div>
     </div>
     <div id="touchButtons">
       <button id="btnSwitch">±</button>
-      <button id="btnBlast">✷</button>
+      <button id="btnFire">●</button>
+      <button id="btnBurst">✷</button>
     </div>
   </div>
 
@@ -29,21 +30,22 @@
   <div id="menu" class="overlay">
     <div class="card">
       <h1 id="title"><span class="plus">+</span><span class="name"></span><span class="minus">−</span></h1>
-      <p class="tagline">Mıknatıs sumosu. Aynı kutuplar iter, zıt kutuplar çeker.<br>Rakiplerini dikenlere ya da boşluğa it.</p>
+      <p class="tagline">Kendi rengindeki mermiyi em, zıt renktekinden kaç.<br>Rakibini vurmak için onun zıt rengine geç.</p>
       <input id="nameInput" maxlength="16" placeholder="Takma adın" autocomplete="off">
       <button id="playBtn" class="primary">OYNA</button>
       <ul class="help">
         <li><b>Fare / WASD</b> hareket</li>
-        <li><b>Space / Sol tık</b> kutup değiştir</li>
-        <li><b>Shift / Sağ tık</b> demir saçması</li>
+        <li><b>Sol tık (basılı)</b> ateş</li>
+        <li><b>Space</b> renk değiştir</li>
+        <li><b>Shift / Sağ tık</b> patlama</li>
         <li><b>T</b> ayar paneli</li>
       </ul>
       <ul class="rules">
-        <li>Kimse kimseyi yiyemez. Rakibi <b>dikenlere</b> ya da <b>arena dışına</b> iterek elersin.</li>
-        <li>Topladığın <b>demir tozu</b> etrafında döner: seni ağırlaştırır ve güçlendirir.</li>
-        <li>Demir aynı zamanda <b>zırh</b>: 10 demirin varsa dikene çarpınca ölmez, demirinin yarısını kaybedersin.</li>
-        <li><b>Saçma</b> demirini fırlatır: isabet alan savrulur, sersemler ve demir kaybeder.</li>
-        <li><span class="boost">Mor bölge</span> gücü 2'ye katlar, <span class="lock">sarı bölge</span> kutbunu kilitler.</li>
+        <li><b>Aynı renk</b> mermi ve küreleri <b>emersin</b>: enerji kazanırsın.</li>
+        <li><b>Zıt renk</b> mermi ve küreler <b>can götürür</b>.</li>
+        <li>Ateş ettiğin mermiler <b>senin rengindedir</b>. Rakibe kendi renginde ateş edersen onu beslersin.</li>
+        <li>Ateş etmek enerji harcar. Enerjin 50 olunca <b>patlama</b> çepeçevre mermi atar.</li>
+        <li><b>Kuleler</b> spiral mermi yağdırır ve ara sıra renk değiştirir (önce yanıp söner).</li>
       </ul>
     </div>
   </div>
