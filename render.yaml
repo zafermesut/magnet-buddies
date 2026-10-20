@@ -4,6 +4,9 @@ services:
   - type: web
     name: magnet-buddies
     runtime: node
+    # Türkiye'ye en yakın bölge: tuş gecikmesi Oregon'a göre çok daha düşük.
+    # Render bölgeyi sonradan değiştirmeye izin vermez; değiştirmek için servis silinip Blueprint yeniden uygulanır.
+    region: frankfurt
     plan: free
     buildCommand: npm ci
     startCommand: npm start
