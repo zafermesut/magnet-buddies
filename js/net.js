@@ -74,6 +74,7 @@ function applySnapshot(g, s) {
   (s.sw || []).forEach((o, i) => { g.switches[i + 1] = !!o; });
   (s.lv || []).forEach((t, i) => { if (g.levers[i]) g.levers[i].flipT = t; });
   (s.l || []).forEach((y, i) => { if (g.lifts[i]) setTarget(g.lifts[i], g.lifts[i].x, y); });
+  (s.m || []).forEach((x, i) => { if (g.movers[i]) setTarget(g.movers[i], x, g.movers[i].y); });
   (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
   for (const e of s.fx) g.effects.push(e);
   if (g.effects.length > 60) g.effects = g.effects.filter(e => g.t - e.t < 1.2);
@@ -81,7 +82,7 @@ function applySnapshot(g, s) {
 
 function smoothNet(g, dt) {
   const k = Math.min(1, dt * 20);
-  for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts]) {
+  for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts, ...g.movers]) {
     if (o.tx === undefined) continue;
     o.x += (o.tx - o.x) * k;
     o.y += (o.ty - o.y) * k;

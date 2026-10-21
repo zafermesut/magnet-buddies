@@ -158,7 +158,8 @@ class Renderer {
           ctx.fillStyle = rgbaHex(col, 0.18);
           ctx.fillRect(x + 4, y, T - 8, T);
           ctx.fillStyle = rgbaHex(col, 0.9);
-          for (let i = 0; i < 3; i++) ctx.fillRect(x + 8 + i * 10, y, 4, T);
+          // Ters kapak yatay çubuklu
+          for (let i = 0; i < 3; i++) gate.inverse ? ctx.fillRect(x + 4, y + 8 + i * 10, T - 8, 4) : ctx.fillRect(x + 8 + i * 10, y, 4, T);
         }
       }
     }
@@ -206,6 +207,16 @@ class Renderer {
       ctx.fillStyle = rgbaHex(CHANNEL_COLORS[L.channel], g.channelOn(L.channel) ? 1 : 0.5);
       ctx.fillRect(L.x + 4, L.y + 4, L.w - 8, 4);
     }
+    for (const M of g.movers) {
+      ctx.fillStyle = '#3a3c6e';
+      ctx.fillRect(M.minX, M.y + M.h / 2 - 1, M.maxX + M.w - M.minX, 2);
+      ctx.fillStyle = '#9a9ee0';
+      ctx.fillRect(M.x, M.y, M.w, M.h);
+      ctx.fillStyle = '#ffa94d';
+      ctx.fillRect(M.x + 4, M.y + M.h / 2 - 1, M.w - 8, 2);
+    }
+    ctx.fillStyle = '#ffa94d';
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) if (g.def.map[r][c] === ':') ctx.fillRect(c * T + T / 2 - 3, r * T, 6, T / 2);
     for (const sp of g.springs) {
       const since = t - sp.t;
       const k = since >= 0 && since < 0.6 ? Math.exp(-since * 7) * Math.cos(since * 26) : 0;

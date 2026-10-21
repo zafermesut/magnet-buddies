@@ -12,6 +12,9 @@
 //   x y z  asansör (1/2/3 kanalı açıkken yukarı çıkar; yan yana aynı harfler tek platform,
 //          üstündeki ilk duvarın bir karo altında durur)
 //   ^  yay (altında duvar olmalı)
+//   A B C  ters kapak (kanalı kapalıyken açık, açıkken kapalı)
+//   =  gezgin platform (yan yana '=' tek platform; duvara ya da ':' ray sonuna kadar gidip döner)
+//   :  ray sonu (görünür durdurucu, içinden geçilir)
 //
 // magnet: true olan bölümlerde mıknatıs açıktır. pols: oyuncuların başlangıç kutupları (1 = +, -1 = −).
 //
@@ -21,7 +24,7 @@ const LEVELS = [
   {
     id: 'merhaba',
     name: 'Merhaba',
-    hint: 'Yürü, zıpla ve hep birlikte kapıya girin. Çukura düşen arkadaşının yanında doğar.',
+    hint: 'Yürü, zıpla ve hep birlikte kapıya girin. Çukura düşen, en son durduğu yerde doğar.',
     map: [
       '################################',
       '#..............................#',
@@ -212,6 +215,105 @@ const LEVELS = [
     ],
   },
   {
+    id: 'gezgin',
+    name: 'Gezgin',
+    hint: 'Gezgin platform çukurun üstünde gidip gelir. Önce anahtarı alın: çıkıntı yüksek, birbirinizin üstüne çıkın.',
+    map: [
+      '################################',
+      '#........................D.....#',
+      '#........................D.....#',
+      '#........................D.....#',
+      '#........................D.....#',
+      '#........................D.....#',
+      '#........................D.....#',
+      '#.K......................D.....#',
+      '####.....................D.....#',
+      '####.....................D.....#',
+      '####.SS..................D...E.#',
+      '##########===.........##########',
+    ],
+  },
+  {
+    id: 'yuk-treni',
+    name: 'Yük treni',
+    hint: 'Ağır sandığı birlikte itip gezgin platforma yükleyin. Karşıda sandık, yüksek çıkıntıya basamak olur.',
+    boxNeed: 2,
+    map: [
+      '##################################',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#..............................E.#',
+      '#...........................######',
+      '#...........................######',
+      '#....H......................######',
+      '#.SS........................######',
+      '############====......############',
+    ],
+  },
+  {
+    id: 'ters-asansor',
+    name: 'Ters asansör',
+    hint: 'Ters kapak (yatay çizgili) düğmeye basılınca kapanır. Asansör çıkarken yol kapalı: zamanlamayı birlikte ayarlayın.',
+    map: [
+      '################################',
+      '#................A.............#',
+      '#................A.............#',
+      '#............##..A.............#',
+      '#................A...1......E..#',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#.1..SS........#################',
+      '#############xx#################',
+      '################################',
+    ],
+  },
+  {
+    id: 'yay-ve-kule',
+    name: 'Yay ve kule',
+    hint: 'Yayla rafa çıkın (zıplamayı basılı tutun). Raftaki çıkıntıya kule kurarak çıkın; yukarıdaki düğme asansörü kaldırır.',
+    map: [
+      '################################',
+      '#.....................##.......#',
+      '#.........................1..E.#',
+      '#.......................########',
+      '#.......................########',
+      '#.......................########',
+      '#.............########xx########',
+      '#.............##################',
+      '#.............##################',
+      '#.............##################',
+      '#.SS.........^##################',
+      '################################',
+    ],
+  },
+  {
+    id: 'hurda-dagi',
+    name: 'Hurda dağı',
+    hint: 'Gezgin platform, düğme, yay, şalter, asansör: hepsi bu dağda. Sonunda asansöre birlikte binip şalteri çevirin.',
+    map: [
+      '########################################',
+      '#......................................#',
+      '#..............................##......#',
+      '#....................................E.#',
+      '#................................#######',
+      '#................................#######',
+      '#................................#######',
+      '#...........................4.5..#######',
+      '#.........................#####yy#######',
+      '#......................a..##############',
+      '#......................a..##############',
+      '#......................a..##############',
+      '#...SS...............1.a.^##############',
+      '############===.....####################',
+    ],
+  },
+  {
     id: 'firlatma',
     name: 'Fırlatma',
     hint: 'Aynı kutuptasınız. Biriniz diğerinin üstüne çıksın, alttaki mıknatısı açınca (eylem tuşunu basılı tut) üstteki fırlar. Yukarı çıkan kutbunu değiştirip arkadaşını çekerek alsın.',
@@ -302,6 +404,7 @@ const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
 const PARTS = [
   { name: 'Uyanış', ids: ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu'] },
   { name: 'Hurda yığınları', ids: ['salter', 'merdiven', 'asansor', 'zipzip', 'hepsi-birden'] },
+  { name: 'Paslı raylar', ids: ['gezgin', 'yuk-treni', 'ters-asansor', 'yay-ve-kule', 'hurda-dagi'] },
   { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'miknatis-ustasi'] },
 ];
 const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
@@ -314,7 +417,7 @@ function levelUnlocked(i, done) {
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

@@ -14,8 +14,11 @@ const EDITOR_TOOLS = [
   { id: 'button', chs: '123', label: 'Düğme', cls: 'tBtn', tip: 'Üstünde biri dururken aynı renkteki kapakları açar, asansörleri kaldırır.' },
   { id: 'lever', chs: '456', label: 'Şalter', cls: 'tLever', tip: 'Eylem tuşuyla çevrilir; aynı renkteki kapaklar ve asansörler açık kalır.' },
   { id: 'gate', chs: 'abc', label: 'Kapak', cls: 'tGate', tip: 'Aynı renkteki düğme ya da şalter açar.' },
+  { id: 'igate', chs: 'ABC', label: 'Ters kapak', cls: 'tIGate', tip: 'Aynı renkteki düğme ya da şalter açıkken kapanır, kapalıyken açıktır.' },
   { id: 'lift', chs: 'xyz', label: 'Asansör', cls: 'tLift', tip: 'Yan yana çiz: tek platform olur. Aynı renk açılınca yukarı çıkar, üstündeki ilk duvarın bir karo altında durur.' },
   { id: 'oneway', ch: '-', label: 'Platform', cls: 'tOne', tip: 'İnce platform: alttan geçilir, üstüne basılır.' },
+  { id: 'mover', ch: '=', label: 'Gezgin', cls: 'tMover', tip: 'Yan yana çiz: tek platform olur. Duvara ya da ray sonuna kadar gidip döner.' },
+  { id: 'stop', ch: ':', label: 'Ray sonu', cls: 'tStop', tip: 'Gezgin platform burada döner. İçinden geçilir.' },
   { id: 'spring', ch: '^', label: 'Yay', cls: 'tSpring', tip: 'Üstüne basanı ~4 karo fırlatır; zıplama basılıysa ~5 karo. Altında duvar olmalı.' },
   { id: 'box', ch: 'H', label: 'Ağır kutu', cls: 'tH', tip: '2×2 karo. İki kişi birlikte iter.' },
 ];

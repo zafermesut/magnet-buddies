@@ -26,6 +26,8 @@ const PHYS = {
 
   // Hurdalık öğeleri
   liftSpeed: 120,      // asansör (px/sn)
+  moverSpeed: 90,      // gezgin platform (px/sn)
+  moverPause: 1.2,     // gezgin platformun uçlarda bekleme süresi (sn)
   springV: 860,        // yayın fırlatma hızı: ~4 karo; zıplama tuşu basılıysa springBoost katı (~5 karo)
   springBoost: 1.12,
 

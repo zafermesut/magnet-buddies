@@ -323,6 +323,9 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tBtn { background: transparent; border-bottom: 5px solid var(--ch); border-radius: 2px; height: 10px; }
 .tool i.tLever { background: linear-gradient(var(--ch), var(--ch)) 70% 0 / 4px 70% no-repeat, linear-gradient(#8c90c8, #8c90c8) bottom / 100% 4px no-repeat; transform: rotate(18deg); }
 .tool i.tGate { background: repeating-linear-gradient(90deg, var(--ch) 0 3px, transparent 3px 6px); }
+.tool i.tIGate { background: repeating-linear-gradient(0deg, var(--ch) 0 3px, transparent 3px 6px); }
+.tool i.tMover { background: linear-gradient(#9a9ee0, #9a9ee0) center / 100% 5px no-repeat, linear-gradient(#3a3c6e, #3a3c6e) center / 100% 1px no-repeat; }
+.tool i.tStop { background: linear-gradient(#ffa94d, #ffa94d) center top / 4px 60% no-repeat; }
 .tool i.tLift { background: #55588f; box-shadow: inset 0 3px 0 var(--ch); }
 .tool i.tOne { background: linear-gradient(#c27a4a, #c27a4a) top / 100% 5px no-repeat; }
 .tool i.tSpring { background: linear-gradient(#ffa94d, #ffa94d) top / 100% 4px no-repeat, repeating-linear-gradient(0deg, #8c90c8 0 2px, transparent 2px 4px); }

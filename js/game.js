@@ -53,7 +53,7 @@ class Game {
     this.grid = [];
     this.blockers = [];
     this.keys = []; this.doors = []; this.buttons = []; this.gates = []; this.boxes = [];
-    this.levers = []; this.lifts = []; this.springs = [];
+    this.levers = []; this.lifts = []; this.springs = []; this.movers = [];
     this.oneway = [];
     this.switches = { 1: false, 2: false, 3: false };   // şalterlerin açık tuttuğu kanallar
     this.spawn = null; this.exit = null;
@@ -82,10 +82,20 @@ class Game {
           this.keys.push(makeBody('key', x + (T - k) / 2, y + T - k, k, k, { holder: null, used: false, noPick: new Map() }));
         } else if (ch === 'D') doorCells.push({ r, c });
         else if ('123'.includes(ch)) this.buttons.push({ channel: +ch, x: x + 3, y: y + T - 8, w: T - 6, h: 8, pressed: false });
-        else if ('abc'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
+        else if ('abcABC'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
         else if (ch === 'H') this.boxes.push(makeBody('box', x, y, 2 * T, 2 * T, { push: { 1: 0, '-1': 0 }, pushers: 0 }));
         else if ('456'.includes(ch)) this.levers.push({ channel: +ch - 3, x, y, w: T, h: T, flipT: -9 });
         else if (ch === '^') this.springs.push({ x: x + 4, y: y + T - 12, w: T - 8, h: 12, t: -9 });
+        else if (ch === '=' && map[r][c - 1] !== '=') {
+          // Gezgin platform: yan yana '=' tek platformdur; duvara ya da ray sonuna (':') kadar gidip döner
+          let w = 1;
+          while (map[r][c + w] === '=') w++;
+          const stop = k => k < 0 || k >= cols || map[r][k] === '#' || map[r][k] === ':';
+          let a = c - 1, b = c + w;
+          while (!stop(a)) a--;
+          while (!stop(b)) b++;
+          this.movers.push(makeBody('mover', x, y, w * T, 14, { minX: (a + 1) * T, maxX: b * T - w * T, dir: 1, pause: 0, supported: true, onGround: true }));
+        }
         else if ('xyz'.includes(ch) && map[r][c - 1] !== ch) {
           // Asansör: yan yana aynı harfler tek platformdur. Üstündeki ilk duvarın bir karo altına kadar çıkar.
           let w = 1;
@@ -118,7 +128,9 @@ class Game {
     }
 
     for (const ch in gateCells) {
-      const gate = { kind: 'gate', channel: 'abc'.indexOf(ch) + 1, cells: gateCells[ch], open: false };
+      // Büyük harfli kapak terstir: kanal kapalıyken açık, açıkken kapalı
+      const inverse = ch === ch.toUpperCase();
+      const gate = { kind: 'gate', channel: 'abc'.indexOf(ch.toLowerCase()) + 1, inverse, cells: gateCells[ch], open: inverse };
       for (const q of gate.cells) this.blockers[q.r][q.c] = gate;
       this.gates.push(gate);
     }
@@ -217,7 +229,7 @@ class Game {
     if (this.done) return;
     this.t += dt;
     const ph = PHYS;
-    this.solids = this.players.filter(p => !p.inExit).concat(this.boxes, this.lifts);
+    this.solids = this.players.filter(p => !p.inExit).concat(this.boxes, this.lifts, this.movers);
 
     // 1) Oyuncu girişleri
     this.players.forEach((p, i) => {
@@ -278,9 +290,10 @@ class Game {
     }
 
     this.updateLifts(dt);
+    this.updateMovers(dt);
 
     // 3) Yerçekimi ve hareket: alttakiler önce hareket eder, üstündekiler onunla taşınır
-    const movers = this.solids.filter(o => o.kind !== 'lift').sort((a, b) => (b.y + b.h) - (a.y + a.h));
+    const movers = this.solids.filter(o => o.kind !== 'lift' && o.kind !== 'mover').sort((a, b) => (b.y + b.h) - (a.y + a.h));
     for (const b of movers) { b.dx = 0; b.blockedBy = null; b.boxHit = null; }
     for (const b of movers) {
       b.vy = Math.min(b.vy + ph.gravity * dt, ph.maxFall);
@@ -303,6 +316,8 @@ class Game {
       }
     }
     for (const b of movers) b.supported = b.onGround && (!b.ground || b.ground.supported);
+    // Düşen oyuncu en son sağlam zeminde (karo üstünde) durduğu yerde doğar
+    for (const p of this.players) if (p.supported && !p.ground && !p.inExit) p.safe = { x: p.x, y: p.y };
 
     // 4) İtme zinciri: kutuya yaslanan oyuncuyu aynı yöne iten herkes iten sayılır
     for (const p of this.players) {
@@ -388,7 +403,7 @@ class Game {
   // Asansör: kanalı açıkken yukarı, kapalıyken aşağı gider; üstündekileri taşır, kimseyi ezmez
   updateLifts(dt) {
     const free = this.keys.filter(k => !k.used && !k.holder);
-    const bodies = this.solids.filter(o => o.kind !== 'lift').concat(free);
+    const bodies = this.solids.filter(o => o.kind !== 'lift' && o.kind !== 'mover').concat(free);
     for (const L of this.lifts) {
       const target = this.channelOn(L.channel) ? L.topY : L.oy;
       const dy = Math.max(-PHYS.liftSpeed * dt, Math.min(PHYS.liftSpeed * dt, target - L.y));
@@ -416,6 +431,25 @@ class Game {
     }
   }
 
+  // Gezgin platform: iki ucu arasında gidip gelir, uçlarda biraz bekler. Üstündekiler yerçekimi adımında
+  // zemin kayması (dx) ile taşınır; önüne çıkanı iter, itemezse (duvara sıkıştıracaksa) geri döner.
+  updateMovers(dt) {
+    const bodies = this.solids.filter(o => o.kind !== 'lift' && o.kind !== 'mover');
+    for (const M of this.movers) {
+      M.dx = 0;
+      if (M.pause > 0) { M.pause -= dt; continue; }
+      let dx = M.dir * PHYS.moverSpeed * dt;
+      const end = M.dir > 0 ? M.maxX : M.minX;
+      if ((M.dir > 0 && M.x + dx >= end) || (M.dir < 0 && M.x + dx <= end)) { dx = end - M.x; M.dir = -M.dir; M.pause = PHYS.moverPause; }
+      const next = { x: M.x + dx, y: M.y, w: M.w, h: M.h };
+      const pushed = bodies.filter(b => b.ground !== M && overlap(b, next));
+      for (const b of pushed) this.moveX(b, dx > 0 ? next.x + next.w - b.x : next.x - (b.x + b.w));
+      if (pushed.some(b => overlap(b, next))) { M.dir = -M.dir; M.pause = 0.2; continue; }
+      M.x += dx;
+      M.dx = dx;
+    }
+  }
+
   // Yay: üstüne basanı yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
   updateSprings() {
     for (const s of this.springs) {
@@ -423,7 +457,8 @@ class Game {
       for (const p of this.players) {
         if (p.inExit || !p.onGround || p.vy < 0 || !overlap(p, pad)) continue;
         p.vy = -PHYS.springV * (p.prevJump ? PHYS.springBoost : 1);
-        p.cut = true; p.coyote = 0; p.jumpBuf = 0;
+        // Artık havada: sonraki karede normal zıplama yayın hızını ezmesin
+        p.cut = true; p.coyote = 0; p.jumpBuf = 0; p.onGround = false; p.supported = false; p.ground = null;
         p.squash = -0.3;
         s.t = this.t;
         this.fx('spring', s.x + s.w / 2, s.y);
@@ -445,8 +480,10 @@ class Game {
       k.vy = Math.min(k.vy + ph.gravity * dt, ph.maxFall);
       k.magT = Math.max(0, (k.magT || 0) - dt);
       k.vx = approach(k.vx, 0, (k.onGround && !k.magT ? 1500 : 150) * dt);
+      const carry = k.ground && (k.ground.kind === 'mover' || this.solids.includes(k.ground)) ? k.ground.dx || 0 : 0;
       k.onGround = false;
-      this.moveX(k, k.vx * dt);
+      k.ground = null;
+      this.moveX(k, k.vx * dt + carry);
       this.moveY(k, k.vy * dt);
       for (const s of this.springs) {
         if (k.onGround && overlap(k, { x: s.x, y: s.y - 2, w: s.w, h: s.h + 2 })) { k.vy = -PHYS.springV * 0.9; s.t = this.t; }
@@ -499,7 +536,7 @@ class Game {
       if (b.pressed && !was) this.fx('click', b.x + b.w / 2, b.y, { color: CHANNEL_COLORS[b.channel] });
     }
     for (const g of this.gates) {
-      const want = this.channelOn(g.channel);
+      const want = this.channelOn(g.channel) !== !!g.inverse;
       if (want) g.open = true;
       else if (g.open) {
         // İçinde biri varken kapanmaz
@@ -525,15 +562,13 @@ class Game {
     p.vy = -250;
   }
 
+  // Çukura düşen, en son sağlam zeminde durduğu yerde doğar (arkadaşının yanında doğsaydı
+  // biri karşıya geçince öbürü kendini çukura atıp geçebilirdi). Orası doluysa biraz üstünde.
   respawn(p) {
-    const mate = this.players.find(o => o !== p && !o.inExit && o.supported);
-    if (mate) {
-      p.x = mate.x;
-      p.y = mate.y - p.h - 6;
-    } else {
-      p.x = this.spawn.x + 3;
-      p.y = this.spawn.y + T - p.h;
-    }
+    const at = p.safe || { x: this.spawn.x + 3, y: this.spawn.y + T - p.h };
+    p.x = at.x;
+    p.y = at.y;
+    while (this.solids.some(o => o !== p && overlap(p, o)) && p.y > 0) p.y -= T / 2;
     p.vx = p.vy = 0;
     this.fx('respawn', p.x + p.w / 2, p.y + p.h / 2, { color: PLAYER_COLORS[p.index] });
   }

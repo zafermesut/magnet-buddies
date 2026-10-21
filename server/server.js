@@ -217,6 +217,7 @@ class Room {
       sw: [1, 2, 3].map(c => (g.switches[c] ? 1 : 0)),
       lv: g.levers.map(l => r3(l.flipT)),
       l: g.lifts.map(l => r1(l.y)),
+      m: g.movers.map(m => r1(m.x)),
       sp: g.springs.map(s => r3(s.t)),
       fx,
     };

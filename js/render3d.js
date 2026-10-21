@@ -155,6 +155,8 @@ class Renderer3D {
       coil: new THREE.TorusGeometry(0.26, 0.035, 8, 24),
       springPad: new RoundedBoxGeometry(0.8, 0.1, 0.62, 2, 0.04),
       rail: new THREE.BoxGeometry(0.06, 1, 0.06),
+      railH: new THREE.BoxGeometry(1, 0.05, 0.05),
+      stopPost: new RoundedBoxGeometry(0.16, 0.5, 0.3, 2, 0.04),
     };
     this.mat = {
       block: std(PALETTE.block, { roughness: 0.82 }),
@@ -458,9 +460,11 @@ class Renderer3D {
         const p = new THREE.Mesh(this.geo.gatePanel, panelMat);
         p.position.y = 0.5;
         g.add(p);
-        for (const dx of [-0.26, 0, 0.26]) {
+        // Ters kapak yatay çubuklu: kanalı açılınca kapanır
+        for (const d of [-0.26, 0, 0.26]) {
           const b = new THREE.Mesh(this.geo.bar, barMat);
-          b.position.set(dx, 0.5, 0);
+          if (gate.inverse) { b.rotation.z = Math.PI / 2; b.scale.y = 0.8; b.position.set(0, 0.5 + d, 0); }
+          else b.position.set(d, 0.5, 0);
           b.castShadow = true;
           g.add(b);
         }
@@ -534,6 +538,27 @@ class Renderer3D {
       }
       return { L, g, stripMat };
     });
+
+    // Gezgin platformlar: ince metal platform, altında gidip geldiği ray ve uçlarda durdurucular
+    this.moverObjs = game.movers.map(M => {
+      const w = wx(M.w);
+      const body = new THREE.Mesh(new RoundedBoxGeometry(w, wx(M.h), 0.86, 2, 0.05), this.mat.lift);
+      body.castShadow = body.receiveShadow = true;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(w - 0.12, 0.05, 0.03), this.mat.springPad);
+      stripe.position.set(0, 0, 0.44);
+      const g = new THREE.Group();
+      g.add(body, stripe);
+      this.levelGroup.add(g);
+      const rail = new THREE.Mesh(this.geo.railH, this.mat.rail);
+      const x0 = wx(M.minX), x1 = wx(M.maxX + M.w);
+      rail.scale.x = x1 - x0;
+      rail.position.set((x0 + x1) / 2, wy(M.y + M.h / 2), -0.36);
+      this.levelGroup.add(rail);
+      return { M, g };
+    });
+    const stops = [];
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (game.def.map[r][c] === ':') stops.push([c, r]);
+    if (stops.length) inst(this.geo.stopPost, this.mat.springPad, stops, (o, c, r) => o.position.set(c + 0.5, -r - 0.25, -0.2));
 
     // Yaylar: taban, yay halkaları ve turuncu pedal
     this.springObjs = game.springs.map(sp => {
@@ -907,6 +932,7 @@ class Renderer3D {
       o.g.position.set(wx(o.L.x + o.L.w / 2), wy(o.L.y + o.L.h / 2), 0);
       o.stripMat.emissiveIntensity = game.channelOn(o.L.channel) ? 1.8 : 0.5;
     }
+    for (const o of this.moverObjs) o.g.position.set(wx(o.M.x + o.M.w / 2), wy(o.M.y + o.M.h / 2), 0);
     for (const o of this.springObjs) {
       // Fırlatınca önce basılır, sonra sönen bir sekmeyle açılır
       const since = game.t - o.sp.t;

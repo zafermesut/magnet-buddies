@@ -258,7 +258,7 @@ function crossPit(g, A, B, edgeX, farX, done) {
     if (B.x > farX - 10) {   // B karşıda: kenardan zıpla, çekilmeyi bekle
       const cx = p.x + p.w / 2;
       if (cx < edgeX - 6 && p.supported && p.x < farX) return I({ right: true });
-      return I({ right: true, jump: true });
+      return I({ right: true, jump: p.supported ? (t * 6 | 0) % 2 === 0 : p.vy < 0 });
     }
     // B'nin hemen arkasında dur, B havalanınca it
     const target = B.x - p.w - 2;
@@ -283,6 +283,7 @@ function crossPit(g, A, B, edgeX, farX, done) {
 }
 // Duvar aşma: B, A'nın üstüne çıkar; A fırlatır; yukarıda B kutup değiştirip A'yı çeker
 function climbWall(g, A, B, standX, wallX, topY, done) {
+  let launching = false;
   const onTop = p => p.supported && p.y + p.h <= topY + 1 && p.x + p.w > wallX;
   const a = (g, p, t) => {
     if (done()) return null;
@@ -296,7 +297,10 @@ function climbWall(g, A, B, standX, wallX, topY, done) {
     }
     const cx = p.x + p.w / 2;
     if (Math.abs(cx - standX) > 6) return I({ right: cx < standX, left: cx > standX });
-    return I({ action: B.ground === p || (!B.supported && B.y < p.y) });
+    // Yalnızca B tam üstüne oturunca fırlat, B yükselirken itmeye devam et
+    if (B.ground === p && Math.abs(B.x - p.x) < 6) launching = true;
+    else if (B.supported || B.vy >= 0) launching = false;
+    return I({ action: launching });
   };
   const b = (g, p, t) => {
     if (done()) return null;
@@ -310,7 +314,7 @@ function climbWall(g, A, B, standX, wallX, topY, done) {
       return I({ action: true, right: A.y + A.h < topY });
     }
     if (p.y + p.h < topY + 20 || (!p.supported && p.vy < 0 && p.y < A.y - T)) return I({ right: true });
-    if (p.ground === A) return idle();
+    if (p.ground === A) { const d = A.x - p.x; return I({ right: d > 2, left: d < -2 }); }   // kafasında ortalan
     return climbOn(A)(g, p, t);
   };
   return [a, b];
@@ -526,6 +530,207 @@ console.log('Hurdalık bölümleri');
   };
   ok(run(g, [a, b], 40, g => g.done), '9. Zıp zıp geçildi (' + g.t.toFixed(1) + ' sn)');
 }
+// Gezgin platformla karşıya geçiş: kıyıda bekle, platform bu uçtayken bin, karşı uçta in.
+// slot: platformdaki yer (px); öndeki büyük, arkadaki küçük slot alır.
+const ride = (M, slotOf) => (g, p, t) => {
+  const shore = M.maxX + M.w, slot = typeof slotOf === 'function' ? slotOf(p) : slotOf;
+  if ((p.supported && !p.ground && p.x + p.w / 2 > shore + 4) || p.x > shore + 10) return null;   // karşı kıyıda
+  if (p.x + p.w > shore + 1 && (p.supported || p.ground === M)) return I({ right: true });   // kıyıya basıyor: ilerle
+  const hold = x => { const d = x - p.x; return I({ right: d > 3, left: d < -3 }); };
+  if (p.ground === M) return M.x >= M.maxX - 0.5 ? I({ right: true }) : hold(M.x + slot);
+  if (!p.supported) return I({ right: true });
+  if (M.x <= M.minX + 0.5 && M.pause > 0.15) return hold(M.x + slot);
+  return hold(M.minX - p.w - 4 - (slot > 20 ? 0 : 40));
+};
+// Kim öndeyse (kıyıya yakınsa) platformun ön tarafına biner
+const rideBoth = (M, A, B) => {
+  const slot = p => { const o = p === A ? B : A; return p.x >= o.x ? M.w - PHYS.playerSize - 4 : 2; };
+  return [ride(M, slot), ride(M, slot)];
+};
+
+console.log('Paslı raylar öğeleri');
+{
+  // Gezgin platform üstündekini taşır, uçlarda döner
+  const g = new Game(L('gezgin'), 1), p = g.players[0], M = g.movers[0];
+  p.x = M.x + 20; p.y = M.y - p.h;
+  let minX = M.x, maxX = M.x, fell = false;
+  run(g, [idle], 8, () => { minX = Math.min(minX, M.x); maxX = Math.max(maxX, M.x); if (p.y > M.y) fell = true; return false; });
+  ok(!fell && Math.abs(p.x - M.x - 20) < 2, 'gezgin platform üstündekini düşürmeden taşır');
+  ok(Math.abs(minX - M.minX) < 1 && Math.abs(maxX - M.maxX) < 1, 'gezgin platform iki ucu arasında gidip gelir');
+}
+{
+  // Ters kapak: kanal kapalıyken açık, düğmeye basılınca kapanır, bırakınca açılır
+  const g = new Game(L('ters-asansor'), 2), [A] = g.players, gate = g.gates.find(x => x.inverse);
+  const low = g.buttons.slice().sort((p, q) => q.y - p.y)[0];
+  run(g, [idle, idle], 0.2);
+  const wasOpen = gate.open;
+  A.x = low.x; A.y = low.y + low.h - A.h;
+  run(g, [idle, idle], 0.3);
+  const closed = !gate.open;
+  A.x = 6 * T;
+  run(g, [idle, idle], 0.3);
+  ok(wasOpen && closed && gate.open, 'ters kapak düğmeye basılınca kapanır, bırakınca açılır');
+}
+{
+  // Çukura düşen, arkadaşının yanında değil en son durduğu yerde doğar
+  const g = new Game(L('gezgin'), 2), [A, B] = g.players;
+  B.x = 24 * T; B.y = 10 * T - B.h + 6;   // B karşıda
+  run(g, [idle, idle], 0.5);
+  A.x = 8 * T; run(g, [idle, idle], 0.3);
+  run(g, [() => I({ right: true }), idle], 4, g => g.effects.some(e => e.type === 'respawn'));
+  ok(A.x < 10 * T && B.x > 22 * T, 'çukura düşen kendi kıyısında doğar (A x=' + (A.x / T).toFixed(1) + ')');
+}
+
+console.log('Paslı raylar bölümleri');
+{
+  // Gezgin: kule ile anahtarı al, platformla geç, kapıyı aç
+  const g = new Game(L('gezgin'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0], M = g.movers[0];
+  const ledge = { surf: 8 * T, x0: T, x1: 4 * T }, baseX = 4 * T + 22;
+  const [ra, rb] = rideBoth(M, A, B);
+  const a = (g, p, t) => {
+    if (key.holder !== B && !key.used) return goTo(baseX)(g, p, t);
+    return door.open ? goTo(ex)(g, p, t) : ra(g, p, t) || goTo(23 * T + 20)(g, p, t);   // kıyıdan uzaklaş, B insin
+  };
+  const b = (g, p, t) => {
+    if (key.holder === p || key.used) {
+      if (door.open) return goTo(ex)(g, p, t);
+      if (p.x < 22 * T) return rb(g, p, t) || I({ right: true });
+      return goTo(door.cells[0].c * T)(g, p, t);
+    }
+    if (surfOn(p, ledge)) return goTo(key.x + key.w / 2)(g, p, t);
+    if (p.ground === A) return I({ jump: (t * 5 | 0) % 2 === 0, left: p.y + p.h < 8 * T });
+    if (!p.supported && p.y + p.h < 10 * T) return I({ jump: p.vy < 0, left: p.y + p.h < 8 * T });
+    if (Math.abs(A.x + A.w / 2 - baseX) > 8 || !A.supported) return goTo(baseX + 60)(g, p, t);
+    return climbOn(A)(g, p, t);
+  };
+  ok(run(g, [a, b], 60, g => g.done), '11. Gezgin geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Yük treni: sandığı platforma iki seferde yükle, karşıda indir, duvara dayayıp basamak yap
+  const g = new Game(L('yuk-treni'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, box = g.boxes[0], M = g.movers[0];
+  const atLeft = () => M.x <= M.minX + 0.5 && M.pause > 0.15, atRight = () => M.x >= M.maxX - 0.5 && M.pause > 0.15;
+  const [ra, rb] = rideBoth(M, A, B);
+  const c = (g, p, t) => {
+    const onM = p.ground === M, boxOnM = box.ground === M;
+    if (box.x + box.w >= 28 * T - 1) {   // sandık duvarda: üstüne çık, oradan çıkıntıya
+      if (p.ground === box) return I({ right: true, jump: (t * 5 | 0) % 2 === 0 || p.vy < 0 });
+      return goTo(ex)(g, p, t);
+    }
+    if (box.x >= 16 * T && !boxOnM) {   // sandık karşı kıyıda: karşıya geç ve duvara it
+      if (onM) return atRight() ? I({ right: true }) : idle();
+      return (p === A ? ra : rb)(g, p, t) || I({ right: true });
+    }
+    if (boxOnM) {
+      if (box.x < M.x + M.w / 2 - 1 && atLeft()) return I({ right: true });   // ikinci yükleme: sandığı öne it, platforma bin
+      if (onM) return atRight() ? I({ right: true }) : idle();
+      return idle();
+    }
+    if (box.x + box.w < 12 * T - 1) return I({ right: true });           // sandığı kıyıya it
+    return atLeft() ? I({ right: true }) : idle();                         // platform gelince yükle
+  };
+  ok(run(g, [c, c], 90, g => g.done), '12. Yük treni geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Ters asansör: düğme asansörü kaldırır ama ters kapağı kapatır; sırayla geçilir
+  const g = new Game(L('ters-asansor'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, lift = g.lifts[0];
+  const [high, low] = g.buttons.slice().sort((p, q) => p.y - q.y), liftX = lift.x + lift.w / 2, gate = g.gates[0];
+  const up = () => lift.y <= lift.topY + 0.5, down = () => lift.y >= lift.oy - 0.5, onLift = p => p.ground === lift;
+  const upper = p => p.supported && p.y + p.h <= 5 * T + 1;
+  const pastGate = p => upper(p) && p.x > 18 * T;
+  const step = (p, x) => { const d = x - p.x; return I({ right: d > 3, left: d < -3 }); };
+  const a = (g, p, t) => {
+    if (pastGate(p)) return goTo(ex)(g, p, t);
+    if (upper(p) && !onLift(p)) return gate.open ? I({ right: true }) : step(p, 15 * T + 4);   // yukarıda, kapak açılmasını bekle
+    if (onLift(p)) return up() ? I({ right: true }) : idle();
+    if (!pastGate(B)) return onLift(B) || !down() ? (upper(B) ? goTo(5 * T)(g, p, t) : goTo(low.x + low.w / 2)(g, p, t)) : goTo(5 * T)(g, p, t);
+    return down() ? goTo(liftX)(g, p, t) : goTo(5 * T)(g, p, t);
+  };
+  const b = (g, p, t) => {
+    if (pastGate(p)) {
+      if (pastGate(A)) return goTo(ex)(g, p, t);
+      if (upper(A) && !onLift(A)) return goTo(ex)(g, p, t);              // A yukarıda: düğmeden in, kapak açılsın
+      return onLift(A) && (down() || !up()) || up() ? step(p, high.x + 4) : step(p, 19 * T);
+    }
+    if (upper(p) && !onLift(p)) return gate.open ? I({ right: true }) : step(p, 15 * T + 4);
+    if (onLift(p)) return up() ? I({ right: true }) : idle();
+    return goTo(liftX)(g, p, t);
+  };
+  ok(run(g, [a, b], 60, g => g.done), '13. Ters asansör geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Yay ve kule: ikisi de yayla rafa, A asansörde durur, B onun üstünden çıkıntıya; B düğmeyle A'yı kaldırır
+  // Öndeki oyuncu (2P) önden gidip asansörde bekler: burada A o, B arkadan gelir
+  const g = new Game(L('yay-ve-kule'), 2), [B, A] = g.players, ex = g.exit.x + g.exit.w / 2, sp = g.springs[0], lift = g.lifts[0], btn = g.buttons[0];
+  const shelf = p => p.supported && Math.abs(p.y + p.h - 6 * T) < 2;
+  const ledge = p => p.supported && p.y + p.h <= 3 * T + 1 && p.x + p.w > 24 * T;
+  const toSpring = (g, p, t) => {
+    if (!p.supported) return I({ right: true, jump: true });
+    const d = sp.x + sp.w / 2 - (p.x + p.w / 2);
+    return I({ right: d > 0, left: d < -30, jump: Math.abs(d) < 50 });
+  };
+  const liftX = lift.x + lift.w / 2;
+  const a = (g, p, t) => {
+    if (ledge(p)) return goTo(ex)(g, p, t);
+    if (p.ground === lift) return lift.y <= lift.topY + 0.5 ? I({ right: true }) : idle();
+    if (shelf(p) || (p.supported && p.y + p.h <= 6 * T + 1)) return goTo(liftX)(g, p, t);
+    return toSpring(g, p, t);
+  };
+  let fromA = false;   // B, A'nın kafasından sıçradı mı (sıçradıysa havada sağa, çıkıntıya)
+  const b = (g, p, t) => {
+    if (ledge(p)) return ledge(A) ? goTo(ex)(g, p, t) : goTo(btn.x + btn.w / 2)(g, p, t);
+    if (p.ground === A) { fromA = true; const d = A.x - p.x; return I({ right: d > 2, left: d < -2, jump: Math.abs(d) <= 2 && (t * 5 | 0) % 2 === 0 }); }
+    if (p.supported) fromA = false;
+    if (fromA && !p.supported) return I({ right: p.y + p.h < 3 * T, jump: p.vy < 0 });
+    const up = p.y + p.h <= 6 * T + 1 && p.x > 14 * T;   // raf seviyesinde (yerde ya da havada)
+    if (shelf(p) || up) return A.ground === lift ? climbOn(A)(g, p, t) : goTo(18 * T)(g, p, t);
+    return A.ground === lift || shelf(A) ? toSpring(g, p, t) : idle();
+  };
+  ok(run(g, [b, a], 60, g => g.done), '14. Yay ve kule geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Hurda dağı: platformla geç; önden inen A yaya gider, arkadan inen B kıyıdaki düğmede kapağı tutar.
+  // A yayla rafa çıkıp şalteri çevirir (kapak açık kalır), B de yayla çıkar; ikisi asansöre biner, biri yandaki şalteri çevirir
+  const g = new Game(L('hurda-dagi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, M = g.movers[0], lift = g.lifts[0], sp = g.springs[0];
+  const btn = g.buttons[0], lv1 = g.levers.find(l => l.channel === 1);
+  const [ra, rb] = rideBoth(M, A, B);
+  const shelf = p => p.supported && p.y + p.h <= 8 * T + 1 && p.x > 26 * T - 10;
+  const top = p => p.supported && p.y + p.h <= 4 * T + 1 && p.x > 30 * T;
+  const toSpring = (g, p, t) => {
+    if (!p.supported) return I({ right: true, jump: true });
+    const d = sp.x + sp.w / 2 - (p.x + p.w / 2);
+    return I({ right: d > 0, left: d < -30, jump: Math.abs(d) < 50 });
+  };
+  const step = (p, x) => { const d = x - p.x; return I({ right: d > 2, left: d < -2 }); };
+  const onLift = p => p.ground === lift;
+  let runner = null;   // ilk karşıya geçen yaya gider, öbürü düğmede bekler
+  const c = (g, p, t) => {
+    const o = p === A ? B : A;
+    if (top(p)) return goTo(ex)(g, p, t);
+    if (onLift(p)) {
+      if (lift.y <= lift.topY + 0.5) return I({ right: true });
+      if (p === runner) {   // şalterin yanındaki yerde dur, arkadaşın binince çevir
+        if (Math.abs(p.x - (31 * T + 2)) > 3) return step(p, 31 * T + 2);
+        return onLift(o) && !g.switches[2] ? I({ action: (t * 6 | 0) % 2 === 0 }) : idle();
+      }
+      return step(p, 32 * T + 4);
+    }
+    if (shelf(p)) {
+      if (p === runner && !g.switches[1]) return overlap(grow(p, 6), lv1) ? I({ action: (t * 6 | 0) % 2 === 0 }) : goTo(lv1.x + T / 2)(g, p, t);
+      if (p === runner) return shelf(o) || onLift(o) ? goTo(31 * T + 20)(g, p, t) : idle();
+      return goTo(32 * T + 20)(g, p, t);
+    }
+    const r = (p === A ? ra : rb)(g, p, t); if (r) return r;
+    if (!runner) runner = p;
+    if (p === runner) {
+      if (p.x < 22 * T + 4) return goTo(22 * T + 20)(g, p, t);   // düğmedekinin üstünden atlayıp kapağın önüne geç
+      return btn.pressed || g.switches[1] ? toSpring(g, p, t) : idle();
+    }
+    return g.switches[1] ? toSpring(g, p, t) : goTo(btn.x + btn.w / 2)(g, p, t);
+  };
+  const a = c, b = c;
+  ok(run(g, [a, b], 90, g => g.done), '15. Hurda dağı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 {
   // Ağ: şalter, asansör ve yayın durumu yeni bir Game'e aktarılabilir olmalı (sunucu bunları yollar)
   const g = new Game(L('asansor'), 2);
