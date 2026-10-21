@@ -235,14 +235,40 @@ button.google:hover:not(:disabled), #account button.google:hover:not(:disabled) 
 .card .row > button { flex: 1; }
 
 /* ---------- Atölye ---------- */
-.card.atolyeCard { width: min(980px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; text-align: left; background: rgba(26, 24, 60, 0.94); }
-.atHead { display: flex; align-items: center; gap: 12px; }
-.atHead h2 { flex: none; }
-.atHead input { flex: 1; text-align: left; }
+.card.atolyeCard { width: min(980px, 100%); max-height: calc(100vh - 40px); overflow-y: auto; text-align: left; background: rgba(26, 24, 60, 0.94); gap: 16px; padding: 24px 26px; }
+.atHead { display: flex; align-items: center; gap: 14px; }
+.atHead h2 { flex: none; display: flex; align-items: center; }
+.atHead input { flex: 1; text-align: left; font-size: 15px; padding: 10px 14px; }
+#atClose { margin-left: auto; }
+#atBody { display: flex; flex-direction: column; gap: 18px; }
+#atBody section { display: flex; flex-direction: column; gap: 12px; }
+.atolyeCard button.primary { font-size: 15px; letter-spacing: .03em; padding: 12px 18px; box-shadow: 0 4px 0 #3f9c51, 0 8px 18px rgba(105, 219, 124, 0.2); }
+.atolyeCard button.primary:active:not(:disabled) { box-shadow: 0 1px 0 #3f9c51; transform: translateY(3px); }
+button.small { padding: 8px 14px; font-size: 14px; border-radius: 12px; }
+.atolyeCard button.primary.small { padding: 9px 16px; font-size: 14px; letter-spacing: 0; }
+.link.back { align-self: flex-start; padding: 6px 12px 6px 8px; border-radius: 10px; background: rgba(255, 255, 255, .05); font-size: 14px; }
+.link.back:hover { background: rgba(255, 255, 255, .1); }
+.secHead { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+#atBody .secHead h3 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 19px; }
+.secHead .count { min-width: 26px; padding: 2px 9px; border-radius: 999px; background: rgba(255, 255, 255, .08); color: #b9bce0; font-size: 13px; font-weight: 600; text-align: center; }
+#atBody .pageTitle { margin: 0; font-size: 24px; display: flex; align-items: center; }
+#atBody .pageTitle .ic { color: #ffd43b; }
+.emptyBox { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 26px 20px; text-align: center;
+  border: 1.5px dashed rgba(255, 255, 255, .14); border-radius: 16px; color: #b9bce0; }
+.emptyBox > .ic { width: 30px; height: 30px; color: #74779f; }
+.emptyBox p { margin: 0; max-width: 420px; font-size: 14px; line-height: 1.5; }
+.emptyBox b { color: #fff; }
+.field { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.field > span { font-size: 13px; font-weight: 600; color: #b9bce0; }
+.field em { font-style: normal; font-weight: 400; color: #74779f; margin-left: 4px; }
+.field input { text-align: left; font-size: 15px; padding: 11px 14px; }
+.field .cselectBtn { padding: 11px 12px; font-size: 15px; }
+.formFoot { display: flex; align-items: center; justify-content: flex-end; gap: 14px; padding-top: 4px; }
+.formFoot .error { flex: 1; margin: 0; }
 .tabs { display: flex; gap: 6px; flex-wrap: wrap; }
 .tabs button { border-radius: 999px; padding: 7px 14px; }
 .tabs button.on { background: #69db7c; color: #14301b; border-color: transparent; }
-#atBody h3 { margin: 10px 0 4px; }
+#atBody h3 { margin: 0; }
 .atGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
 .atCard { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 8px; position: relative; }
 .atCard canvas { width: 100%; height: auto; border-radius: 10px; }
@@ -260,14 +286,12 @@ button.google:hover:not(:disabled), #account button.google:hover:not(:disabled) 
 .atInfo button.on { color: #ff8787; border-color: #ff8787; }
 .mineBox { display: flex; flex-direction: column; gap: 6px; padding: 10px; border-radius: 14px; background: rgba(255, 255, 255, 0.05); }
 button.danger { color: #ff8787; border-color: rgba(255, 135, 135, 0.4); }
-.atActions { display: flex; gap: 10px; flex-wrap: wrap; }
-.atEmpty { text-align: center; padding: 30px 10px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+
 .packList { display: flex; flex-direction: column; gap: 6px; max-height: 360px; overflow-y: auto; }
 .packItem { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 10px; background: rgba(255, 255, 255, 0.04); }
 .packItem canvas { border-radius: 6px; width: 120px; height: 54px; flex: none; }
 .packItem .num { width: 22px; text-align: center; color: #8e92c0; font-weight: 700; }
-.packForm { display: grid; grid-template-columns: 1fr 2fr auto; gap: 8px; }
-.packForm input { text-align: left; }
+.packForm { display: grid; grid-template-columns: 1fr 1.6fr 190px; gap: 14px; padding: 16px; border-radius: 16px; background: rgba(255, 255, 255, .04); }
 select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18); background: #14132c; color: #fff; }
 #likeBtn { color: #ff8787; border-color: rgba(255, 135, 135, 0.5); }
 .edSaveBox { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-radius: 12px; background: rgba(255, 255, 255, 0.04); }

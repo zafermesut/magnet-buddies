@@ -12,6 +12,8 @@ const VIS_ICONS = { private: 'lock', link: 'link', public: 'globe' };
 const visOptions = cur => Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}" data-ic="${VIS_ICONS[k]}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('');
 const visBadge = v => `<span class="vis">${icon(VIS_ICONS[v])}${VIS_LABELS[v]}</span>`;
 const likeLabel = (liked, long) => liked ? `${icon('heartFill')}Beğendin` : `${icon('heart')}${long ? 'Bu bölümü beğen' : 'Beğen'}`;
+const emptyBox = (ic, text, action = '') => `<div class="emptyBox">${icon(ic)}<p>${text}</p>${action}</div>`;
+const secHead = (title, n, extra = '') => `<div class="secHead"><h3>${title}<span class="count">${n}</span></h3>${extra}</div>`;
 const counts = (likes, plays, likeId) => `<span class="cnt">${icon('heart')}<span${likeId ? ` id="${likeId}"` : ''}>${likes}</span></span><span class="cnt">${icon('play')}${plays}</span>`;
 
 // Küçük önizleme: bölümün haritası karolar hâlinde
@@ -195,7 +197,7 @@ const Atolye = {
     const r = await this.api('GET', `/api/${packs ? 'packs' : 'levels'}?sort=${sort}&q=${encodeURIComponent(this.q)}`);
     if (!r.ok) { body.innerHTML = `<p class="error">${esc(r.json.error || 'Yüklenemedi.')}</p>`; return; }
     if (!r.json.items.length) {
-      body.innerHTML = `<p class="small">${this.q ? 'Aramana uyan bir şey bulamadım.' : packs ? 'Henüz paylaşılmış paket yok. İlk paketi sen yap!' : 'Henüz paylaşılmış bölüm yok. Editörde bir bölüm yapıp herkese açık kaydet!'}</p>`;
+      body.innerHTML = emptyBox(this.q ? 'search' : packs ? 'pack' : 'grid', this.q ? 'Aramana uyan bir şey bulamadım.' : packs ? 'Henüz paylaşılmış paket yok. İlk paketi sen yap!' : 'Henüz paylaşılmış bölüm yok. Editörde bir bölüm yapıp herkese açık kaydet!');
       return;
     }
     body.innerHTML = '<div class="atGrid"></div>';
@@ -217,20 +219,21 @@ const Atolye = {
   async renderMine() {
     const body = $('atBody');
     if (!this.me) {
-      body.innerHTML = `<div class="atEmpty"><p>Bölümlerini kaydetmek ve her cihazdan görmek için giriş yap.</p>
-        ${this.loginEnabled ? googleButton('mineLogin') : '<p class="note">Bu sunucuda giriş kapalı.</p>'}</div>`;
+      body.innerHTML = emptyBox('user', 'Bölümlerini kaydetmek ve her cihazdan görmek için giriş yap.',
+        this.loginEnabled ? googleButton('mineLogin') : '<p class="note">Bu sunucuda giriş kapalı.</p>');
       if ($('mineLogin')) $('mineLogin').onclick = () => this.login('/?atolye=mine');
       return;
     }
     const [lv, pk] = await Promise.all([this.api('GET', '/api/levels/mine'), this.api('GET', '/api/packs/mine')]);
-    body.innerHTML = `<div class="atActions"><button id="newLevel" class="primary">${icon('plus')}YENİ BÖLÜM</button><button id="newPack">${icon('pack')}Paket oluştur</button></div>
-      <h3>Bölümlerim (${lv.json.items ? lv.json.items.length : 0})</h3><div class="atGrid" id="mineLevels"></div>
-      <h3>Paketlerim (${pk.json.items ? pk.json.items.length : 0})</h3><div class="atGrid" id="minePacks"></div>`;
+    const levels = lv.json.items || [], packs = pk.json.items || [];
+    body.innerHTML = `<section>${secHead('Bölümlerim', levels.length, `<button id="newLevel" class="small primary">${icon('plus')}Yeni bölüm</button>`)}<div class="atGrid" id="mineLevels"></div></section>
+      <section>${secHead('Paketlerim', packs.length, `<button id="newPack" class="small">${icon('plus')}Paket oluştur</button>`)}<div class="atGrid" id="minePacks"></div></section>`;
     $('newLevel').onclick = () => { Editor.load(blankLevel(), null); Editor.refresh(); toEditor(); };
-    $('newPack').onclick = () => this.packBuilder(null, lv.json.items || []);
-    for (const it of lv.json.items || []) $('mineLevels').appendChild(this.card(it, false));
-    for (const it of pk.json.items || []) $('minePacks').appendChild(this.card(it, true));
-    if (!(lv.json.items || []).length) $('mineLevels').innerHTML = '<p class="small">Henüz kayıtlı bölümün yok. Editörde yapıp "Kaydet"e bas.</p>';
+    $('newPack').onclick = () => this.packBuilder(null, levels);
+    for (const it of levels) $('mineLevels').appendChild(this.card(it, false));
+    for (const it of packs) $('minePacks').appendChild(this.card(it, true));
+    if (!levels.length) $('mineLevels').innerHTML = emptyBox('pencil', 'Henüz kayıtlı bölümün yok. Editörde bir bölüm yapıp <b>Kaydet</b>\'e bas.');
+    if (!packs.length) $('minePacks').innerHTML = emptyBox('pack', 'Paket, bölümlerini sırayla oynatan küçük bir macera. Birkaç bölüm kaydedince paket kurabilirsin.');
   },
 
   // ---------- Bölüm sayfası ----------
@@ -349,22 +352,26 @@ const Atolye = {
     const body = $('atBody');
     let order = pk ? pk.levels.map(l => l.id).filter(id => myLevels.some(l => l.id === id)) : [];
     body.innerHTML = `<button class="link back">${icon('back')}Geri</button>
-      <h3>${pk ? 'Paketi düzenle' : 'Yeni paket'}</h3>
+      <h3 class="pageTitle">${icon('pack')}${pk ? 'Paketi düzenle' : 'Yeni paket'}</h3>
       <div class="packForm">
-        <input id="pkName" maxlength="24" placeholder="Paketin adı" value="${pk ? esc(pk.name) : ''}">
-        <input id="pkAbout" maxlength="140" placeholder="Kısa açıklama (isteğe bağlı)" value="${pk ? esc(pk.about || '') : ''}">
-        <select id="pkVis">${visOptions(pk ? pk.visibility : 'private')}</select>
+        <label class="field"><span>Paketin adı</span><input id="pkName" maxlength="24" placeholder="Örn. Hurdalık macerası" value="${pk ? esc(pk.name) : ''}"></label>
+        <label class="field"><span>Kısa açıklama <em>isteğe bağlı</em></span><input id="pkAbout" maxlength="140" placeholder="Oyunculara ne bekliyor?" value="${pk ? esc(pk.about || '') : ''}"></label>
+        <div class="field"><span>Kimler görebilir?</span><select id="pkVis">${visOptions(pk ? pk.visibility : 'private')}</select></div>
       </div>
-      <p class="small">Bölümlere tıklayarak oynanma sırasına göre seç (en fazla 30). Gizli bölümler de pakette oynanabilir.</p>
-      <div class="atGrid" id="pkPick"></div>
-      <button id="pkSave" class="primary">${pk ? 'KAYDET' : 'PAKETİ OLUŞTUR'}</button>
-      <p id="pkMsg" class="error"></p>`;
+      <section>
+        ${secHead('Bölümleri seç', `<span id="pkCount">0</span> / 30`)}
+        <p class="small">Oynanma sırasına göre tıkla; tekrar tıklayınca çıkar. Gizli bölümler de pakette oynanabilir.</p>
+        <div class="atGrid" id="pkPick"></div>
+      </section>
+      <div class="formFoot"><p id="pkMsg" class="error"></p><button id="pkSave" class="primary small">${icon('check')}${pk ? 'Kaydet' : 'Paketi oluştur'}</button></div>`;
     enhanceSelects(body);
     body.querySelector('.back').onclick = () => (pk ? this.openPack(pk.id) : this.setTab('mine'));
     const draw = () => {
       const grid = $('pkPick');
       grid.innerHTML = '';
-      if (!myLevels.length) grid.innerHTML = '<p class="small">Önce editörde bölüm yapıp kaydetmelisin.</p>';
+      $('pkCount').textContent = order.length;
+      if (!myLevels.length) grid.innerHTML = emptyBox('pencil', 'Pakete koyacak bölümün yok. Önce editörde bölüm yapıp kaydet.', `<button id="pkToEditor" class="small">${icon('pencil')}Editörü aç</button>`);
+      if ($('pkToEditor')) $('pkToEditor').onclick = () => toEditor();
       for (const l of myLevels) {
         const el = this.card(l, false), at = order.indexOf(l.id);
         el.classList.toggle('picked', at >= 0);
