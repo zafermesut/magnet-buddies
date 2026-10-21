@@ -157,6 +157,10 @@ class Renderer3D {
       rail: new THREE.BoxGeometry(0.06, 1, 0.06),
       railH: new THREE.BoxGeometry(1, 0.05, 0.05),
       stopPost: new RoundedBoxGeometry(0.16, 0.5, 0.3, 2, 0.04),
+      metalCrate: new RoundedBoxGeometry(0.95, 0.95, 0.9, 2, 0.08),
+      rivet: new THREE.SphereGeometry(0.045, 8, 6),
+      signBar: new THREE.BoxGeometry(0.42, 0.11, 0.06),
+      poleField: new THREE.BoxGeometry(0.9, 1, 0.5),
     };
     this.mat = {
       block: std(PALETTE.block, { roughness: 0.82 }),
@@ -177,6 +181,8 @@ class Renderer3D {
       lift: std('#9a9ee0', { roughness: 0.45, metalness: 0.3, emissive: '#3b3f9a', emissiveIntensity: 0.35 }),
       rail: std('#6d71b8', { roughness: 0.5, metalness: 0.5 }),
       springPad: std('#ffa94d', { roughness: 0.4, emissive: '#ff922b', emissiveIntensity: 0.25 }),
+      metalCrate: std('#9ea3c7', { roughness: 0.3, metalness: 0.8 }),
+      sign: new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }),
     };
     this.ballMats = PLAYER_COLORS.map(c => new THREE.MeshPhysicalMaterial({
       map: ballTexture(c), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15,
@@ -405,6 +411,7 @@ class Renderer3D {
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W; c++) {
         if (!game.grid[r][c]) continue;
+        if ('PN'.includes(game.def.map[r][c])) continue;   // sabit mıknatıslar ayrıca çizilir
         cells.push([c, r]);
         if (r > 0 && !game.grid[r - 1][c]) caps.push([c, r]);
       }
@@ -539,6 +546,38 @@ class Renderer3D {
       return { L, g, stripMat };
     });
 
+    // Sabit mıknatıslar: kutup renginde blok, önünde + / − işareti; oyuncuyu etkilerken parlar
+    this.fixedObjs = game.fixed.map(f => {
+      const col = POLE_COLORS[f.pol];
+      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.25, roughness: 0.45, metalness: 0.3 });
+      const g = new THREE.Group();
+      g.position.set(f.c + 0.5, -f.r - 0.5, 0);
+      const block = new THREE.Mesh(this.geo.block, mat);
+      block.castShadow = block.receiveShadow = true;
+      const h = new THREE.Mesh(this.geo.signBar, this.mat.sign);
+      h.position.z = 0.5;
+      g.add(block, h);
+      if (f.pol > 0) { const v = new THREE.Mesh(this.geo.signBar, this.mat.sign); v.rotation.z = Math.PI / 2; v.position.z = 0.5; g.add(v); }
+      this.levelGroup.add(g);
+      return { f, mat, glow: 0 };
+    });
+
+    // Kutup kapıları: kutup renginde yarı saydam alan; yalnızca aynı kutuptaki geçer
+    this.poleObjs = [];
+    for (const [key, pol] of game.poleCells) {
+      const r = Math.floor(key / W), c = key % W, col = POLE_COLORS[pol];
+      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.9, transparent: true, opacity: 0.4, roughness: 0.2, depthWrite: false });
+      const m = new THREE.Mesh(this.geo.poleField, mat);
+      m.position.set(c + 0.5, -r - 0.5, 0);
+      const sign = new THREE.Mesh(this.geo.signBar, mat.clone());
+      sign.material.opacity = 0.75;
+      sign.scale.setScalar(0.7);
+      sign.position.set(c + 0.5, -r - 0.5, 0.27);
+      this.levelGroup.add(m, sign);
+      if (pol > 0) { const v = sign.clone(); v.rotation.z = Math.PI / 2; this.levelGroup.add(v); }
+      this.poleObjs.push({ mat });
+    }
+
     // Gezgin platformlar: ince metal platform, altında gidip geldiği ray ve uçlarda durdurucular
     this.moverObjs = game.movers.map(M => {
       const w = wx(M.w);
@@ -614,11 +653,26 @@ class Renderer3D {
     }
 
     // Ağır kutular ve anahtarlar (konumları her karede güncellenir)
-    this.boxObjs = game.boxes.map(() => {
-      const m = new THREE.Mesh(this.geo.crate, this.mat.crate);
-      m.castShadow = m.receiveShadow = true;
-      this.levelGroup.add(m);
-      return m;
+    this.boxObjs = game.boxes.map(b => {
+      if (!b.metal) {
+        const m = new THREE.Mesh(this.geo.crate, this.mat.crate);
+        m.castShadow = m.receiveShadow = true;
+        this.levelGroup.add(m);
+        return m;
+      }
+      // Metal sandık: perçinli parlak kutu
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(this.geo.metalCrate, this.mat.metalCrate);
+      body.castShadow = body.receiveShadow = true;
+      g.add(body);
+      for (const [x, y] of [[-0.36, -0.36], [0.36, -0.36], [-0.36, 0.36], [0.36, 0.36]]) {
+        const rv = new THREE.Mesh(this.geo.rivet, this.mat.rail);
+        rv.position.set(x, y, 0.46);
+        g.add(rv);
+      }
+      g.scale.setScalar(PHYS.crateSize / T);
+      this.levelGroup.add(g);
+      return g;
     });
     this.keyObjs = game.keys.map(() => {
       const g = new THREE.Group();
@@ -932,6 +986,12 @@ class Renderer3D {
       o.g.position.set(wx(o.L.x + o.L.w / 2), wy(o.L.y + o.L.h / 2), 0);
       o.stripMat.emissiveIntensity = game.channelOn(o.L.channel) ? 1.8 : 0.5;
     }
+    for (const o of this.fixedObjs) {
+      const on = game.players.some(p => p.fixedOn && p.fixedOn.includes(o.f));
+      o.glow += ((on ? 1 : 0) - o.glow) * Math.min(1, dt * 8);
+      o.mat.emissiveIntensity = 0.25 + o.glow * (0.9 + 0.3 * Math.sin(t * 10));
+    }
+    for (const o of this.poleObjs) o.mat.opacity = 0.4 + 0.08 * Math.sin(t * 3);
     for (const o of this.moverObjs) o.g.position.set(wx(o.M.x + o.M.w / 2), wy(o.M.y + o.M.h / 2), 0);
     for (const o of this.springObjs) {
       // Fırlatınca önce basılır, sonra sönen bir sekmeyle açılır
@@ -998,6 +1058,7 @@ class Renderer3D {
     }
 
     for (const box of game.boxes) {
+      if (box.metal) continue;   // metal sandığı tek kişi iter
       const n = game.boxNeed, gap = ppu * 0.42, s = this.worldToScreen(box.x + box.w / 2, box.y - 10, 0.5);
       for (let i = 0; i < n; i++) {
         ctx.beginPath();

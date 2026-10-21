@@ -15,6 +15,9 @@
 //   A B C  ters kapak (kanalı kapalıyken açık, açıkken kapalı)
 //   =  gezgin platform (yan yana '=' tek platform; duvara ya da ':' ray sonuna kadar gidip döner)
 //   :  ray sonu (görünür durdurucu, içinden geçilir)
+//   M  metal sandık (tek kişi iter, mıknatıs çeker)
+//   P N  sabit mıknatıs bloğu (+ / −): zıt kutuptaki oyuncuyu çeker, aynı kutuptakini iter
+//   p n  kutup kapısı (+ / −): yalnızca aynı kutuptaki oyuncuyu geçirir
 //
 // magnet: true olan bölümlerde mıknatıs açıktır. pols: oyuncuların başlangıç kutupları (1 = +, -1 = −).
 //
@@ -376,6 +379,26 @@ const LEVELS = [
     ],
   },
   {
+    id: 'metal-sandik',
+    name: 'Metal sandık',
+    hint: 'Metal sandık hafiftir: tek kişi iter, mıknatıs kutbu ne olursa olsun çeker. Rafın yanında mıknatısı açıp indirin, duvara dayayıp basamak yapın.',
+    magnet: true,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#....M......................E..#',
+      '######..................########',
+      '#.......................########',
+      '#.......................########',
+      '#........SS.............########',
+      '################################',
+    ],
+  },
+  {
     id: 'miknatis-ustasi',
     name: 'Mıknatıs ustası',
     hint: 'Önce uçurum, sonra yüksek duvar. İtmek mi çekmek mi, hangisi ne zaman?',
@@ -396,6 +419,111 @@ const LEVELS = [
       '############......######################',
     ],
   },
+  {
+    id: 'yapiskan-tavan',
+    name: 'Yapışkan tavan',
+    hint: 'Tavandaki − mıknatıs + kutbu çeker: zıplayıp yapış, asılı yürü. Karşıda kutbunu değiştir, bırakıl.',
+    magnet: true,
+    pols: [1, 1],
+    map: [
+      '##################################',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#......NNNNNNNNNNNNNNNNNNNN......#',
+      '#..............................E.#',
+      '#............................#####',
+      '#............................#####',
+      '#.SS.........................#####',
+      '#########................#########',
+    ],
+  },
+  {
+    id: 'miknatis-bacasi',
+    name: 'Mıknatıs bacası',
+    hint: 'Mıknatıslı duvara zıt kutupla yapış, zıpladıkça tırman; duvardan ayrılmak için kutbunu değiştir. Karşıda düğmelerle birbirinize kapı açın.',
+    magnet: true,
+    map: [
+      '################################',
+      '#.....................a........#',
+      '#.....................a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#...........N.........a........#',
+      '#..SS.......N...1.....a..1..E..#',
+      '################################',
+    ],
+  },
+  {
+    id: 'kutup-kapisi',
+    name: 'Kutup kapısı',
+    hint: 'Kırmızı kapıdan yalnızca + kutup, mavi kapıdan yalnızca − kutup geçer. Kapının önünde kutbunu değiştir.',
+    magnet: true,
+    map: [
+      '################################',
+      '#.......p...........n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.......p......K....n....D.....#',
+      '#.......p.....####..n....D.....#',
+      '#.......p...........n....D.....#',
+      '#.SS....p...........n....D..E..#',
+      '################################',
+    ],
+  },
+  {
+    id: 'ikiye-bolun',
+    name: 'İkiye bölün',
+    hint: '+ kutup kırmızı zeminden, − kutup mavi zeminden düşer. Aşağıda ayrı odalardasınız: şalterlerle birbirinize kapı açın.',
+    magnet: true,
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#.............SS...............#',
+      '######pp################nn######',
+      '#...........a######b...........#',
+      '#...........a######b...........#',
+      '#...........a######b...........#',
+      '#...........a######b...........#',
+      '#...........a######b...........#',
+      '#...........a......b...........#',
+      '#....5......a..E...b....4......#',
+      '################################',
+    ],
+  },
+  {
+    id: 'cekirdek',
+    name: 'Çekirdek',
+    hint: 'Tavan, kutup kapısı, metal sandık ve mıknatıs: çekirdekte hepsi var. Sandık basamak, arkadaşın asansör olsun.',
+    magnet: true,
+    map: [
+      '####################################',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#....................n.............#',
+      '#......NNNNNNNNNNNN..n....M......E.#',
+      '#....................n.####...######',
+      '#....................n........######',
+      '#....................n........######',
+      '#.SS.................n........######',
+      '########..........##################',
+    ],
+  },
 ];
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
@@ -405,7 +533,8 @@ const PARTS = [
   { name: 'Uyanış', ids: ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu'] },
   { name: 'Hurda yığınları', ids: ['salter', 'merdiven', 'asansor', 'zipzip', 'hepsi-birden'] },
   { name: 'Paslı raylar', ids: ['gezgin', 'yuk-treni', 'ters-asansor', 'yay-ve-kule', 'hurda-dagi'] },
-  { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'miknatis-ustasi'] },
+  { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'metal-sandik', 'miknatis-ustasi'] },
+  { name: 'Manyetik çekirdek', ids: ['yapiskan-tavan', 'miknatis-bacasi', 'kutup-kapisi', 'ikiye-bolun', 'cekirdek'] },
 ];
 const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
 
@@ -417,7 +546,7 @@ function levelUnlocked(i, done) {
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpn';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

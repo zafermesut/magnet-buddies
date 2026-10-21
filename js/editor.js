@@ -21,6 +21,11 @@ const EDITOR_TOOLS = [
   { id: 'stop', ch: ':', label: 'Ray sonu', cls: 'tStop', tip: 'Gezgin platform burada döner. İçinden geçilir.' },
   { id: 'spring', ch: '^', label: 'Yay', cls: 'tSpring', tip: 'Üstüne basanı ~4 karo fırlatır; zıplama basılıysa ~5 karo. Altında duvar olmalı.' },
   { id: 'box', ch: 'H', label: 'Ağır kutu', cls: 'tH', tip: '2×2 karo. İki kişi birlikte iter.' },
+  { id: 'crate', ch: 'M', label: 'Metal sandık', cls: 'tCrate', tip: 'Tek kişi iter; mıknatıs kutbu ne olursa olsun çeker. Düğmeye basabilir.' },
+  { id: 'magP', ch: 'P', label: '+ mıknatıs', cls: 'tMagP', tip: 'Sabit mıknatıs bloğu: − kutuptakini çeker (tavana yapışılır, duvara tırmanılır), + kutuptakini iter.' },
+  { id: 'magN', ch: 'N', label: '− mıknatıs', cls: 'tMagN', tip: 'Sabit mıknatıs bloğu: + kutuptakini çeker (tavana yapışılır, duvara tırmanılır), − kutuptakini iter.' },
+  { id: 'poleP', ch: 'p', label: '+ kapı', cls: 'tPoleP', tip: 'Kutup kapısı: yalnızca + kutuptaki oyuncu geçer.' },
+  { id: 'poleN', ch: 'n', label: '− kapı', cls: 'tPoleN', tip: 'Kutup kapısı: yalnızca − kutuptaki oyuncu geçer.' },
 ];
 
 const EDITOR_KEY = 'editor-level-v1';

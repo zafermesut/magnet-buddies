@@ -36,6 +36,14 @@ const PHYS = {
   magnetRange: 280,
   magnetForce: 5000,
   magnetKeyForce: 3500,
+  crateSpeed: 150,     // metal sandık tek kişiyle bu hızla itilir
+  crateSize: 38,
+
+  // Sabit mıknatıs: zıt kutuptakini çeker (tavana yapışmaya yeter), aynı kutuptakini iter
+  fixedRange: 150,
+  fixedForce: 4200,
+  fixedMax: 6000,      // birden çok bloğun toplam ivme sınırı
+  wallSlide: 120,      // mıknatıslı duvara yapışıkken en fazla bu hızla aşağı kayar
 };
 
 const POLE_COLORS = { 1: '#ff8787', '-1': '#66d9e8' };

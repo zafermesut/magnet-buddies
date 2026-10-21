@@ -29,7 +29,8 @@ class Game {
     this.parse(this.def.map);
 
     const P = PHYS.playerSize, s = this.spawn;
-    this.magnet = !!this.def.magnet;
+    // Sabit mıknatıs ya da kutup kapısı olan bölümde kutup değiştirmek de açık
+    this.magnet = !!this.def.magnet || this.fixed.length > 0 || this.poleCells.size > 0;
     const pols = this.def.pols || [1, -1];
     this.players = [];
     for (let i = 0; i < playerCount; i++) {
@@ -54,6 +55,8 @@ class Game {
     this.blockers = [];
     this.keys = []; this.doors = []; this.buttons = []; this.gates = []; this.boxes = [];
     this.levers = []; this.lifts = []; this.springs = []; this.movers = [];
+    this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
+    this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
     this.oneway = [];
     this.switches = { 1: false, 2: false, 3: false };   // şalterlerin açık tuttuğu kanallar
     this.spawn = null; this.exit = null;
@@ -66,7 +69,7 @@ class Game {
       for (let c = 0; c < cols; c++) {
         const ch = map[r][c];
         const x = c * T, y = r * T;
-        this.grid[r].push(ch === '#');
+        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N');
         this.blockers[r].push(null);
         this.oneway[r].push(ch === '-');
         if (ch === 'S' && !this.spawn) this.spawn = { x, y };
@@ -84,6 +87,13 @@ class Game {
         else if ('123'.includes(ch)) this.buttons.push({ channel: +ch, x: x + 3, y: y + T - 8, w: T - 6, h: 8, pressed: false });
         else if ('abcABC'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
         else if (ch === 'H') this.boxes.push(makeBody('box', x, y, 2 * T, 2 * T, { push: { 1: 0, '-1': 0 }, pushers: 0 }));
+        else if (ch === 'M') {
+          // Metal sandık: tek kişi iter, mıknatıs çeker
+          const k = PHYS.crateSize;
+          this.boxes.push(makeBody('box', x + (T - k) / 2, y + T - k, k, k, { metal: true, push: { 1: 0, '-1': 0 }, pushers: 0, magT: 0 }));
+        }
+        else if (ch === 'P' || ch === 'N') this.fixed.push({ x: x + T / 2, y: y + T / 2, c, r, pol: ch === 'P' ? 1 : -1 });
+        else if (ch === 'p' || ch === 'n') this.poleCells.set(r * cols + c, ch === 'p' ? 1 : -1);
         else if ('456'.includes(ch)) this.levers.push({ channel: +ch - 3, x, y, w: T, h: T, flipT: -9 });
         else if (ch === '^') this.springs.push({ x: x + 4, y: y + T - 12, w: T - 8, h: 12, t: -9 });
         else if (ch === '=' && map[r][c - 1] !== '=') {
@@ -144,10 +154,18 @@ class Game {
     return !!b && !b.open;
   }
 
-  rectBlocked(x, y, w, h) {
+  // Kutup kapısı: yalnızca aynı kutuptaki oyuncu geçer; başka her şeyi durdurur
+  poleAt(c, r) { return r >= 0 && r < this.rows ? this.poleCells.get(r * this.cols + c) || 0 : 0; }
+  blocks(b, c, r) {
+    if (this.blocked(c, r)) return true;
+    const pol = this.poleCells.size ? this.poleAt(c, r) : 0;
+    return !!pol && !(b && b.kind === 'player' && b.pol === pol);
+  }
+
+  rectBlocked(x, y, w, h, b = null) {
     const c0 = Math.floor(x / T), c1 = Math.floor((x + w - 0.001) / T);
     const r0 = Math.floor(y / T), r1 = Math.floor((y + h - 0.001) / T);
-    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (this.blocked(c, r)) return true;
+    for (let r = r0; r <= r1; r++) for (let c = c0; c <= c1; c++) if (this.blocks(b, c, r)) return true;
     return false;
   }
 
@@ -169,7 +187,7 @@ class Game {
     const r0 = Math.floor(b.y / T), r1 = Math.floor((b.y + b.h - 0.001) / T);
     const c = dx > 0 ? Math.floor((b.x + b.w - 0.001) / T) : Math.floor(b.x / T);
     for (let r = r0; r <= r1; r++) {
-      if (this.blocked(c, r)) { b.x = dx > 0 ? c * T - b.w : (c + 1) * T; hit = 'tile'; break; }
+      if (this.blocks(b, c, r)) { b.x = dx > 0 ? c * T - b.w : (c + 1) * T; hit = 'tile'; break; }
     }
     for (const o of this.solids) {
       if (o === b || !overlap(b, o)) continue;
@@ -188,7 +206,7 @@ class Game {
     const c0 = Math.floor(b.x / T), c1 = Math.floor((b.x + b.w - 0.001) / T);
     const r = dy > 0 ? Math.floor((b.y + b.h - 0.001) / T) : Math.floor(b.y / T);
     for (let c = c0; c <= c1; c++) {
-      if (this.blocked(c, r)) { b.y = dy > 0 ? r * T - b.h : (r + 1) * T; hit = 'tile'; break; }
+      if (this.blocks(b, c, r)) { b.y = dy > 0 ? r * T - b.h : (r + 1) * T; hit = 'tile'; break; }
       // Tek yönlü platform: yalnızca yukarıdan gelen üstüne basar, alttan geçilir
       if (dy > 0 && !hit && this.oneway[r] && this.oneway[r][c] && b.y + b.h - dy <= r * T + 0.01) { b.y = r * T - b.h; hit = 'tile'; break; }
     }
@@ -198,7 +216,7 @@ class Game {
       if (dy < 0) {
         const fromLeft = b.x + b.w - o.x, fromRight = o.x + o.w - b.x;
         const nudge = fromLeft < fromRight ? -fromLeft : fromRight;
-        if (Math.abs(nudge) <= 6 && !this.rectBlocked(b.x + nudge, b.y, b.w, b.h)) { b.x += nudge; continue; }
+        if (Math.abs(nudge) <= 6 && !this.rectBlocked(b.x + nudge, b.y, b.w, b.h, b)) { b.x += nudge; continue; }
       }
       // Alttaki oyuncu zıplarsa üstündekini de kaldırır. Mıknatısı açık olan sabittir:
       // yoksa çektiği arkadaşı onu yukarı iter, ikisi birbirini sonsuza dek taşırdı.
@@ -246,7 +264,8 @@ class Game {
         if (jumpEdge || actEdge) this.leaveExit(p);
         return;
       }
-      if (this.magnet && swapEdge) {
+      // Kutup kapısının içindeyken kutup değişmez (kapının içinde sıkışılmasın)
+      if (this.magnet && swapEdge && !(this.poleCells.size && this.rectBlocked(p.x, p.y, p.w, p.h, { kind: 'player', pol: -p.pol }))) {
         p.pol = -p.pol;
         this.fx('swap', p.x + p.w / 2, p.y + p.h / 2, { color: POLE_COLORS[p.pol] });
       }
@@ -280,11 +299,18 @@ class Game {
     });
 
     this.applyMagnets(dt);
+    this.applyFixed(dt);
 
     // 2) Kutular: önceki adımda yeterince kişi ittiyse kayar
     for (const b of this.boxes) {
-      const dir = b.push[1] >= this.boxNeed ? 1 : b.push[-1] >= this.boxNeed ? -1 : 0;
-      b.vx = dir * ph.boxSpeed;
+      const need = b.metal ? 1 : this.boxNeed;
+      const dir = b.push[1] >= need ? 1 : b.push[-1] >= need ? -1 : 0;
+      if (b.metal) {
+        // Metal sandık: itilince kayar, mıknatısla savrulunca bir süre kayar, sonra durur
+        b.magT = Math.max(0, b.magT - dt);
+        if (dir) b.vx = dir * ph.crateSpeed;
+        else b.vx = approach(b.vx, 0, (b.onGround && !b.magT ? 1800 : 200) * dt);
+      } else b.vx = dir * ph.boxSpeed;
       b.pushers = Math.max(b.push[1], b.push[-1]);
       b.push[1] = 0; b.push[-1] = 0;
     }
@@ -298,7 +324,8 @@ class Game {
     for (const b of movers) {
       b.vy = Math.min(b.vy + ph.gravity * dt, ph.maxFall);
       const g = b.ground;
-      const carry = g && this.solids.includes(g) ? g.dx : 0;
+      // Üstündekini taşır; ama oyuncunun kafasına düşen sandık taşınmaz, oyuncu yürüyünce kayıp düşer
+      const carry = g && this.solids.includes(g) && !(b.kind === 'box' && g.kind === 'player') ? g.dx : 0;
       const x0 = b.x;
       b.onGround = false;
       b.ground = null;
@@ -387,6 +414,45 @@ class Game {
         if (k.used || k.holder) continue;
         if (push(k, hx, hy, -ph.magnetKeyForce)) h.affects.push({ o: k, repel: false });
       }
+      for (const b of this.boxes) {
+        if (b.metal && push(b, hx, hy, -ph.magnetKeyForce)) h.affects.push({ o: b, repel: false });
+      }
+    }
+  }
+
+  // Sabit mıknatıslar: menzildeki oyuncuyu kutbuna göre çeker ya da iter. Kontrolü azaltmaz
+  // (tavanda asılıyken yürünebilsin). Değdiği mıknatısa çekiliyorsa ona tutunmuş sayılır: zıplayabilir.
+  applyFixed(dt) {
+    if (!this.fixed.length) return;
+    const ph = PHYS, R = ph.fixedRange;
+    for (const p of this.players) {
+      p.fixedOn = [];
+      p.wallSide = 0;
+      if (p.inExit) continue;
+      const px = p.x + p.w / 2, py = p.y + p.h / 2;
+      let ax = 0, ay = 0;
+      for (const f of this.fixed) {
+        const dx = px - f.x, dy = py - f.y, d = Math.hypot(dx, dy) || 1;
+        if (d > R) continue;
+        const sign = f.pol === p.pol ? 1 : -1, a = ph.fixedForce * (1 - (d / R) ** 2) * sign;
+        ax += dx / d * a; ay += dy / d * a;
+        p.fixedOn.push(f);
+        // Değiyor mu (kenar kenara)? Çekiliyorsa tutunur; yandaysa duvar zıplaması için tarafı
+        const touchX = Math.abs(dx) <= T / 2 + p.w / 2 + 1 && Math.abs(dy) < T / 2 + p.h / 2 - 4;
+        const touchY = Math.abs(dy) <= T / 2 + p.h / 2 + 1 && Math.abs(dx) < T / 2 + p.w / 2 - 4;
+        if (sign < 0 && (touchX || touchY)) {
+          p.gripT = 0.1;
+          if (touchX && !touchY) p.wallSide = dx < 0 ? -1 : 1;   // duvar hangi yanda (duvardan uzaklaşma yönü)
+        }
+      }
+      // Mıknatıslı duvara yapışıkken yalnızca duvara doğru çekilir: yavaşça kayar, zıpladıkça tırmanır
+      if (p.wallSide) ay = 0;
+      const am = Math.hypot(ax, ay);
+      if (am > ph.fixedMax) { ax *= ph.fixedMax / am; ay *= ph.fixedMax / am; }
+      p.vx += ax * dt;
+      p.vy += ay * dt;
+      if (p.wallSide && p.vy > ph.wallSlide) p.vy = ph.wallSlide;
+      if (p.cut === false && ay < 0) p.cut = true;
     }
   }
 

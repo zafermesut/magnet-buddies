@@ -201,13 +201,14 @@ class Room {
     this.fxT = g.t;
     const keyIndex = new Map(g.keys.map((k, i) => [k, i]));
     const playerIndex = new Map(g.players.map((p, i) => [p, i]));
+    const boxIndex = new Map(g.boxes.map((b, i) => [b, i]));
     return {
       t: 's',
       time: r3(g.t),
       p: g.players.map(p => [
         r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.pol, p.magnetOn ? 1 : 0, p.inExit ? 1 : 0,
         Math.round(p.squash * 100) / 100, p.facing,
-        (p.affects || []).map(a => (playerIndex.has(a.o) ? ['p', playerIndex.get(a.o), a.repel ? 1 : 0] : ['k', keyIndex.get(a.o), 0])),
+        (p.affects || []).map(a => (playerIndex.has(a.o) ? ['p', playerIndex.get(a.o), a.repel ? 1 : 0] : boxIndex.has(a.o) ? ['b', boxIndex.get(a.o), 0] : ['k', keyIndex.get(a.o), 0])),
       ]),
       k: g.keys.map(k => [r1(k.x), r1(k.y), k.used ? 1 : 0, k.holder ? playerIndex.get(k.holder) : -1]),
       d: g.doors.map(d => [d.open ? 1 : 0, r3(d.openT)]),

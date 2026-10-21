@@ -207,6 +207,19 @@ class Renderer {
       ctx.fillStyle = rgbaHex(CHANNEL_COLORS[L.channel], g.channelOn(L.channel) ? 1 : 0.5);
       ctx.fillRect(L.x + 4, L.y + 4, L.w - 8, 4);
     }
+    for (const f of g.fixed) {
+      const x = f.c * T, y = f.r * T, col = POLE_COLORS[f.pol];
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y, T, T);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x + 10, y + T / 2 - 2, T - 20, 4);
+      if (f.pol > 0) ctx.fillRect(x + T / 2 - 2, y + 10, 4, T - 20);
+    }
+    for (const [key, pol] of g.poleCells) {
+      const r = Math.floor(key / g.cols), c = key % g.cols;
+      ctx.fillStyle = rgbaHex(POLE_COLORS[pol], 0.3);
+      ctx.fillRect(c * T + 2, r * T, T - 4, T);
+    }
     for (const M of g.movers) {
       ctx.fillStyle = '#3a3c6e';
       ctx.fillRect(M.minX, M.y + M.h / 2 - 1, M.maxX + M.w - M.minX, 2);
@@ -270,6 +283,13 @@ class Renderer {
 
   drawBox(ctx, b, g) {
     const { x, y, w, h } = b;
+    if (b.metal) {
+      ctx.fillStyle = '#9ea3c7';
+      ctx.fillRect(x, y, w, h);
+      ctx.fillStyle = '#5d6194';
+      for (const [dx, dy] of [[5, 5], [w - 9, 5], [5, h - 9], [w - 9, h - 9]]) ctx.fillRect(x + dx, y + dy, 4, 4);
+      return;
+    }
     ctx.fillStyle = PAL.box;
     ctx.fillRect(x, y, w, h);
     ctx.strokeStyle = PAL.boxDark;

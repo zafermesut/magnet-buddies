@@ -296,7 +296,7 @@ function climbWall(g, A, B, standX, wallX, topY, done) {
       return I({ jump: (t * 5 | 0) % 2 === 0 || p.vy < 0, right: p.y + p.h < topY + 40 && !p.supported });
     }
     const cx = p.x + p.w / 2;
-    if (Math.abs(cx - standX) > 6) return I({ right: cx < standX, left: cx > standX });
+    if (Math.abs(cx - standX) > 6 || !p.supported) return goTo(standX)(g, p, t);
     // Yalnızca B tam üstüne oturunca fırlat, B yükselirken itmeye devam et
     if (B.ground === p && Math.abs(B.x - p.x) < 6) launching = true;
     else if (B.supported || B.vy >= 0) launching = false;
@@ -304,6 +304,7 @@ function climbWall(g, A, B, standX, wallX, topY, done) {
   };
   const b = (g, p, t) => {
     if (done()) return null;
+    if (p.inExit) return I({ jump: (t * 4 | 0) % 2 === 0 });   // kapıya düştüyse çık, arkadaşını çek
     // Fırlatılmak için A ile aynı kutupta, yukarıdan çekmek için zıt kutupta olmalı
     const wantPol = onTop(p) ? -A.pol : A.pol;
     if (p.pol !== wantPol) return I({ swap: (t * 10 | 0) % 2 === 0 });
@@ -729,6 +730,199 @@ console.log('Paslı raylar bölümleri');
   };
   const a = c, b = c;
   ok(run(g, [a, b], 90, g => g.done), '15. Hurda dağı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+console.log('Manyetik öğeler');
+{
+  // Metal sandık: tek kişi iter, mıknatıs uzaktan çeker
+  const g = new Game(L('metal-sandik'), 2), [A, B] = g.players, crate = g.boxes[0];
+  const x0 = crate.x;
+  A.x = 7 * T; B.x = 17 * T;   // B mıknatısın menzili dışında (yoksa o da çekilir)
+  run(g, [() => I({ action: true }), idle], 0.5);
+  run(g, [() => I({ left: true }), idle], 2);   // mıknatısı bırak, sandık düşerken kenara çekil
+  ok(crate.y + crate.h >= 11 * T - 1 && crate.x > x0 + 5, 'metal sandık mıknatısla raftan çekilir (' + crate.x.toFixed(0) + ', ' + crate.y.toFixed(0) + ')');
+  run(g, [idle, idle], 0.5);
+  A.x = crate.x - A.w - 2; A.y = 11 * T - A.h;
+  const x1 = crate.x;
+  run(g, [() => I({ right: true }), idle], 1);
+  ok(crate.x > x1 + 60, 'metal sandığı tek kişi iter');
+}
+{
+  // Sabit mıknatıs: dururken tavana kapılmaz, zıplayınca yapışır, asılı yürür, kutup değişince bırakır
+  const g = new Game(L('yapiskan-tavan'), 2), [A] = g.players;
+  A.x = 10 * T; A.y = 11 * T - A.h - 60;   // çukurun üstünde, tavanın altında
+  A.x = 8 * T; A.y = 11 * T - A.h;
+  run(g, [idle, idle], 0.5);
+  const stays = A.supported;
+  run(g, [(g, p, t) => I({ jump: t < g.t + 1 })], 0.4);
+  const stuck = A.y <= 7 * T + 1 && !A.supported;
+  run(g, [() => I({ right: true })], 2);
+  const hang = A.y <= 7 * T + 1 && A.x > 12 * T;
+  let sw = false;
+  run(g, [() => { const r = I({ swap: !sw }); sw = true; return r; }], 1.5);
+  ok(stays && stuck && hang && A.y > 8 * T, 'tavana zıplayınca yapışılır, asılı yürünür, kutup değişince bırakılır');
+}
+{
+  // Mıknatıslı duvar: zıt kutupla yapışıp zıplayarak tırmanılır ve üstünden aşılır
+  const g = new Game(L('miknatis-bacasi'), 2), [A] = g.players;
+  A.pol = 1; A.x = 12 * T - A.w; A.y = 11 * T - A.h;
+  // Tepeye çıkınca kutbunu değiştirip duvardan ayrılır
+  run(g, [(g, p, t) => (p.supported && p.y + p.h <= 3 * T + 1 && p.pol === 1 ? I({ swap: true, right: true }) : I({ right: true, jump: p.pol === 1 && (t * 6 | 0) % 2 === 0 }))], 12,
+    () => A.x > 14 * T && A.supported);
+  ok(A.x > 14 * T && A.supported, 'mıknatıslı duvara tırmanıp kutup değiştirerek öbür yana geçilir (' + g.t.toFixed(1) + ' sn)');
+  const g2 = new Game(L('miknatis-bacasi'), 2), [Z] = g2.players;
+  Z.pol = -1; Z.x = 12 * T - Z.w; Z.y = 11 * T - Z.h;
+  run(g2, [(g, p, t) => I({ right: true, jump: (t * 6 | 0) % 2 === 0 })], 8);
+  ok(Z.x < 12 * T, 'aynı kutuptaki duvara tırmanamaz');
+}
+{
+  // Kutup kapısı: yalnızca aynı kutuptaki geçer, içindeyken kutup değişmez
+  const g = new Game(L('kutup-kapisi'), 2), [A, B] = g.players;
+  A.x = 5 * T; B.x = 2 * T;
+  run(g, [() => I({ right: true }), () => I({ right: true })], 3);
+  ok(A.pol === 1 && A.x > 9 * T && B.x < 8 * T, '+ kutup kırmızı kapıdan geçer, − geçemez');
+  const g2 = new Game(L('kutup-kapisi'), 2), [C] = g2.players;
+  C.x = 8 * T + 3; C.y = 11 * T - C.h;
+  run(g2, [() => I({ swap: true })], 0.2);
+  ok(C.pol === 1, 'kapının içindeyken kutup değişmez');
+}
+
+console.log('Mıknatıs mezarlığı ve Manyetik çekirdek bölümleri');
+// Tavana yapışıp karşıya geç: başlangıçta yanlış kutuptaysa değiştir, karşıda bırak
+const hangAcross = (startX, endX, pol) => (g, p, t) => {
+  if (p.x + p.w / 2 > endX && (p.supported || p.pol !== pol)) return null;
+  if (p.pol !== pol && p.x + p.w / 2 < endX) return I({ swap: (t * 10 | 0) % 2 === 0 });
+  const hanging = !p.supported && p.vy <= 1 && p.gripT > 0;
+  if (hanging) return p.x + p.w / 2 > endX ? I({ swap: true }) : I({ right: true });
+  if (!p.supported) return I({ right: p.x + p.w / 2 > startX });
+  const d = startX - (p.x + p.w / 2);
+  if (Math.abs(d) > 8) return I({ right: d > 0, left: d < 0 });
+  return I({ jump: (t * 4 | 0) % 2 === 0 });
+};
+{
+  // Metal sandık: A mıknatısla sandığı indirir, sandık duvara itilir, A sandığın üstünde B'yi fırlatır, B A'yı çeker
+  const g = new Game(L('metal-sandik'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 7 * T + 1);
+  const down = () => crate.y + crate.h >= 11 * T - 1, atWall = () => crate.x + crate.w >= 24 * T - 1;
+  const behind = p => p.x + p.w <= crate.x + 3 && p.supported && p.ground !== crate;   // sandığın solunda, yerde
+  // Sandığı indir: raftayken mıknatısla çek, raftan ayrılınca bırak ve kenara çekil
+  const pullDown = (shelfY, standX) => (g, p, t) => {
+    if (down()) return null;
+    if (crate.ground === p) return I({ right: true });   // sandık kafasında: yürü, düşsün
+    if (crate.y + crate.h > shelfY + 2) return goTo(standX + 90)(g, p, t);
+    return Math.abs(p.x + p.w / 2 - standX) > 6 ? goTo(standX)(g, p, t) : I({ action: true });
+  };
+  const fetch = [pullDown(7 * T, 6 * T + 37), (g, p, t) => (down() ? null : goTo(17 * T)(g, p, t))];   // B menzil dışında bekler
+  const push = [
+    (g, p, t) => (atWall() ? null : behind(p) ? I({ right: true }) : goTo(crate.x - 50)(g, p, t)),
+    (g, p, t) => (atWall() ? null : p.x > crate.x + crate.w ? idle() : goTo(crate.x - 90)(g, p, t)),
+  ];
+  const ctl = phases([fetch, push, climbWall(g, A, B, 24 * T - crate.w / 2, 24 * T, 7 * T, both), [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 60, g => g.done), '19. Metal sandık geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Yapışkan tavan: sırayla tavandan karşıya geç, sonra kule ve mıknatısla çıkıntıya
+  const g = new Game(L('yapiskan-tavan'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const ha = hangAcross(8 * T, 26 * T, 1), hb = hangAcross(8 * T, 26 * T, 1);
+  // Öndeki (B) önce geçer, A arkada bekler
+  const across = [
+    (g, p, t) => (B.x < 25 * T ? (p.x > 2 * T ? goTo(2 * T)(g, p, t) : idle()) : ha(g, p, t)),
+    (g, p, t) => hb(g, p, t),
+  ];
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 8 * T + 1);
+  const ctl = phases([across, climbWall(g, A, B, 28 * T, 29 * T, 8 * T, both), [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 60, g => g.done), '21. Yapışkan tavan geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Mıknatıs bacası: A duvara tırmanıp düğmeye basar; B kutbunu değiştirip tırmanır, kapıdan geçip içerideki düğmeye basar; A da geçer
+  const g = new Game(L('miknatis-bacasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const [b1, b2] = g.buttons.slice().sort((p, q) => p.x - q.x), gate = g.gates[0];
+  const over = p => p.x > 13 * T;
+  const climbed = new Set();
+  const climb = (g, p, t) => {
+    if (p.supported && p.y + p.h <= 3 * T + 1) climbed.add(p);
+    if (climbed.has(p)) return p.pol === 1 ? I({ swap: true, right: true }) : I({ right: true });   // tepede: kutbu değiştir, duvardan ayrıl
+    if (p.pol !== 1) return I({ swap: (t * 10 | 0) % 2 === 0 });
+    if (p.x + p.w < 12 * T - 4 && p.supported) return goTo(12 * T - p.w)(g, p, t);
+    return I({ right: true, jump: (t * 6 | 0) % 2 === 0 });
+  };
+  const a = (g, p, t) => {
+    if (!over(p)) return climb(g, p, t);
+    if (b2.pressed || p.x > gate.cells[0].c * T) return goTo(ex)(g, p, t);
+    return goTo(b1.x + b1.w / 2)(g, p, t);
+  };
+  const b = (g, p, t) => {
+    if (!over(p)) return b1.pressed ? climb(g, p, t) : goTo(5 * T)(g, p, t);
+    if (A.x > b2.x + 20 || A.inExit) return goTo(ex)(g, p, t);
+    return goTo(b2.x + b2.w / 2)(g, p, t);
+  };
+  ok(run(g, [a, b], 60, g => g.done), '22. Mıknatıs bacası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // Kutup kapısı: B kutbunu değiştirip kırmızı kapıdan geçer, kule ile anahtar, ikisi − olup mavi kapıdan, kapı, çıkış
+  const g = new Game(L('kutup-kapisi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
+  const ledge = { surf: 8 * T, x0: 14 * T, x1: 18 * T }, baseX = 13 * T;
+  const want = p => (p.x < 9 * T ? 1 : -1);   // kırmızı kapıya + , mavi kapıya − ile
+  const swapTo = (p, t, pol) => (p.pol !== pol ? I({ swap: (t * 10 | 0) % 2 === 0 }) : null);
+  const a = (g, p, t) => {
+    if (door.open) return swapTo(p, t, -1) || goTo(ex)(g, p, t);
+    if (key.holder === B || key.used) return swapTo(p, t, -1) || goTo(22 * T)(g, p, t);
+    return swapTo(p, t, 1) || goTo(baseX)(g, p, t);
+  };
+  const b = (g, p, t) => {
+    if (door.open) return swapTo(p, t, -1) || goTo(ex)(g, p, t);
+    if (key.holder === p) return swapTo(p, t, -1) || goTo(door.cells[0].c * T)(g, p, t);
+    if (p.x < 9 * T) return swapTo(p, t, 1) || goTo(10 * T)(g, p, t);
+    if (surfOn(p, ledge)) return goTo(key.x + key.w / 2)(g, p, t);
+    if (p.ground === A) return I({ jump: (t * 5 | 0) % 2 === 0, right: p.y + p.h < 8 * T });
+    if (!p.supported && p.y + p.h < 10 * T) return I({ jump: p.vy < 0, right: p.y + p.h < 8 * T });
+    if (Math.abs(A.x + A.w / 2 - baseX) > 8 || !A.supported) return goTo(baseX - 60)(g, p, t);
+    return climbOn(A)(g, p, t);
+  };
+  ok(run(g, [a, b], 60, g => g.done), '23. Kutup kapısı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // İkiye bölün: + kırmızı zeminden sol odaya, − mavi zeminden sağ odaya düşer; şalterle birbirine kapı açar
+  const g = new Game(L('ikiye-bolun'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const lv = ch => g.levers.find(l => l.channel === ch);
+  const room = (holeX, lever, gateCh) => (g, p, t) => {
+    if (p.y + p.h <= 5 * T + 1) return goTo(holeX)(g, p, t);                       // üstteyken deliğe yürü
+    if (!g.switches[lever.channel]) return overlap(grow(p, 6), lever) ? I({ action: (t * 6 | 0) % 2 === 0 }) : goTo(lever.x + T / 2)(g, p, t);
+    return g.switches[gateCh] ? goTo(ex)(g, p, t) : idle();
+  };
+  const a = room(7 * T, lv(2), 1), b = room(25 * T, lv(1), 2);
+  ok(run(g, [a, b], 40, g => g.done), '24. İkiye bölün geçildi (' + g.t.toFixed(1) + ' sn)');
+  const solo = new Game(L('ikiye-bolun'), 1);
+  ok(!run(solo, [room(7 * T, lv(2), 1)], 20, g => g.done), 'İkiye bölün tek kişiyle geçilemez');
+}
+{
+  // Çekirdek: tavandan geç, − olup mavi kapıdan, sandığı indir ve duvara it, fırlat ve çek
+  const g = new Game(L('cekirdek'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const ha = hangAcross(7 * T + 20, 18 * T, 1), hb = hangAcross(7 * T + 20, 18 * T, 1);   // şeridin karadaki ucunda bırak
+  const swapTo = (p, t, pol) => (p.pol !== pol ? I({ swap: (t * 10 | 0) % 2 === 0 }) : null);
+  // Öndeki (B) önce geçer, A arkada bekler
+  const across = [
+    (g, p, t) => (p.x > 22 * T ? null : B.x < 18 * T ? (p.x > 2 * T ? goTo(2 * T)(g, p, t) : idle()) : ha(g, p, t) || swapTo(p, t, -1) || goTo(22 * T + 20)(g, p, t)),
+    (g, p, t) => (p.x > 22 * T ? null : hb(g, p, t) || swapTo(p, t, -1) || goTo(23 * T + 10)(g, p, t)),
+  ];
+  const down = () => crate.y + crate.h >= 13 * T - 1, atWall = () => crate.x + crate.w >= 30 * T - 1;
+  const behind = p => p.x + p.w <= crate.x + 3 && p.supported && p.ground !== crate;
+  const fetch = [
+    (g, p, t) => {
+      if (down()) return null;
+      if (crate.ground === p) return I({ left: true });
+      if (crate.y + crate.h > 9 * T + 2) return goTo(27 * T + 127)(g, p, t);
+      return Math.abs(p.x + p.w / 2 - (27 * T + 37)) > 6 ? goTo(27 * T + 37)(g, p, t) : I({ action: true });
+    },
+    (g, p, t) => (down() ? null : idle()),
+  ];
+  const push = [
+    (g, p, t) => (atWall() ? null : behind(p) ? I({ right: true }) : goTo(crate.x - 50)(g, p, t)),
+    (g, p, t) => (atWall() ? null : p.x > crate.x + crate.w ? idle() : goTo(crate.x - 90)(g, p, t)),
+  ];
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 9 * T + 1);
+  const ctl = phases([across, fetch, push, climbWall(g, A, B, 30 * T - crate.w / 2, 30 * T, 9 * T, both), [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 90, g => g.done), '25. Çekirdek geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 {

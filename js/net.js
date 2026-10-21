@@ -59,7 +59,7 @@ function applySnapshot(g, s) {
     setTarget(p, a[0], a[1]);
     p.vx = a[2]; p.vy = a[3]; p.pol = a[4];
     p.magnetOn = !!a[5]; p.inExit = !!a[6]; p.squash = a[7]; p.facing = a[8];
-    p.affects = a[9].map(([kind, idx, repel]) => ({ o: kind === 'p' ? g.players[idx] : g.keys[idx], repel: !!repel })).filter(x => x.o);
+    p.affects = a[9].map(([kind, idx, repel]) => ({ o: kind === 'p' ? g.players[idx] : kind === 'b' ? g.boxes[idx] : g.keys[idx], repel: !!repel })).filter(x => x.o);
   });
   s.k.forEach((a, i) => {
     const k = g.keys[i];
