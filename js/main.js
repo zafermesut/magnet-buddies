@@ -381,7 +381,7 @@ addEventListener('keydown', e => {
 
 // ---------- Döngü ----------
 
-let slotsT = 0;
+let slotsT = 0, shownQuality;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -408,6 +408,9 @@ function frame(now) {
   }
 
   if (state === 'editor' && Editor.game) game = Editor.game;
+  if (renderer.quality !== shownQuality) { shownQuality = renderer.quality; renderSettings(); }   // otomatik düşürülmüş olabilir
+  if (state === 'playing' || state === 'complete') Sound.processEffects(game);
+  else Sound.setHum(false);
   renderer.draw(game, now / 1000);
   if (state === 'editor') Editor.drawOverlay(renderer.overlayCtx);
   requestAnimationFrame(frame);
@@ -415,6 +418,24 @@ function frame(now) {
 
 // Linkle gelen: ?oda=KOD (online odaya katıl) ya da ?bolum=... (paylaşılan bölümü aç).
 // editor.js bu dosyadan sonra yüklendiği için açılış, sayfa hazır olunca yapılır.
+// Ayar düğmeleri: ses efektleri, müzik, görüntü kalitesi (3D'de)
+function renderSettings() {
+  $('setSfx').classList.toggle('off', !Sound.settings.sfx);
+  $('setMusic').classList.toggle('off', !Sound.settings.music);
+  $('setQuality').classList.toggle('hidden', !renderer || !renderer.setQuality);
+  if (renderer && renderer.setQuality) {
+    $('setQuality').classList.toggle('off', renderer.quality !== 'high');
+    $('setQuality').title = renderer.quality === 'high' ? 'Görüntü kalitesi: yüksek' : 'Görüntü kalitesi: düşük (daha akıcı)';
+  }
+}
+$('setSfx').addEventListener('click', () => { Sound.start(); Sound.toggle('sfx'); renderSettings(); });
+$('setMusic').addEventListener('click', () => { Sound.start(); Sound.toggle('music'); renderSettings(); });
+$('setQuality').addEventListener('click', () => {
+  renderer.setQuality(renderer.quality === 'high' ? 'low' : 'high');
+  renderSettings();
+});
+for (const b of document.querySelectorAll('#settings button')) b.addEventListener('mousedown', e => e.preventDefault());
+
 function createRenderer() {
   if (window.Renderer3D && !new URLSearchParams(location.search).has('2d')) {
     try {
@@ -429,6 +450,7 @@ function createRenderer() {
 
 addEventListener('DOMContentLoaded', () => {
   renderer = createRenderer();
+  renderSettings();
   const params = new URLSearchParams(location.search);
   const linkCode = params.get('oda'), shared = params.get('bolum');
   if (linkCode) {

@@ -13,6 +13,13 @@
   <canvas id="game"></canvas>
   <canvas id="overlay"></canvas>
 
+  <!-- Ses, müzik ve kalite ayarları (her ekranda) -->
+  <div id="settings">
+    <button id="setSfx" title="Ses efektleri">🔊</button>
+    <button id="setMusic" title="Müzik">🎵</button>
+    <button id="setQuality" title="Görüntü kalitesi">✨</button>
+  </div>
+
   <!-- Oyun içi -->
   <div id="hud" class="hidden">
     <div id="levelInfo" class="panel"><b id="levelName"></b><span id="levelHint"></span></div>
@@ -123,6 +130,7 @@
   <script src="js/input.js"></script>
   <script src="js/game.js"></script>
   <script src="js/net.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
   <script src="js/editor.js"></script>

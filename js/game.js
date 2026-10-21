@@ -178,7 +178,10 @@ class Game {
       if (dy > 0) {
         b.onGround = true;
         b.ground = hit === 'tile' ? null : hit;
-        if (b.kind === 'player' && vy0 > 350) b.squash = Math.min(0.32, vy0 / 2600);
+        if (b.kind === 'player' && vy0 > 350) {
+          b.squash = Math.min(0.32, vy0 / 2600);
+          this.fx('land', b.x + b.w / 2, b.y + b.h, { power: Math.min(1, vy0 / 1000) });
+        }
       }
       b.vy = 0;
     }

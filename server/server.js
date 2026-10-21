@@ -152,7 +152,7 @@ class Room {
 
   snapshot() {
     const g = this.game;
-    const fx = g.effects.filter(e => e.t > this.fxT).map(e => ({ type: e.type, x: r1(e.x), y: r1(e.y), t: r3(e.t), color: e.color }));
+    const fx = g.effects.filter(e => e.t > this.fxT).map(e => ({ type: e.type, x: r1(e.x), y: r1(e.y), t: r3(e.t), color: e.color, power: e.power }));
     this.fxT = g.t;
     const keyIndex = new Map(g.keys.map((k, i) => [k, i]));
     const playerIndex = new Map(g.players.map((p, i) => [p, i]));
