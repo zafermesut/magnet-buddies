@@ -147,10 +147,8 @@ const Editor = {
   // ---------- Fare ----------
 
   cellAt(e) {
-    const v = renderer.view;
-    if (!v) return null;
-    const x = (e.clientX - v.ox) / v.z, y = (e.clientY - v.oy) / v.z;
-    return { c: Math.floor(x / T), r: Math.floor(y / T) };
+    const w = renderer.screenToWorld(e.clientX, e.clientY);
+    return { c: Math.floor(w.x / T), r: Math.floor(w.y / T) };
   },
 
   pointer(e) {
@@ -174,25 +172,28 @@ const Editor = {
   },
 
   // Izgara, başlangıç işareti ve fare altındaki hücre
+  // Izgara, başlangıç işareti ve fare altındaki hücre. Noktalar oyun koordinatından ekrana
+  // izdüşürülür; böylece hem 2D hem 3D (eğik kamera) çizimde doğru yere düşer.
   drawOverlay(ctx) {
-    const v = renderer.view;
-    if (!v || !this.grid) return;
+    if (!this.grid) return;
+    const P = (x, y) => renderer.worldToScreen(x, y);
     ctx.save();
-    ctx.translate(v.ox, v.oy);
-    ctx.scale(v.z, v.z);
-    ctx.strokeStyle = 'rgba(255,255,255,0.06)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let c = 0; c <= this.cols; c++) { ctx.moveTo(c * T, 0); ctx.lineTo(c * T, this.rows * T); }
-    for (let r = 0; r <= this.rows; r++) { ctx.moveTo(0, r * T); ctx.lineTo(this.cols * T, r * T); }
+    const line = (x1, y1, x2, y2) => { const a = P(x1, y1), b = P(x2, y2); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); };
+    for (let c = 0; c <= this.cols; c++) line(c * T, 0, c * T, this.rows * T);
+    for (let r = 0; r <= this.rows; r++) line(0, r * T, this.cols * T, r * T);
     ctx.stroke();
+    const unit = Math.hypot(P(T, 0).x - P(0, 0).x, P(T, 0).y - P(0, 0).y) / T;   // ekranda 1 px oyun birimi
     this.grid.forEach((row, r) => row.forEach((ch, c) => {
       if (ch !== 'S') return;
       PLAYER_COLORS.forEach((col, i) => {
+        const s = P(c * T + T / 2 + i * 40, r * T + T - 17);
         ctx.globalAlpha = i < 2 ? 0.9 : 0.35;
         ctx.fillStyle = col;
         ctx.beginPath();
-        ctx.arc(c * T + T / 2 + i * 40, r * T + T - 17, 15, 0, Math.PI * 2);
+        ctx.arc(s.x, s.y, 15 * unit, 0, Math.PI * 2);
         ctx.fill();
       });
       ctx.globalAlpha = 1;
@@ -200,9 +201,14 @@ const Editor = {
     const h = this.hover;
     if (h && h.c >= 0 && h.r >= 0 && h.c < this.cols && h.r < this.rows) {
       const w = this.tool === 'H' ? 2 : 1;
-      ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+      const x0 = h.c * T + 1, y0 = h.r * T + 1, x1 = (h.c + w) * T - 1, y1 = (h.r + w) * T - 1;
+      const pts = [P(x0, y0), P(x1, y0), P(x1, y1), P(x0, y1)];
+      ctx.strokeStyle = 'rgba(255,255,255,0.85)';
       ctx.lineWidth = 2;
-      ctx.strokeRect(h.c * T + 1, h.r * T + 1, w * T - 2, w * T - 2);
+      ctx.beginPath();
+      pts.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+      ctx.closePath();
+      ctx.stroke();
     }
     ctx.restore();
   },

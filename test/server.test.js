@@ -33,6 +33,27 @@ function client(name) {
     const leak = await fetch(`http://localhost:${PORT}/server/server.js`).then(r => r.status);
     const pkg = await fetch(`http://localhost:${PORT}/package.json`).then(r => r.status);
     ok(leak === 404 && pkg === 404, 'sunucu kodu ve proje dosyaları dışarı verilmiyor');
+    const three = await fetch(`http://localhost:${PORT}/vendor/three/build/three.module.min.js`);
+    ok(three.status === 200 && /javascript/.test(three.headers.get('content-type')), 'Three.js sunuluyor');
+    const bloom = await fetch(`http://localhost:${PORT}/vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js`).then(r => r.status);
+    ok(bloom === 200, 'Three.js eklentileri sunuluyor');
+    const escapes = await Promise.all([
+      '/vendor/three/package.json',
+      '/vendor/three/../ws/package.json',
+      '/vendor/three/%2e%2e/%2e%2e/package.json',
+      '/vendor/three/build/../../../server/server.js',
+    ].map(p => fetch(`http://localhost:${PORT}${p}`).then(r => r.status)));
+    // fetch '../' kısımlarını kendisi temizler; ham istekle adresi olduğu gibi gönder
+    const raw = p => new Promise(resolve => {
+      require('http').get({ host: 'localhost', port: PORT, path: p }, r => { r.resume(); resolve(r.statusCode); });
+    });
+    const rawEscapes = await Promise.all([
+      '/vendor/three/../ws/package.json',
+      '/vendor/three/build/../../../server/server.js',
+      '/vendor/three/build/..%2f..%2f..%2fpackage.json',
+      '/vendor/three/examples/jsm/../../package.json',
+    ].map(raw));
+    ok(escapes.concat(rawEscapes).every(s => s === 404), 'vendor adresinden Three.js dışına çıkılamıyor (' + escapes.concat(rawEscapes).join(',') + ')');
 
     console.log('Oda');
     const a = client('Ayşe'), b = client('Bora');

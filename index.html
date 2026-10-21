@@ -5,9 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Magnet Buddies</title>
   <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+    { "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }
+  </script>
 </head>
 <body>
   <canvas id="game"></canvas>
+  <canvas id="overlay"></canvas>
 
   <!-- Oyun içi -->
   <div id="hud" class="hidden">
@@ -122,5 +126,7 @@
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
   <script src="js/editor.js"></script>
+  <!-- 3D çizim: modül olduğu için klasik script'lerden sonra, sayfa hazır olmadan önce çalışır -->
+  <script type="module" src="js/render3d.js"></script>
 </body>
 </html>

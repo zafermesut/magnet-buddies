@@ -12,6 +12,7 @@ html, body {
 }
 
 canvas { display: block; width: 100vw; height: 100vh; }
+#overlay { position: fixed; inset: 0; pointer-events: none; }   /* 3D'nin üstünde adlar, rozetler, editör ızgarası */
 
 .hidden { display: none !important; }
 

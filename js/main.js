@@ -7,7 +7,7 @@
 // Aynı klavyede simülasyon burada çalışır; online'da sunucuda çalışır, burada yalnızca çizilir.
 
 const $ = id => document.getElementById(id);
-const renderer = new Renderer($('game'));
+let renderer = null;        // sayfa hazır olunca kurulur: 3D (Three.js) ya da 2D yedek
 Input.init();
 
 const STEP = 1 / 60;
@@ -409,13 +409,26 @@ function frame(now) {
 
   if (state === 'editor' && Editor.game) game = Editor.game;
   renderer.draw(game, now / 1000);
-  if (state === 'editor') Editor.drawOverlay(renderer.ctx);
+  if (state === 'editor') Editor.drawOverlay(renderer.overlayCtx);
   requestAnimationFrame(frame);
 }
 
 // Linkle gelen: ?oda=KOD (online odaya katıl) ya da ?bolum=... (paylaşılan bölümü aç).
 // editor.js bu dosyadan sonra yüklendiği için açılış, sayfa hazır olunca yapılır.
+function createRenderer() {
+  if (window.Renderer3D && !new URLSearchParams(location.search).has('2d')) {
+    try {
+      return new window.Renderer3D($('game'), $('overlay'));
+    } catch (e) {
+      console.warn('3D çizim başlatılamadı, 2D kullanılıyor:', e);
+    }
+  }
+  $('overlay').classList.add('hidden');
+  return new Renderer($('game'));
+}
+
 addEventListener('DOMContentLoaded', () => {
+  renderer = createRenderer();
   const params = new URLSearchParams(location.search);
   const linkCode = params.get('oda'), shared = params.get('bolum');
   if (linkCode) {

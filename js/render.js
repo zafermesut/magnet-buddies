@@ -23,9 +23,11 @@ function hexToRgb(h) {
 const rgbaHex = (h, a) => { const [r, g, b] = hexToRgb(h); return `rgba(${r},${g},${b},${a})`; };
 
 class Renderer {
+  // WebGL yoksa kullanılan 2D yedek çizim. 3D çizimle aynı arayüzü sunar.
   constructor(canvas) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
+    this.overlayCtx = this.ctx;   // editör katmanı aynı tuvale çizilir
     this.stars = Array.from({ length: 70 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.6 + 0.4, p: Math.random() * 6 }));
     this.resize();
     addEventListener('resize', () => this.resize());
@@ -37,6 +39,17 @@ class Renderer {
     this.h = innerHeight;
     this.canvas.width = this.w * this.dpr;
     this.canvas.height = this.h * this.dpr;
+  }
+
+  // Oyun koordinatı (px) ↔ ekran (CSS px); editör ve 3D çizimle ortak arayüz
+  worldToScreen(x, y) {
+    const v = this.view || { z: 1, ox: 0, oy: 0 };
+    return { x: v.ox + x * v.z, y: v.oy + y * v.z };
+  }
+
+  screenToWorld(sx, sy) {
+    const v = this.view || { z: 1, ox: 0, oy: 0 };
+    return { x: (sx - v.ox) / v.z, y: (sy - v.oy) / v.z };
   }
 
   draw(game, time) {
@@ -61,7 +74,7 @@ class Renderer {
     const padTop = this.padTop ?? 70, padLeft = this.padLeft || 0, pad = 24;
     const z = Math.min((this.w - padLeft - pad * 2) / game.W, (this.h - padTop - pad) / game.H, 1.6);
     const ox = padLeft + (this.w - padLeft - game.W * z) / 2, oy = padTop + (this.h - padTop - pad - game.H * z) / 2;
-    this.view = { z, ox, oy };   // editör fare konumunu karoya çevirmek için kullanır
+    this.view = { z, ox, oy };
     ctx.save();
     ctx.translate(ox, oy);
     ctx.scale(z, z);

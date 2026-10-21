@@ -34,6 +34,8 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 const PUBLIC = new Set(['index.html', 'css', 'js']);
+const THREE_ROOT = path.join(ROOT, 'node_modules', 'three');
+const THREE_PUBLIC = [path.join(THREE_ROOT, 'build'), path.join(THREE_ROOT, 'examples', 'jsm')];
 
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -48,13 +50,21 @@ const server = http.createServer((req, res) => {
   }
   let rel;
   try { rel = decodeURIComponent(url.pathname).replace(/^\/+/, '') || 'index.html'; } catch (e) { rel = ''; }
-  const file = path.normalize(path.join(ROOT, rel));
-  if (!file.startsWith(ROOT + path.sep) || !PUBLIC.has(rel.split('/')[0])) {
-    res.writeHead(404); res.end('Bulunamadı'); return;
+  let file, cache = 'no-cache';
+  if (rel.startsWith('vendor/three/')) {
+    // Three.js: yalnızca node_modules/three içindeki tarayıcı dosyaları (build/ ve examples/jsm/)
+    file = path.normalize(path.join(THREE_ROOT, rel.slice('vendor/three/'.length)));
+    if (!THREE_PUBLIC.some(dir => file.startsWith(dir + path.sep))) { res.writeHead(404); res.end('Bulunamadı'); return; }
+    cache = 'public, max-age=86400';
+  } else {
+    file = path.normalize(path.join(ROOT, rel));
+    if (!file.startsWith(ROOT + path.sep) || !PUBLIC.has(rel.split('/')[0])) {
+      res.writeHead(404); res.end('Bulunamadı'); return;
+    }
   }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('Bulunamadı'); return; }
-    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-cache' });
+    res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': cache });
     res.end(data);
   });
 });
