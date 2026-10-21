@@ -4,6 +4,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Magnet Buddies</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
     { "imports": { "three": "/vendor/three/build/three.module.min.js", "three/addons/": "/vendor/three/examples/jsm/" } }
@@ -12,6 +15,8 @@
 <body>
   <canvas id="game"></canvas>
   <canvas id="overlay"></canvas>
+  <div id="fade"></div>
+  <div id="levelIntro"><span id="introNum"></span><b id="introName"></b></div>
 
   <!-- Ses, müzik ve kalite ayarları (her ekranda) -->
   <div id="settings">
@@ -30,8 +35,15 @@
 
   <!-- Ana menü -->
   <div id="home" class="overlay">
-    <div class="card">
-      <h1 class="gameTitle"></h1>
+    <div class="card home">
+      <div class="logo">
+        <svg class="logoMagnet" viewBox="0 0 64 64" aria-hidden="true">
+          <path d="M14 8 v26 a18 18 0 0 0 36 0 v-26" fill="none" stroke="#e6e8ff" stroke-width="12"/>
+          <rect x="8" y="5" width="12" height="13" rx="3" fill="#ff8787"/>
+          <rect x="44" y="5" width="12" height="13" rx="3" fill="#66d9e8"/>
+        </svg>
+        <h1 class="gameTitle"></h1>
+      </div>
       <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
       <button id="homeOnline" class="primary">ONLİNE · LİNKLE OYNA</button>
       <button id="homeLocal">Aynı klavyede oyna</button>

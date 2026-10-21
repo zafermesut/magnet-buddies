@@ -134,7 +134,7 @@ class Renderer3D {
     const std = (color, extra) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.75, metalness: 0.0 }, extra));
     this.geo = {
       block: new RoundedBoxGeometry(1, 1, 1, 3, 0.09),
-      cap: new RoundedBoxGeometry(1.02, 0.16, 1.04, 2, 0.06),
+      cap: new RoundedBoxGeometry(1, 0.16, 1.04, 2, 0.06),   // tam bir karo genişliği: komşularıyla çakışıp titremesin
       door: new RoundedBoxGeometry(0.8, 1, 0.7, 2, 0.06),
       bar: new THREE.CylinderGeometry(0.045, 0.045, 1, 10),
       gatePanel: new THREE.BoxGeometry(0.82, 1, 0.08),
@@ -156,7 +156,8 @@ class Renderer3D {
       keyhole: new THREE.MeshStandardMaterial({ color: '#3b2408', roughness: 0.9 }),
       buttonBase: std('#262849', { roughness: 0.6 }),
       crate: std('#ffffff', { roughness: 0.85, map: this.crateTexture() }),
-      exitFrame: std(PALETTE.exit, { emissive: PALETTE.exit, emissiveIntensity: 1.4, roughness: 0.4 }),
+      // Parlama (bloom) olmadan da yeşil kalsın: ışık saçma çok güçlü olursa renk beyaza kaçar
+      exitFrame: std('#40c057', { emissive: '#2fb344', emissiveIntensity: 0.9, roughness: 0.4 }),
       exitInside: new THREE.MeshBasicMaterial({ color: '#0b0c20' }),
       key: std(PALETTE.key, { roughness: 0.25, metalness: 0.85, emissive: '#ff9d00', emissiveIntensity: 0.35 }),
       eyeWhite: std('#ffffff', { roughness: 0.3 }),
@@ -409,7 +410,8 @@ class Renderer3D {
       blocks.setColorAt(i, this.tmpColor.setRGB(k, k, k * 1.03));
     });
     if (blocks.instanceColor) blocks.instanceColor.needsUpdate = true;
-    inst(this.geo.cap, this.mat.cap, caps, (o, c, r) => o.position.set(c + 0.5, -r - 0.08, 0));
+    // Kenar şeridi bloğun üst yüzeyinden biraz yukarıda: aynı düzlemde iki yüzey titreşir (z-fighting)
+    inst(this.geo.cap, this.mat.cap, caps, (o, c, r) => o.position.set(c + 0.5, -r - 0.05, 0));
 
     // Kilitli kapılar
     this.doorObjs = game.doors.map(d => {
@@ -586,11 +588,26 @@ class Renderer3D {
     for (let i = 0; i < this.players.length; i++) {
       if (i >= n) { this.players[i].root.visible = false; for (const w of this.players[i].waves) w.visible = false; }
     }
+    const inside = game.players.filter(p => p.inExit);
     game.players.forEach((p, i) => {
       const o = this.playerObj(i);
-      o.root.visible = !p.inExit;
+      o.root.visible = true;
+      o.root.scale.setScalar(1);
       for (const w of o.waves) w.visible = false;
-      if (p.inExit) { o.lastX = null; return; }
+      if (p.inExit) {
+        // Kapıya girenler kemerin içinde küçülüp mutlu gözlerle zıplar (bölüm bitince daha coşkulu)
+        o.lastX = null;
+        o.halo.visible = false;
+        if (!game.exit) { o.root.visible = false; return; }
+        const k = inside.indexOf(p), e = game.exit;
+        const hop = Math.abs(Math.sin(t * (game.done ? 9 : 4) + k * 1.3)) * (game.done ? 0.45 : 0.12);
+        o.root.position.set(wx(e.x + e.w / 2) + (k % 2 ? 0.3 : -0.3), wy(e.y + e.h) + Math.floor(k / 2) * 0.55 + hop, -0.05);
+        o.root.scale.setScalar(0.72);
+        o.body.scale.set(1, 1, 1);
+        for (const eye of o.eyes) { eye.white.scale.y = o.r * 0.3 * 0.25; eye.pupil.position.set(0, 0.4, 0.75); }
+        o.face.position.x = 0;
+        return;
+      }
       const cx = wx(p.x + p.w / 2), by = wy(p.y + p.h);
       o.root.position.set(cx, by, 0);
       // Yuvarlanma: x'teki değişim kadar döner (yerelde de online'da da çalışır)
@@ -838,7 +855,7 @@ class Renderer3D {
     ctx.textAlign = 'center';
     ctx.lineJoin = 'round';
 
-    if (game.exit && game.players.length) {
+    if (game.exit && game.players.length && !game.isDemo) {
       const e = game.exit, inside = game.players.filter(p => p.inExit).length;
       const s = this.worldToScreen(e.x + e.w / 2, e.y - 4, 0.3);
       ctx.font = `800 ${fs + 1}px ${FONT_STACK}`;
@@ -864,7 +881,7 @@ class Renderer3D {
     }
 
     game.players.forEach((p, i) => {
-      if (p.inExit) return;
+      if (p.inExit || p.noLabel) return;
       const col = PLAYER_COLORS[i % PLAYER_COLORS.length];
       const top = this.worldToScreen(p.x + p.w / 2, p.y - 6, 0.4);
       let ly = top.y;
@@ -902,6 +919,6 @@ class Renderer3D {
   }
 }
 
-const FONT_STACK = 'system-ui, -apple-system, "Segoe UI", sans-serif';
+const FONT_STACK = '"Fredoka", system-ui, -apple-system, "Segoe UI", sans-serif';
 
 window.Renderer3D = Renderer3D;

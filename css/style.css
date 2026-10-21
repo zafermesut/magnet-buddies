@@ -6,7 +6,7 @@ html, body {
   overflow: hidden;
   background: #1c1b3a;
   color: #eef0ff;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-family: "Fredoka", system-ui, -apple-system, "Segoe UI", sans-serif;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -60,30 +60,62 @@ canvas { display: block; width: 100vw; height: 100vh; }
 }
 .card {
   width: min(440px, 100%);
-  background: rgba(28, 27, 58, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
+  background: rgba(30, 28, 66, 0.72);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 24px 70px rgba(5, 4, 20, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  animation: cardIn .32s cubic-bezier(.2, .9, .3, 1.2);
+  border-radius: 22px;
   padding: 26px;
   text-align: center;
   display: flex; flex-direction: column; gap: 12px;
 }
 .card.wide { width: min(640px, 100%); }
-h1 { margin: 0; font-size: 42px; letter-spacing: -0.02em; }
+.card.home { width: min(500px, 100%); }
+h1 { margin: 0; font-size: 46px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 4px 0 rgba(10, 8, 40, 0.45); }
+.logo { display: flex; align-items: center; justify-content: center; gap: 12px; }
+.logoMagnet { width: 58px; height: 58px; animation: wobble 3.2s ease-in-out infinite; filter: drop-shadow(0 4px 0 rgba(10, 8, 40, 0.45)); }
+@keyframes wobble { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg) translateY(-3px); } }
+@keyframes cardIn { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: none; } }
+
+/* Bölüm girişi: kararıp açılma ve bölüm adı */
+#fade { position: fixed; inset: 0; background: #0b0a22; pointer-events: none; opacity: 0; z-index: 20; }
+#fade.go { animation: fadeOut .7s ease forwards; }
+@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+#levelIntro {
+  position: fixed; left: 0; right: 0; top: 38%; z-index: 21; pointer-events: none;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0;
+  text-shadow: 0 4px 0 rgba(10, 8, 40, 0.6), 0 0 30px rgba(10, 8, 40, 0.6);
+}
+#levelIntro.go { animation: intro 2.1s ease forwards; }
+#introNum { font-size: 20px; font-weight: 600; color: #b9bce0; letter-spacing: .2em; text-transform: uppercase; }
+#introName { font-size: 64px; font-weight: 700; color: #fff; }
+@keyframes intro {
+  0% { opacity: 0; transform: scale(.85); }
+  15% { opacity: 1; transform: scale(1.04); }
+  25% { transform: scale(1); }
+  75% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-20px); }
+}
 h2 { margin: 0; font-size: 28px; }
 .tagline { margin: 0; color: #b9bce0; font-size: 15px; line-height: 1.5; }
 .small { margin: 0; color: #8e92c0; font-size: 12px; line-height: 1.5; }
 .note { margin: 0; min-height: 18px; color: #ffd43b; font-size: 13px; }
 
 button {
-  font: inherit; cursor: pointer; padding: 11px; border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.18); background: transparent; color: #dfe1ff;
+  font: inherit; font-weight: 500; cursor: pointer; padding: 11px; border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18); background: rgba(255, 255, 255, 0.03); color: #dfe1ff;
+  transition: transform .12s ease, background .15s ease, box-shadow .15s ease, filter .15s ease;
 }
-button:hover { background: rgba(255, 255, 255, 0.06); }
+button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.09); transform: translateY(-1px); }
+button:active:not(:disabled) { transform: translateY(1px) scale(.98); }
 button.primary {
-  border: none; font-size: 17px; font-weight: 800; letter-spacing: .06em; color: #1c1b3a;
-  background: #69db7c;
+  border: none; font-size: 18px; font-weight: 700; letter-spacing: .05em; color: #14301b;
+  background: #69db7c; box-shadow: 0 6px 0 #3f9c51, 0 10px 24px rgba(105, 219, 124, 0.25);
 }
-button.primary:hover { background: #8ce99a; }
+button.primary:hover:not(:disabled) { background: #7ee28f; }
+button.primary:active:not(:disabled) { box-shadow: 0 2px 0 #3f9c51; transform: translateY(4px); }
 button.primary:disabled { opacity: 0.35; cursor: default; }
 
 button.link { border: none; color: #8e92c0; padding: 6px; }

@@ -16,7 +16,7 @@ const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'e
 let mode = 'local';         // local | online
 let state = 'home';
 let joined = [];            // aynı klavye: katılan giriş kaynakları (katılım sırasıyla)
-let game = new Game(0, 0);  // menülerin arkasında boş 1. bölüm görünsün
+let game = null;            // menülerde canlı demo sahnesi (menuGame), oyunda oynanan bölüm
 let levelIndex = 0;
 let acc = 0, last = performance.now(), completeAt = 0;
 let room = null;            // online: sunucudan gelen son oda bilgisi
@@ -59,6 +59,72 @@ function show(id) {
   renderer.padTop = id === 'editor' ? 24 : 70;
 }
 
+// ---------- Menü arka planı: botların zıplayıp birbirini mıknatısla fırlattığı canlı sahne ----------
+
+const MENU_LEVEL = {
+  name: 'Menü', magnet: true, pols: [1, 1, 1],
+  map: [
+    '############################',
+    '#..........................#',
+    '#..........................#',
+    '#..........................#',
+    '#.......#####.......####...#',
+    '#..........................#',
+    '#..........................#',
+    '#...###.............###....#',
+    '#..........................#',
+    '#..........................#',
+    '#.S.........##.......E.....#',
+    '############################',
+  ],
+};
+const MENU_STATES = new Set(['home', 'lobby', 'select', 'onlineForm', 'room']);
+let demo = null;
+
+function menuGame() {
+  if (!demo) {
+    demo = new Game(MENU_LEVEL, 3);
+    demo.isDemo = true;
+    demo.players.forEach(p => { p.noLabel = true; });
+    demo.bots = demo.players.map(() => ({ dir: 1, t: Math.random(), jump: false, hold: 0 }));
+  }
+  return demo;
+}
+
+// Basit botlar: rastgele yürür, zıplar; ara sıra biri durup mıknatısını açar ve yakınındakileri fırlatır
+function demoInputs(g, dt) {
+  return g.players.map((p, i) => {
+    const b = g.bots[i];
+    b.t -= dt;
+    b.hold -= dt;
+    if (b.t <= 0) {
+      b.t = 0.5 + Math.random() * 1.3;
+      b.dir = [-1, 1, 1, -1, 0][Math.random() * 5 | 0];
+      b.jump = Math.random() < 0.5;
+      if (Math.random() < 0.18) b.hold = 0.6;
+    }
+    const c = Math.floor((p.x + p.w / 2 + b.dir * (p.w / 2 + 6)) / T), r = Math.floor((p.y + p.h - 1) / T);
+    if (b.dir && (g.blocked(c, r) || g.blocked(c, r - 1))) b.jump = true;
+    const holding = b.hold > 0;
+    return {
+      left: !holding && b.dir < 0, right: !holding && b.dir > 0,
+      jump: !holding && b.jump && (g.t * 3 + i) % 1 < 0.5, action: holding, swap: false,
+    };
+  });
+}
+
+// Bölüm başlarken: ekran kararıp açılır, bölümün adı büyükçe belirir
+function levelIntro(num, name) {
+  for (const id of ['fade', 'levelIntro']) {
+    const el = $(id);
+    el.classList.remove('go');
+    void el.offsetWidth;   // animasyonu baştan başlat
+    el.classList.add('go');
+  }
+  $('introNum').textContent = num;
+  $('introName').textContent = name;
+}
+
 function toHome() {
   Net.close();
   mode = 'local';
@@ -66,7 +132,7 @@ function toHome() {
   pendingCustom = null;
   editorTest = false;
   state = 'home';
-  game = new Game(0, 0);
+  game = menuGame();
   show('home');
 }
 
@@ -75,7 +141,7 @@ function toHome() {
 function toLobby() {
   mode = 'local';
   state = 'lobby';
-  game = new Game(0, 0);
+  game = menuGame();
   show('lobby');
   renderSlots();
 }
@@ -83,7 +149,7 @@ function toLobby() {
 function toSelect() {
   if (joined.length < 2) return;
   state = 'select';
-  game = new Game(levelIndex, 0);
+  game = menuGame();
   show('select');
   const grid = $('levelGrid');
   grid.innerHTML = '';
@@ -111,6 +177,7 @@ function playLocal(def, title) {
   acc = 0;
   state = 'playing';
   show(null);
+  levelIntro(levelIndex >= 0 ? `Bölüm ${levelIndex + 1}` : 'Kendi bölümün', def.name);
   const sources = Input.sources();
   setHud(title, def, joined.map((id, k) => {
     const s = sources.find(x => x.id === id);
@@ -219,7 +286,7 @@ function toOnlineForm(err) {
   editorTest = false;
   customSent = false;
   state = 'onlineForm';
-  game = new Game(0, 0);
+  game = menuGame();
   show('onlineForm');
   $('onlineError').textContent = err || (Net.available() ? '' : 'Online oynamak için oyunu sunucudan açmalısın (npm start).');
   try { if (!$('onlineName').value) $('onlineName').value = localStorage.getItem('name') || ''; } catch (e) { /* yoksay */ }
@@ -294,19 +361,20 @@ Net.on('room', m => {
   if (pendingCustom && !customSent && m.host === m.you) { customSent = true; Net.send({ t: 'custom', def: pendingCustom }); }
   history.replaceState(null, '', `${location.pathname}?oda=${m.code}`);
   if (m.state === 'lobby' || (state !== 'playing' && state !== 'complete')) {
-    if (state !== 'room') { state = 'room'; game = new Game(m.level || 0, 0); show('room'); }
+    if (state !== 'room') { state = 'room'; game = menuGame(); show('room'); }
   }
   renderRoom();
 });
 
 Net.on('start', m => {
   levelIndex = m.level;
-  if (m.you < 0) { state = 'room'; show('room'); renderRoom(); return; }   // bu bölümü izliyor
+  if (m.you < 0) { state = 'room'; game = menuGame(); show('room'); renderRoom(); return; }   // bu bölümü izliyor
   currentDef = m.def || LEVELS[m.level];
   game = new Game(m.def || m.level, m.players.length);
   game.players.forEach((p, i) => { p.name = m.players[i].name; p.isMe = i === m.you; });
   state = 'playing';
   show(null);
+  levelIntro(m.def ? 'Kendi bölümün' : `Bölüm ${m.level + 1}`, currentDef.name);
   setHud(m.def ? `★ ${m.def.name}` : `${m.level + 1}. ${currentDef.name}`, currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
     hint: 'A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem' + (game.magnet ? ' (basılı: mıknatıs) · E / sağ Shift kutup' : '') }]);
 });
@@ -389,6 +457,8 @@ function frame(now) {
 
   if (state === 'lobby') {
     lobbyInput();
+    acc += dt;
+    while (acc >= STEP) { game.step(STEP, demoInputs(game, STEP)); acc -= STEP; }
     slotsT -= dt;
     if (slotsT <= 0) { slotsT = 1; renderSlots(); }   // gamepad takılırsa listede görünsün
   } else if (state === 'playing' && mode === 'local') {
@@ -401,6 +471,9 @@ function frame(now) {
     Net.sendInput(onlineInput());
     smoothNet(game, dt);
     $('timer').textContent = fmt(game.t);
+  } else if (MENU_STATES.has(state) && game && game.isDemo) {
+    acc += dt;
+    while (acc >= STEP) { game.step(STEP, demoInputs(game, STEP)); acc -= STEP; }
   } else if (state === 'complete') {
     if (mode === 'online') smoothNet(game, dt);
     const anyJump = mode === 'online' ? Input.sources().some(s => Input.pressed(s.id, 'jump')) : joined.some(id => Input.pressed(id, 'jump'));

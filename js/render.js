@@ -208,7 +208,7 @@ class Renderer {
       ctx.fill();
     });
     ctx.fillStyle = '#fff';
-    ctx.font = '700 16px system-ui, sans-serif';
+    ctx.font = '700 16px "Fredoka", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.fillText(`${inside.length}/${g.players.length}`, cx, e.y - 4);
@@ -329,12 +329,13 @@ class Renderer {
       ctx.lineWidth = 2;
       ctx.stroke();
       ctx.fillStyle = '#1c1b3a';
-      ctx.font = '900 15px system-ui, sans-serif';
+      ctx.font = '900 15px "Fredoka", system-ui, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
       ctx.fillText(p.pol > 0 ? '+' : '−', bx, by + 1);
     }
 
+    if (p.noLabel) return;
     // Kim olduğu: online'da takma ad, kendi topunun üstünde küçük bir ok
     const label = p.name || `${p.index + 1}P`;
     let ly = p.y - 6;
@@ -347,7 +348,7 @@ class Renderer {
       ctx.fill();
       ly -= 11;
     }
-    ctx.font = '800 13px system-ui, sans-serif';
+    ctx.font = '800 13px "Fredoka", system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     ctx.lineWidth = 3;
