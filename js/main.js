@@ -327,9 +327,19 @@ function showComplete(i, secs) {
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
     (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '');
   if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
+  // Alan 1'in finali: pusula parçası bulundu, pusula ilk kez kıpırdar
+  const final = !custom && LEVELS[i].final;
+  $('compassScene').classList.toggle('hidden', !final);
+  $('toSelectBtn').classList.toggle('hidden', !!final);
+  if (final) {
+    $('completeTitle').textContent = 'Pusula parçası bulundu!';
+    $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b><br><span class="partDone">${icon('star')}Alan 1 · Hurdalık tamamlandı</span>
+      <br><span class="small">Pusula ilk kez kıpırdadı. İğne kuzeyi, Fabrika'yı gösteriyor…</span>`;
+    $('nextBtn').textContent = mode === 'online' ? 'ODAYA DÖN' : 'HARİTA';
+  }
   // Kısmın son bölümü ilk kez geçildi: küçük kutlama ve haritada sıradaki kısım açılır
   const part = custom ? -1 : partOf(i);
-  if (part >= 0 && !prevBest && PARTS[part].ids[PARTS[part].ids.length - 1] === LEVELS[i].id) {
+  if (part >= 0 && !final && !prevBest && PARTS[part].ids[PARTS[part].ids.length - 1] === LEVELS[i].id) {
     $('completeTitle').textContent = `${PARTS[part].name} tamam!`;
     $('completeInfo').innerHTML += `<br><span class="partDone">${icon('star')}${part + 1}. Kısım bitti${PARTS[part + 1] ? ` · sırada <b>${esc(PARTS[part + 1].name)}</b>` : ''}</span>`;
   }

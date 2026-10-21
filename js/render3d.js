@@ -674,8 +674,23 @@ class Renderer3D {
       this.levelGroup.add(g);
       return g;
     });
-    this.keyObjs = game.keys.map(() => {
+    this.keyObjs = game.keys.map(k => {
       const g = new THREE.Group();
+      if (k.compass) {
+        // Pusula parçası: kırmızı uçlu, parlayan iğne parçası
+        const tip = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 4), new THREE.MeshStandardMaterial({ color: '#ff6b6b', emissive: '#ff6b6b', emissiveIntensity: 1.2, roughness: 0.3, metalness: 0.4 }));
+        tip.position.y = 0.21;
+        const tail = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.42, 4), new THREE.MeshStandardMaterial({ color: '#f1f3ff', emissive: '#b9bce0', emissiveIntensity: 0.6, roughness: 0.3, metalness: 0.4 }));
+        tail.rotation.z = Math.PI;
+        tail.position.y = -0.21;
+        const hub = new THREE.Mesh(new THREE.SphereGeometry(0.07, 12, 8), this.mat.key);
+        const light = new THREE.PointLight('#ff8787', 1.6, 3, 1.5);
+        g.add(tip, tail, hub, light);
+        g.rotation.z = -0.5;
+        g.scale.setScalar(1.6);
+        this.levelGroup.add(g);
+        return g;
+      }
       const ring = new THREE.Mesh(new THREE.TorusGeometry(0.13, 0.045, 10, 24), this.mat.key);
       ring.position.x = -0.12;
       const shaft = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.07), this.mat.key);
@@ -1011,6 +1026,7 @@ class Renderer3D {
       g.visible = !k.used;
       g.position.set(wx(k.x + k.w / 2), wy(k.y + k.h / 2) + (k.holder ? 0 : Math.sin(t * 3 + i) * 0.04), 0.1);
       g.rotation.y = t * 2.2;
+      if (k.compass) g.rotation.z = -0.5 + Math.sin(t * 5) * 0.15;   // iğne titrer
     });
     if (this.exitObj) {
       const pulse = 0.8 + 0.2 * Math.sin(t * 3);

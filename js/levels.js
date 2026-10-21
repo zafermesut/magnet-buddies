@@ -18,6 +18,7 @@
 //   M  metal sandık (tek kişi iter, mıknatıs çeker)
 //   P N  sabit mıknatıs bloğu (+ / −): zıt kutuptaki oyuncuyu çeker, aynı kutuptakini iter
 //   p n  kutup kapısı (+ / −): yalnızca aynı kutuptaki oyuncuyu geçirir
+//   C  pusula parçası (anahtar gibi taşınır, kilitli kapıyı açar)
 //
 // magnet: true olan bölümlerde mıknatıs açıktır. pols: oyuncuların başlangıç kutupları (1 = +, -1 = −).
 //
@@ -524,6 +525,121 @@ const LEVELS = [
       '########..........##################',
     ],
   },
+  {
+    id: 'uzun-yol',
+    name: 'Uzun yol',
+    hint: 'Gezgin platform sizi çukurun ortasındaki sütuna götürür. Oradan ötesi uzak: biriniz itsin, karşıya geçen kutbunu değiştirip çeksin.',
+    magnet: true,
+    pols: [1, 1],
+    map: [
+      '####################################',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#.SS..............................E#',
+      '#########===........##......########',
+    ],
+  },
+  {
+    id: 'anahtar-zinciri',
+    name: 'Anahtar zinciri',
+    hint: 'İki kapı, iki anahtar. İlki yüksekte: kule kurun. İkincisi rafta: mıknatısla indirin.',
+    magnet: true,
+    map: [
+      '##################################',
+      '#...........D...........D........#',
+      '#...........D...........D........#',
+      '#...........D...........D........#',
+      '#...........D...........D........#',
+      '#...........D.....K.....D........#',
+      '#...........D...####....D........#',
+      '#..K........D...........D........#',
+      '#.###.......D...........D........#',
+      '#.###.......D...........D........#',
+      '#.###.SS....D...........D.....E..#',
+      '##################################',
+    ],
+  },
+  {
+    id: 'asma-bahce',
+    name: 'Asma bahçe',
+    hint: 'Biriniz aşağıdaki düğmede kapıyı tutsun, öbürü tırmansın: yay, tavan, mıknatıslı duvar. Yukarıdaki düğmeyle sıra değişir.',
+    magnet: true,
+    map: [
+      '################################',
+      '#......................a.......#',
+      '#......................a..1..E.#',
+      '#..................N############',
+      '#..................N...........#',
+      '#..................N...........#',
+      '#..................N...........#',
+      '#......NNNNNNNN....N...........#',
+      '#..................N...........#',
+      '#..................N...........#',
+      '#..................N...........#',
+      '#............######............#',
+      '#..............................#',
+      '#..............................#',
+      '#.SS.1..^......................#',
+      '################################',
+    ],
+  },
+  {
+    id: 'firtinanin-gozu',
+    name: 'Fırtınanın gözü',
+    hint: 'Asansör, gezgin platform ve kutup kapısı: fırtına her yeri karıştırmış. Önce birbirinizi yukarı taşıyın.',
+    magnet: true,
+    map: [
+      '####################################',
+      '#............................p.....#',
+      '#............................p.....#',
+      '#............................p.....#',
+      '#.......##...................p.....#',
+      '#...........1................p...E.#',
+      '#.........#######===.......#########',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..................................#',
+      '#..1.SS............................#',
+      '########xx##########################',
+      '####################################',
+    ],
+  },
+  {
+    id: 'pusula-parcasi',
+    name: 'Pusula parçası',
+    hint: 'Son yolculuk: öğrendiğiniz her şeyle pusula parçasına ulaşın. Parça kapıyı açar.',
+    magnet: true,
+    final: true,
+    map: [
+      '##############################################',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n..........#',
+      '#.................................n.......D..#',
+      '#...................NNNNNNNNNNN...n.......D..#',
+      '#.................................n.......D..#',
+      '#.................................n.M....CD.E#',
+      '#.................................n.###.######',
+      '#.................................n.....######',
+      '#.................................n.....######',
+      '#.SS................^.............n.....######',
+      '#######===.....######........#################',
+    ],
+  },
 ];
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
@@ -535,6 +651,7 @@ const PARTS = [
   { name: 'Paslı raylar', ids: ['gezgin', 'yuk-treni', 'ters-asansor', 'yay-ve-kule', 'hurda-dagi'] },
   { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'metal-sandik', 'miknatis-ustasi'] },
   { name: 'Manyetik çekirdek', ids: ['yapiskan-tavan', 'miknatis-bacasi', 'kutup-kapisi', 'ikiye-bolun', 'cekirdek'] },
+  { name: 'Pusula parçası', ids: ['uzun-yol', 'anahtar-zinciri', 'asma-bahce', 'firtinanin-gozu', 'pusula-parcasi'] },
 ];
 const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
 
@@ -546,7 +663,7 @@ function levelUnlocked(i, done) {
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpn';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnC';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

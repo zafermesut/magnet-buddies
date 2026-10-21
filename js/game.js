@@ -80,9 +80,10 @@ class Game {
           else if (map[r][c - 1] === '#') ex = x;
           this.exit = { x: ex, y: y - T, w: EXIT_W, h: 2 * T };
         }
-        else if (ch === 'K') {
+        else if (ch === 'K' || ch === 'C') {
+          // Pusula parçası (C) anahtar gibi taşınır ve kapı açar; yalnızca görünüşü farklıdır
           const k = PHYS.keySize;
-          this.keys.push(makeBody('key', x + (T - k) / 2, y + T - k, k, k, { holder: null, used: false, noPick: new Map() }));
+          this.keys.push(makeBody('key', x + (T - k) / 2, y + T - k, k, k, { holder: null, used: false, noPick: new Map(), compass: ch === 'C' }));
         } else if (ch === 'D') doorCells.push({ r, c });
         else if ('123'.includes(ch)) this.buttons.push({ channel: +ch, x: x + 3, y: y + T - 8, w: T - 6, h: 8, pressed: false });
         else if ('abcABC'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });

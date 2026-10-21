@@ -196,6 +196,17 @@
   <!-- Bölüm sonu -->
   <div id="complete" class="overlay hidden">
     <div class="card">
+      <div id="compassScene" class="hidden" aria-hidden="true">
+        <svg viewBox="0 0 120 120">
+          <circle cx="60" cy="60" r="54" class="dial"/>
+          <circle cx="60" cy="60" r="44" class="ring"/>
+          <text x="60" y="27" class="dir">K</text>
+          <text x="96" y="64" class="dir">D</text>
+          <text x="60" y="101" class="dir">G</text>
+          <text x="24" y="64" class="dir">B</text>
+          <g class="needle"><path d="M60 22 L68 60 L52 60 Z" class="north"/><path d="M60 98 L68 60 L52 60 Z" class="south"/><circle cx="60" cy="60" r="5" class="hub"/></g>
+        </svg>
+      </div>
       <h2 id="completeTitle">Bölüm tamam!</h2>
       <p id="completeInfo"></p>
       <button id="likeBtn" class="hidden"><i data-ic="heart"></i>Bu bölümü beğen</button>

@@ -526,3 +526,23 @@ button.stop:hover .dot { transform: translateY(-3px) scale(1.05); }
   .stop .dot { width: 44px; height: 44px; font-size: 17px; }
   .stop .time { display: none; }
 }
+
+/* ---------- Alan 1 finali: pusula ---------- */
+#compassScene { display: grid; place-items: center; margin: -6px 0 2px; }
+#compassScene svg { width: 132px; height: 132px; filter: drop-shadow(0 8px 0 rgba(10, 8, 40, .4)); }
+#compassScene .dial { fill: #f1e3c6; stroke: #b07a3a; stroke-width: 5; }
+#compassScene .ring { fill: none; stroke: rgba(120, 80, 30, .35); stroke-width: 1.5; stroke-dasharray: 2 5; }
+#compassScene .dir { font: 700 13px Fredoka, sans-serif; fill: #7a4f1f; text-anchor: middle; }
+#compassScene .north { fill: #ff6b6b; }
+#compassScene .south { fill: #4d4f7a; }
+#compassScene .hub { fill: #b07a3a; }
+#compassScene .needle { transform-origin: 60px 60px; animation: compassSpin 3.2s cubic-bezier(.2, .8, .3, 1) forwards; }
+/* İğne önce şaşkınca döner, titrer, sonra kuzeydoğuya (Fabrika'ya) oturur */
+@keyframes compassSpin {
+  0% { transform: rotate(-200deg); }
+  45% { transform: rotate(70deg); }
+  60% { transform: rotate(10deg); }
+  72% { transform: rotate(48deg); }
+  84% { transform: rotate(28deg); }
+  100% { transform: rotate(35deg); }
+}

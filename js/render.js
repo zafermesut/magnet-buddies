@@ -437,6 +437,18 @@ class Renderer {
     const x = k.x + k.w / 2, y = k.y + k.h / 2 + bob;
     ctx.save();
     ctx.translate(x, y);
+    if (k.compass) {
+      // Pusula parçası: kırmızı-beyaz iğne
+      ctx.rotate(0.5 + Math.sin(t * 5) * 0.15);
+      ctx.shadowColor = '#ff6b6b';
+      ctx.shadowBlur = 14;
+      ctx.fillStyle = '#ff6b6b';
+      ctx.beginPath(); ctx.moveTo(0, -16); ctx.lineTo(6, 0); ctx.lineTo(-6, 0); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#f1f3ff';
+      ctx.beginPath(); ctx.moveTo(0, 16); ctx.lineTo(6, 0); ctx.lineTo(-6, 0); ctx.closePath(); ctx.fill();
+      ctx.restore();
+      return;
+    }
     ctx.shadowColor = PAL.key;
     ctx.shadowBlur = 12;
     ctx.strokeStyle = PAL.key;
