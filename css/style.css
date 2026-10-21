@@ -47,10 +47,11 @@ canvas { display: block; }
 /* ---------- Ayar düğmeleri ---------- */
 #settings { position: fixed; top: 14px; right: 16px; display: flex; gap: 6px; z-index: 5; }
 #settings button {
-  width: 38px; height: 38px; padding: 0; border-radius: 50%; font-size: 17px; line-height: 1;
+  display: grid; place-items: center; width: 42px; height: 42px; padding: 0; border-radius: 50%;
   background: rgba(20, 20, 45, 0.7); border: 1px solid rgba(255, 255, 255, 0.15); backdrop-filter: blur(6px);
 }
-#settings button.off { opacity: 0.4; filter: grayscale(1); }
+#settings button .ic { width: 21px; height: 21px; transition: transform .4s ease; }
+#settings button:hover .ic { transform: rotate(60deg); }
 
 /* ---------- Menüler ---------- */
 .overlay {
@@ -82,7 +83,9 @@ button.big small { font-size: 12px; font-weight: 600; letter-spacing: 0; opacity
 .wideBtn { font-size: 16px; padding: 13px; }
 .homeTiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .tile { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; text-align: left; align-items: center; padding: 12px 14px; }
-.tile .ic { grid-row: span 2; font-size: 26px; }
+.tileIc { grid-row: span 2; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 12px; background: rgba(255, 255, 255, .07); }
+.tileIc .ic { width: 22px; height: 22px; }
+#homeAtolye .tileIc { color: #ffd43b; } #homeEditor .tileIc { color: #66d9e8; }
 .tile b { font-size: 15px; }
 .tile small { font-size: 11px; color: #8e92c0; }
 
@@ -92,25 +95,25 @@ button.big small { font-size: 12px; font-weight: 600; letter-spacing: 0; opacity
 .guestBall { position: relative; width: 64px; height: 64px; margin: 2px auto 0; border-radius: 50%;
   background: radial-gradient(circle at 35% 30%, #a5b4fc, #5c63c9 70%); box-shadow: 0 6px 0 rgba(10, 8, 40, .45), inset -6px -8px 14px rgba(0, 0, 0, .25);
   animation: bob 2.6s ease-in-out infinite; }
-.guestBall i { position: absolute; top: 24px; width: 10px; height: 13px; border-radius: 50%; background: #fff; }
-.guestBall i::after { content: ''; position: absolute; left: 3px; top: 4px; width: 5px; height: 6px; border-radius: 50%; background: #1d1b3a; }
-.guestBall i:first-child { left: 20px; } .guestBall i:last-child { left: 34px; }
+.guestBall span { position: absolute; top: 24px; width: 10px; height: 13px; border-radius: 50%; background: #fff; }
+.guestBall span::after { content: ''; position: absolute; left: 3px; top: 4px; width: 5px; height: 6px; border-radius: 50%; background: #1d1b3a; }
+.guestBall span:first-child { left: 20px; } .guestBall span:last-child { left: 34px; }
 @keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
 .profile .guestBall + h3 { text-align: center; }
 .profile .guestBall ~ .small { text-align: center; }
 .perks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: #c9cbef; }
 .perks li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
-.perks span { font-size: 16px; }
+.perks .ic { width: 18px; height: 18px; flex-shrink: 0; color: #66d9e8; }
 .profTop { display: flex; gap: 12px; align-items: center; }
 .profTop small { color: #8e92c0; font-size: 12px; }
 .profTop .link { padding: 2px 0; font-size: 12px; }
 .profile img.big, .profile .noav.big { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255, 255, 255, .15); }
 .noav { display: grid; place-items: center; background: #4dabf7; color: #fff; font-weight: 700; }
 .profile .noav.big { font-size: 26px; }
-.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
-.stats div { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
-.stats b { font-size: 22px; }
-.stats span { font-size: 11px; color: #8e92c0; }
+.profStats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
+.profStats div { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
+.profStats b { font-size: 22px; }
+.profStats span { font-size: 11px; color: #8e92c0; }
 .profile .link { align-self: center; }
 
 @media (max-width: 760px) {
@@ -341,3 +344,78 @@ input:focus { border-color: #4dabf7; }
   #levelGrid { grid-template-columns: repeat(2, 1fr); }
   #levelInfo { max-width: calc(100vw - 120px); }
 }
+
+/* ---------- İkonlar ---------- */
+.ic { width: 1.1em; height: 1.1em; flex-shrink: 0; vertical-align: -0.18em; }
+button:has(> .ic) { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.link:has(> .ic) .ic { width: 15px; height: 15px; }
+.bigLine { display: inline-flex; align-items: center; gap: 10px; }
+.bigLine .ic { width: 18px; height: 18px; }
+.wideBtn .ic { width: 22px; height: 22px; color: #b197fc; }
+.ic.mag { color: #ff8787; margin-right: 5px; }
+h2 .ic, h3 .ic { margin-right: 8px; vertical-align: -0.12em; }
+.atHead h2 .ic { color: #ffd43b; }
+.lvl .best .ic { width: 12px; height: 12px; margin-right: 3px; }
+.lvl .num .ic { width: 22px; height: 22px; }
+.cnt { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; }
+.cnt .ic { width: 13px; height: 13px; }
+.by .ic { width: 14px; height: 14px; margin-right: 5px; }
+.vis { display: inline-flex; align-items: center; gap: 4px; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: rgba(255, 255, 255, .07); font-size: 11px; }
+.vis .ic { width: 12px; height: 12px; }
+#edSaveMsg .ic, .note .ic { width: 13px; height: 13px; margin-right: 4px; color: #69db7c; }
+.atInfo button.on .ic, #likeBtn .ic { color: #ff8787; }
+#meBtn .ic { width: 14px; height: 14px; opacity: .7; }
+#meMenu button { justify-content: flex-start; }
+.iconBtn { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border-radius: 12px; flex-shrink: 0; }
+.iconBtn .ic { width: 19px; height: 19px; }
+.iconBtn.static { border: 1px solid rgba(255, 255, 255, 0.1); color: #ffd43b; }
+.iconBtn.off { color: #74779f; }
+
+/* ---------- Ayarlar penceresi ---------- */
+.overlay.modal { z-index: 30; background: rgba(8, 7, 24, 0.6); }
+.settingsCard { width: min(420px, 100%); text-align: left; gap: 16px; }
+.modalHead { display: flex; align-items: center; justify-content: space-between; }
+.modalHead h2 { font-size: 24px; }
+.setRow { display: flex; gap: 14px; align-items: center; padding: 12px; border-radius: 16px; background: rgba(255, 255, 255, .04); }
+.setRow .iconBtn { width: 44px; height: 44px; border-radius: 14px; color: #66d9e8; }
+.setMain { flex: 1; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.setLabel { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; }
+.setLabel span { font-size: 12px; color: #8e92c0; font-variant-numeric: tabular-nums; }
+input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 8px; padding: 0; border: none; border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, #69db7c var(--fill, 50%), rgba(255, 255, 255, .12) var(--fill, 50%));
+}
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+input[type=range]::-moz-range-thumb { width: 20px; height: 20px; border: none; border-radius: 50%; background: #fff; box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
+input[type=range]:focus-visible { outline: 2px solid #4dabf7; outline-offset: 4px; }
+.segmented { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; border-radius: 12px; background: rgba(0, 0, 0, .25); }
+.segmented button { border: none; padding: 7px 4px; border-radius: 9px; font-size: 13px; }
+.segmented button.on { background: #69db7c; color: #14301b; font-weight: 700; }
+
+/* ---------- Özel seçim kutusu ---------- */
+.cselect { position: relative; flex: 1; min-width: 0; }
+.cselect > select { display: none; }
+.cselectBtn { width: 100%; display: flex !important; align-items: center; justify-content: flex-start !important; gap: 8px;
+  padding: 9px 10px; border-radius: 12px; background: #14132c; text-align: left; }
+.cselectBtn span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cselectBtn .chev { width: 15px; height: 15px; opacity: .6; transition: transform .15s ease; }
+.cselect.open .cselectBtn { border-color: #4dabf7; }
+.cselect.open .chev { transform: rotate(180deg); }
+.cselectList { position: absolute; left: 0; right: 0; top: calc(100% + 6px); z-index: 40; display: flex; flex-direction: column; gap: 2px; padding: 5px;
+  min-width: 160px; border-radius: 14px; background: #1d1b45; border: 1px solid rgba(255, 255, 255, .16); box-shadow: 0 16px 40px rgba(5, 4, 20, .6);
+  animation: cardIn .14s ease; }
+.cselect.up .cselectList { top: auto; bottom: calc(100% + 6px); }
+.cselectList button { display: flex !important; justify-content: flex-start !important; align-items: center; gap: 9px; border: none; border-radius: 9px; padding: 8px 10px; font-size: 13px; text-align: left; }
+.cselectList button span { flex: 1; }
+.cselectList .tick { width: 14px; height: 14px; color: #69db7c; visibility: hidden; }
+.cselectList button.on .tick { visibility: visible; }
+.cselectList button.on { background: rgba(255, 255, 255, .06); color: #fff; }
+.edSaveBox .cselectBtn { padding: 7px 8px; font-size: 12px; }
+
+/* ---------- Anahtar (checkbox yerine) ---------- */
+input.switch { -webkit-appearance: none; appearance: none; position: relative; width: 36px; height: 20px; padding: 0; margin: 0; border: none; border-radius: 999px;
+  background: rgba(255, 255, 255, .15); cursor: pointer; transition: background .15s ease; flex-shrink: 0; }
+input.switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s ease; }
+input.switch:checked { background: #69db7c; }
+input.switch:checked::after { transform: translateX(16px); }
+.edCheck .ic { color: #ff8787; }

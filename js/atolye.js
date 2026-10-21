@@ -7,7 +7,12 @@
 const GOOGLE_G = '<svg class="gIcon" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
 const googleButton = (id, text = 'Google ile giriş yap') => `<button id="${id}" class="google">${GOOGLE_G}<span>${text}</span></button>`;
 
-const VIS_LABELS = { private: '🔒 Gizli', link: '🔗 Linkle', public: '🌍 Herkese açık' };
+const VIS_LABELS = { private: 'Gizli', link: 'Linkle', public: 'Herkese açık' };
+const VIS_ICONS = { private: 'lock', link: 'link', public: 'globe' };
+const visOptions = cur => Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}" data-ic="${VIS_ICONS[k]}" ${k === cur ? 'selected' : ''}>${v}</option>`).join('');
+const visBadge = v => `<span class="vis">${icon(VIS_ICONS[v])}${VIS_LABELS[v]}</span>`;
+const likeLabel = (liked, long) => liked ? `${icon('heartFill')}Beğendin` : `${icon('heart')}${long ? 'Bu bölümü beğen' : 'Beğen'}`;
+const counts = (likes, plays, likeId) => `<span class="cnt">${icon('heart')}<span${likeId ? ` id="${likeId}"` : ''}>${likes}</span></span><span class="cnt">${icon('play')}${plays}</span>`;
 
 // Küçük önizleme: bölümün haritası karolar hâlinde
 function drawLevelThumb(canvas, map) {
@@ -103,8 +108,8 @@ const Atolye = {
       $('loginBtn').onclick = () => this.login();
       return;
     }
-    el.innerHTML = `<button id="meBtn">${this.avatar()}<span>${esc(this.me.name)}</span> ▾</button>
-      <div id="meMenu" class="panel hidden"><button id="mineBtn">📂 Bölümlerim</button><button id="renameBtn">✎ Adımı değiştir</button><button id="logoutBtn">Çıkış yap</button></div>`;
+    el.innerHTML = `<button id="meBtn">${this.avatar()}<span>${esc(this.me.name)}</span>${icon('chevron')}</button>
+      <div id="meMenu" class="panel hidden"><button id="mineBtn">${icon('folder')}Bölümlerim</button><button id="renameBtn">${icon('pencil')}Adımı değiştir</button><button id="logoutBtn">${icon('logout')}Çıkış yap</button></div>`;
     $('meBtn').onclick = () => $('meMenu').classList.toggle('hidden');
     $('mineBtn').onclick = () => this.open('mine');
     $('renameBtn').onclick = () => this.rename();
@@ -118,13 +123,13 @@ const Atolye = {
     if (!this.loginEnabled) return;
     if (!this.me) {
       el.innerHTML = `
-        <div class="guestBall"><i></i><i></i></div>
+        <div class="guestBall"><span></span><span></span></div>
         <h3>Misafir oyuncu</h3>
         <p class="small">Oynamak için hesap gerekmez. Giriş yaparsan:</p>
         <ul class="perks">
-          <li><span>☁️</span>Bölümlerin kaydedilir, her cihazdan açarsın</li>
-          <li><span>🌍</span>Atölye'de herkesle paylaşırsın</li>
-          <li><span>❤️</span>Bölüm beğenir, paket kurarsın</li>
+          <li>${icon('cloud')}Bölümlerin kaydedilir, her cihazdan açarsın</li>
+          <li>${icon('globe')}Atölye'de herkesle paylaşırsın</li>
+          <li>${icon('heart')}Bölüm beğenir, paket kurarsın</li>
         </ul>
         ${googleButton('profileLogin')}
         <p class="tiny">Yalnızca adın ve profil resmin kullanılır.</p>`;
@@ -134,16 +139,16 @@ const Atolye = {
     const st = this.stats || { levels: 0, likes: 0, plays: 0 };
     el.innerHTML = `
       <div class="profTop">${this.avatar('big')}
-        <div><small>Hoş geldin</small><h3>${esc(this.me.name)}</h3><button id="profRename" class="link">✎ Adını değiştir</button></div>
+        <div><small>Hoş geldin</small><h3>${esc(this.me.name)}</h3><button id="profRename" class="link">${icon('pencil')}Adını değiştir</button></div>
       </div>
-      <div class="stats">
+      <div class="profStats">
         <div><b>${st.levels}</b><span>Bölüm</span></div>
         <div><b>${st.likes}</b><span>Beğeni</span></div>
         <div><b>${st.plays}</b><span>Oynanma</span></div>
       </div>
-      <button id="profMine">📂 Bölümlerim ve paketlerim</button>
-      <button id="profNew">✏️ Yeni bölüm yap</button>
-      <button id="profLogout" class="link">Çıkış yap</button>`;
+      <button id="profMine">${icon('folder')}Bölümlerim ve paketlerim</button>
+      <button id="profNew">${icon('pencil')}Yeni bölüm yap</button>
+      <button id="profLogout" class="link">${icon('logout')}Çıkış yap</button>`;
     $('profRename').onclick = () => this.rename();
     $('profMine').onclick = () => this.open('mine');
     $('profNew').onclick = () => toEditor();
@@ -201,9 +206,9 @@ const Atolye = {
     const el = document.createElement('button');
     el.className = 'atCard';
     el.innerHTML = `<canvas width="240" height="110"></canvas>
-      <b>${it.magnet ? '🧲 ' : ''}${isPack ? '📦 ' : ''}${esc(it.name)}</b>
+      <b>${it.magnet ? icon('magnet', 'mag') : ''}${isPack ? icon('pack') : ''}${esc(it.name)}</b>
       <span class="by">${esc(it.author.name)}${isPack ? ` · ${it.count} bölüm` : ''}</span>
-      <span class="stats">❤ ${it.likes} · ▶ ${it.plays}${it.mine ? ` · ${VIS_LABELS[it.visibility]}` : ''}</span>`;
+      <span class="stats">${counts(it.likes, it.plays)}${it.mine ? visBadge(it.visibility) : ''}</span>`;
     drawLevelThumb(el.querySelector('canvas'), isPack ? it.cover : it.map);
     el.onclick = () => (isPack ? this.openPack(it.id) : this.openLevel(it.id));
     return el;
@@ -218,7 +223,7 @@ const Atolye = {
       return;
     }
     const [lv, pk] = await Promise.all([this.api('GET', '/api/levels/mine'), this.api('GET', '/api/packs/mine')]);
-    body.innerHTML = `<div class="atActions"><button id="newLevel" class="primary">+ YENİ BÖLÜM</button><button id="newPack">📦 Paket oluştur</button></div>
+    body.innerHTML = `<div class="atActions"><button id="newLevel" class="primary">${icon('plus')}YENİ BÖLÜM</button><button id="newPack">${icon('pack')}Paket oluştur</button></div>
       <h3>Bölümlerim (${lv.json.items ? lv.json.items.length : 0})</h3><div class="atGrid" id="mineLevels"></div>
       <h3>Paketlerim (${pk.json.items ? pk.json.items.length : 0})</h3><div class="atGrid" id="minePacks"></div>`;
     $('newLevel').onclick = () => { Editor.load(blankLevel(), null); Editor.refresh(); toEditor(); };
@@ -237,29 +242,30 @@ const Atolye = {
     const r = await this.api('GET', `/api/levels/${id}`);
     if (!r.ok) { body.innerHTML = `<p class="error">${esc(r.json.error || 'Bölüm açılamadı.')}</p>`; return; }
     const l = r.json;
-    body.innerHTML = `<button class="link back">← Geri</button>
+    body.innerHTML = `<button class="link back">${icon('back')}Geri</button>
       <div class="atDetail">
         <canvas width="520" height="240"></canvas>
         <div class="atInfo">
-          <h3>${l.magnet ? '🧲 ' : ''}${esc(l.name)}</h3>
-          <p class="by">${esc(l.author.name)} · ❤ <span id="lk">${l.likes}</span> · ▶ ${l.plays}${l.hidden ? ' · <span class="error">bildirildiği için listeden kaldırıldı</span>' : ''}</p>
+          <h3>${l.magnet ? icon('magnet', 'mag') : ''}${esc(l.name)}</h3>
+          <p class="by">${icon('user')}${esc(l.author.name)} ${counts(l.likes, l.plays, 'lk')}${l.hidden ? ' · <span class="error">bildirildiği için listeden kaldırıldı</span>' : ''}</p>
           <button id="playLocal" class="primary">AYNI KLAVYEDE OYNA</button>
           <button id="playOnline">Online odada oyna</button>
           <div class="row">
-            <button id="likeLv" class="${l.liked ? 'on' : ''}">${l.liked ? '❤ Beğendin' : '♡ Beğen'}</button>
-            <button id="shareLv">🔗 Linki kopyala</button>
+            <button id="likeLv" class="${l.liked ? 'on' : ''}">${likeLabel(l.liked)}</button>
+            <button id="shareLv">${icon('link')}Linki kopyala</button>
           </div>
           <div class="row">
-            <button id="copyLv">Editörde kopyasını aç</button>
-            ${l.mine ? '' : '<button id="reportLv" class="link">Bildir</button>'}
+            <button id="copyLv">${icon('copy')}Editörde kopyasını aç</button>
+            ${l.mine ? '' : `<button id="reportLv" class="link">${icon('flag')}Bildir</button>`}
           </div>
           ${l.mine ? `<div class="mineBox"><b>Senin bölümün</b>
-            <select id="visLv">${Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}" ${k === l.visibility ? 'selected' : ''}>${v}</option>`).join('')}</select>
-            <div class="row"><button id="editLv">✏️ Düzenle</button><button id="delLv" class="danger">Sil</button></div></div>` : ''}
+            <select id="visLv">${visOptions(l.visibility)}</select>
+            <div class="row"><button id="editLv">${icon('pencil')}Düzenle</button><button id="delLv" class="danger">${icon('trash')}Sil</button></div></div>` : ''}
           <p id="lvMsg" class="note"></p>
         </div>
       </div>`;
     drawLevelThumb(body.querySelector('canvas'), l.map);
+    enhanceSelects(body);
     const def = { name: l.name, magnet: l.magnet, map: l.map };
     body.querySelector('.back').onclick = () => this.render();
     $('playLocal').onclick = () => this.playLevel(l, null, 0, 'local');
@@ -267,7 +273,7 @@ const Atolye = {
     $('likeLv').onclick = async () => {
       if (!this.me) return this.needLogin(`/?b=${l.id}`);
       const x = await this.api('POST', `/api/levels/${l.id}/like`, {});
-      if (x.ok) { $('lk').textContent = x.json.likes; $('likeLv').textContent = x.json.liked ? '❤ Beğendin' : '♡ Beğen'; $('likeLv').classList.toggle('on', x.json.liked); }
+      if (x.ok) { $('lk').textContent = x.json.likes; $('likeLv').innerHTML = likeLabel(x.json.liked); $('likeLv').classList.toggle('on', x.json.liked); }
     };
     $('shareLv').onclick = () => this.copy(`${location.origin}/?b=${l.id}`, $('shareLv'));
     $('copyLv').onclick = () => { Editor.load({ name: (l.name + ' (kopya)').slice(0, 24), magnet: l.magnet, map: l.map }, null); Editor.refresh(); toEditor('Kopya açıldı. Kendi adınla kaydedebilirsin.'); };
@@ -295,22 +301,22 @@ const Atolye = {
     const r = await this.api('GET', `/api/packs/${id}`);
     if (!r.ok) { body.innerHTML = `<p class="error">${esc(r.json.error || 'Paket açılamadı.')}</p>`; return; }
     const pk = r.json;
-    body.innerHTML = `<button class="link back">← Geri</button>
+    body.innerHTML = `<button class="link back">${icon('back')}Geri</button>
       <div class="atDetail">
-        <div class="packList">${pk.levels.map((l, i) => `<div class="packItem"><span class="num">${i + 1}</span><canvas width="120" height="54"></canvas><span>${l.magnet ? '🧲 ' : ''}${esc(l.name)}</span></div>`).join('')}</div>
+        <div class="packList">${pk.levels.map((l, i) => `<div class="packItem"><span class="num">${i + 1}</span><canvas width="120" height="54"></canvas><span>${l.magnet ? icon('magnet', 'mag') : ''}${esc(l.name)}</span></div>`).join('')}</div>
         <div class="atInfo">
-          <h3>📦 ${esc(pk.name)}</h3>
-          <p class="by">${esc(pk.author.name)} · ${pk.levels.length} bölüm · ❤ <span id="lk">${pk.likes}</span> · ▶ ${pk.plays}</p>
+          <h3>${icon('pack')}${esc(pk.name)}</h3>
+          <p class="by">${icon('user')}${esc(pk.author.name)} · ${pk.levels.length} bölüm ${counts(pk.likes, pk.plays, 'lk')}</p>
           ${pk.about ? `<p>${esc(pk.about)}</p>` : ''}
           <button id="playLocal" class="primary" ${pk.levels.length ? '' : 'disabled'}>AYNI KLAVYEDE OYNA</button>
           <button id="playOnline" ${pk.levels.length ? '' : 'disabled'}>Online odada oyna</button>
           <div class="row">
-            <button id="likePk" class="${pk.liked ? 'on' : ''}">${pk.liked ? '❤ Beğendin' : '♡ Beğen'}</button>
-            <button id="sharePk">🔗 Linki kopyala</button>
+            <button id="likePk" class="${pk.liked ? 'on' : ''}">${likeLabel(pk.liked)}</button>
+            <button id="sharePk">${icon('link')}Linki kopyala</button>
           </div>
-          ${pk.mine ? `<div class="mineBox"><b>Senin paketin</b> · ${VIS_LABELS[pk.visibility]}
-            <div class="row"><button id="editPk">✏️ Düzenle</button><button id="delPk" class="danger">Sil</button></div></div>`
-          : '<button id="reportPk" class="link">Bildir</button>'}
+          ${pk.mine ? `<div class="mineBox"><b>Senin paketin</b> ${visBadge(pk.visibility)}
+            <div class="row"><button id="editPk">${icon('pencil')}Düzenle</button><button id="delPk" class="danger">${icon('trash')}Sil</button></div></div>`
+          : `<button id="reportPk" class="link">${icon('flag')}Bildir</button>`}
           <p id="pkMsg" class="note"></p>
         </div>
       </div>`;
@@ -321,7 +327,7 @@ const Atolye = {
     $('likePk').onclick = async () => {
       if (!this.me) return this.needLogin(`/?p=${pk.id}`);
       const x = await this.api('POST', `/api/packs/${pk.id}/like`, {});
-      if (x.ok) { $('lk').textContent = x.json.likes; $('likePk').textContent = x.json.liked ? '❤ Beğendin' : '♡ Beğen'; $('likePk').classList.toggle('on', x.json.liked); }
+      if (x.ok) { $('lk').textContent = x.json.likes; $('likePk').innerHTML = likeLabel(x.json.liked); $('likePk').classList.toggle('on', x.json.liked); }
     };
     $('sharePk').onclick = () => this.copy(`${location.origin}/?p=${pk.id}`, $('sharePk'));
     if ($('reportPk')) $('reportPk').onclick = () => this.report(`/api/packs/${pk.id}/report`, `/?p=${pk.id}`);
@@ -342,17 +348,18 @@ const Atolye = {
   packBuilder(pk, myLevels) {
     const body = $('atBody');
     let order = pk ? pk.levels.map(l => l.id).filter(id => myLevels.some(l => l.id === id)) : [];
-    body.innerHTML = `<button class="link back">← Geri</button>
+    body.innerHTML = `<button class="link back">${icon('back')}Geri</button>
       <h3>${pk ? 'Paketi düzenle' : 'Yeni paket'}</h3>
       <div class="packForm">
         <input id="pkName" maxlength="24" placeholder="Paketin adı" value="${pk ? esc(pk.name) : ''}">
         <input id="pkAbout" maxlength="140" placeholder="Kısa açıklama (isteğe bağlı)" value="${pk ? esc(pk.about || '') : ''}">
-        <select id="pkVis">${Object.entries(VIS_LABELS).map(([k, v]) => `<option value="${k}" ${pk && pk.visibility === k ? 'selected' : ''}>${v}</option>`).join('')}</select>
+        <select id="pkVis">${visOptions(pk ? pk.visibility : 'private')}</select>
       </div>
       <p class="small">Bölümlere tıklayarak oynanma sırasına göre seç (en fazla 30). Gizli bölümler de pakette oynanabilir.</p>
       <div class="atGrid" id="pkPick"></div>
       <button id="pkSave" class="primary">${pk ? 'KAYDET' : 'PAKETİ OLUŞTUR'}</button>
       <p id="pkMsg" class="error"></p>`;
+    enhanceSelects(body);
     body.querySelector('.back').onclick = () => (pk ? this.openPack(pk.id) : this.setTab('mine'));
     const draw = () => {
       const grid = $('pkPick');
@@ -386,7 +393,7 @@ const Atolye = {
       pendingCustom = { def: queue[0], queue, packName: pack ? pack.name : null };
       customSent = false;
       toOnlineForm();
-      $('onlineError').textContent = pack ? `Oda kur: "${pack.name}" paketi odada ★ ile çıkacak.` : 'Oda kur: bölüm odada ★ ile çıkacak.';
+      $('onlineError').textContent = pack ? `Oda kur: "${pack.name}" paketi odada yıldızla işaretli çıkacak.` : 'Oda kur: bölüm odada yıldızla işaretli çıkacak.';
       return;
     }
     startCustom(this.defOf(level), this.play);
@@ -400,11 +407,11 @@ const Atolye = {
     if (p.pack && p.index === p.pack.levels.length - 1) this.api('POST', `/api/packs/${p.pack.id}/play`, {});
     const btn = $('likeBtn');
     btn.classList.remove('hidden');
-    btn.textContent = p.level.liked ? '❤ Beğendin' : '♡ Bu bölümü beğen';
+    btn.innerHTML = likeLabel(p.level.liked, true);
     btn.onclick = async () => {
       if (!this.me) return this.needLogin(p.pack ? `/?p=${p.pack.id}` : `/?b=${p.level.id}`);
       const x = await this.api('POST', `/api/levels/${p.level.id}/like`, {});
-      if (x.ok) { p.level.liked = x.json.liked; btn.textContent = x.json.liked ? '❤ Beğendin' : '♡ Bu bölümü beğen'; }
+      if (x.ok) { p.level.liked = x.json.liked; btn.innerHTML = likeLabel(x.json.liked, true); }
     };
   },
 
@@ -457,7 +464,7 @@ const Atolye = {
     if (r.status === 404 && Editor.remote) { Editor.setRemote(null); return this.saveFromEditor(); }   // silinmişse yeniden oluştur
     if (!r.ok) { msg.textContent = r.json.error || 'Kaydedilemedi.'; return; }
     Editor.setRemote({ id: r.json.id, visibility: r.json.visibility });
-    msg.textContent = `Kaydedildi ✓ (${VIS_LABELS[r.json.visibility]})`;
+    msg.innerHTML = `${icon('check')}Kaydedildi · ${visBadge(r.json.visibility)}`;
   },
 };
 

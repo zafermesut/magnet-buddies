@@ -104,7 +104,7 @@ class Renderer3D {
 
     let saved = null;
     try { saved = localStorage.getItem('quality'); } catch (e) { /* yoksay */ }
-    this.setQuality(saved === 'low' ? 'low' : 'high', false);
+    this.setQuality(['low', 'medium', 'high'].includes(saved) ? saved : 'high', false);
 
     this.raycaster = new THREE.Raycaster();
     this.plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -302,10 +302,11 @@ class Renderer3D {
 
   setQuality(q, persist = true) {
     this.quality = q;
-    const high = q === 'high';
-    this.gl.shadowMap.enabled = high;
-    this.sun.castShadow = high;
-    this.gl.setPixelRatio(Math.min(devicePixelRatio || 1, high ? 2 : 1));
+    // Düşük: gölge ve parlama yok · Orta: gölge var, parlama yok · Yüksek: hepsi, keskin çözünürlük
+    const shadows = q !== 'low';
+    this.gl.shadowMap.enabled = shadows;
+    this.sun.castShadow = shadows;
+    this.gl.setPixelRatio(Math.min(devicePixelRatio || 1, { low: 1, medium: 1.5, high: 2 }[q]));
     this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
     if (persist) { try { localStorage.setItem('quality', q); } catch (e) { /* yoksay */ } }
     this.frameTimes = [];
@@ -314,14 +315,14 @@ class Renderer3D {
 
   // Kare süresi uzun süre yüksek kalırsa kaliteyi kendiliğinden düşür
   watchPerformance(dt) {
-    if (this.quality !== 'high' || this.autoLowered) return;
+    if (this.quality === 'low') return;
     // Sekme arka plandayken tarayıcı kareleri yavaşlatır; bunlar bilgisayarın yavaşlığı değildir
     if (document.visibilityState !== 'visible' || dt >= 0.09) return;
     this.frameTimes.push(dt);
     if (this.frameTimes.length < 180) return;
     const avg = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
     this.frameTimes = [];
-    if (avg > 0.026) { this.autoLowered = true; this.setQuality('low', false); }
+    if (avg > 0.026) { this.autoLowered = true; this.setQuality(this.quality === 'high' ? 'medium' : 'low', false); }
   }
 
   resize() {

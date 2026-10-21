@@ -21,11 +21,32 @@
   <!-- Hesap: menülerde sol üstte Google ile giriş ya da ad + resim -->
   <div id="account" class="hidden"></div>
 
-  <!-- Ses, müzik ve kalite ayarları (her ekranda) -->
+  <!-- Ayarlar düğmesi (her ekranda) ve penceresi -->
   <div id="settings">
-    <button id="setSfx" title="Ses efektleri">🔊</button>
-    <button id="setMusic" title="Müzik">🎵</button>
-    <button id="setQuality" title="Görüntü kalitesi">✨</button>
+    <button id="setOpen" title="Ayarlar"><i data-ic="settings"></i></button>
+  </div>
+  <div id="settingsModal" class="overlay modal hidden">
+    <div class="card settingsCard" role="dialog" aria-label="Ayarlar">
+      <div class="modalHead"><h2>Ayarlar</h2><button id="setClose" class="iconBtn" title="Kapat"><i data-ic="close"></i></button></div>
+      <div class="setRow">
+        <button id="sfxMute" class="iconBtn" title="Ses efektlerini kapat/aç"><i data-ic="volume"></i></button>
+        <div class="setMain"><div class="setLabel"><b>Ses efektleri</b><span id="sfxVal"></span></div>
+          <input type="range" id="sfxVol" min="0" max="100" step="5"></div>
+      </div>
+      <div class="setRow">
+        <button id="musicMute" class="iconBtn" title="Müziği kapat/aç"><i data-ic="music"></i></button>
+        <div class="setMain"><div class="setLabel"><b>Müzik</b><span id="musicVal"></span></div>
+          <input type="range" id="musicVol" min="0" max="100" step="5"></div>
+      </div>
+      <div class="setRow" id="qualityRow">
+        <span class="iconBtn static"><i data-ic="sparkles"></i></span>
+        <div class="setMain"><div class="setLabel"><b>Görüntü kalitesi</b><span id="qualityNote"></span></div>
+          <div class="segmented" id="qualitySeg">
+            <button data-q="low">Düşük</button><button data-q="medium">Orta</button><button data-q="high">Yüksek</button>
+          </div></div>
+      </div>
+      <p class="small">Oyun yavaşlarsa kalite kendiliğinden bir kademe düşer. Ayarların bu tarayıcıda saklanır.</p>
+    </div>
   </div>
 
   <!-- Oyun içi -->
@@ -49,11 +70,11 @@
           <h1 class="gameTitle"></h1>
         </div>
         <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
-        <button id="homeOnline" class="primary big">▶ ONLİNE OYNA<small>Arkadaşına link gönder, birlikte oynayın</small></button>
-        <button id="homeLocal" class="wideBtn">🎮 Aynı klavyede oyna</button>
+        <button id="homeOnline" class="primary big"><span class="bigLine"><i data-ic="play"></i>ONLİNE OYNA</span><small>Arkadaşına link gönder, birlikte oynayın</small></button>
+        <button id="homeLocal" class="wideBtn"><i data-ic="gamepad"></i>Aynı klavyede oyna</button>
         <div class="homeTiles">
-          <button id="homeAtolye" class="tile"><span class="ic">🛠</span><b>Atölye</b><small>Oyuncuların bölümleri</small></button>
-          <button id="homeEditor" class="tile"><span class="ic">✏️</span><b>Bölüm editörü</b><small>Kendi bölümünü yap</small></button>
+          <button id="homeAtolye" class="tile"><span class="tileIc"><i data-ic="wrench"></i></span><b>Atölye</b><small>Oyuncuların bölümleri</small></button>
+          <button id="homeEditor" class="tile"><span class="tileIc"><i data-ic="pencil"></i></span><b>Bölüm editörü</b><small>Kendi bölümünü yap</small></button>
         </div>
       </div>
       <aside id="profile" class="card profile hidden"></aside>
@@ -65,7 +86,7 @@
     <div class="edHead"><b>Bölüm editörü</b><span id="edSize"></span></div>
     <input id="edName" maxlength="24" placeholder="Bölüm adı">
     <div id="edTools"></div>
-    <label class="edCheck"><input type="checkbox" id="edMagnet"> 🧲 Mıknatıs açık</label>
+    <label class="edCheck"><input type="checkbox" id="edMagnet" class="switch"><i data-ic="magnet"></i> Mıknatıs açık</label>
     <div class="edResize">
       <span>Genişlik</span><button data-resize="-1,0">−</button><button data-resize="1,0">+</button>
       <span>Yükseklik</span><button data-resize="0,-1">−</button><button data-resize="0,1">+</button>
@@ -75,11 +96,11 @@
     <div class="edSaveBox">
       <div class="row">
         <select id="edVis" title="Kimler görebilir?">
-          <option value="private">🔒 Gizli</option>
-          <option value="link">🔗 Linkle</option>
-          <option value="public">🌍 Herkese açık</option>
+          <option value="private" data-ic="lock">Gizli</option>
+          <option value="link" data-ic="link">Linkle</option>
+          <option value="public" data-ic="globe">Herkese açık</option>
         </select>
-        <button id="edSave">💾 Kaydet</button>
+        <button id="edSave"><i data-ic="save"></i>Kaydet</button>
       </div>
       <p id="edSaveMsg" class="small"></p>
       <div id="edAccount"></div>
@@ -88,7 +109,7 @@
     <button id="edShare">Linki kopyala</button>
     <div class="edFoot">
       <button id="edClear" class="link">Temizle</button>
-      <button id="edBack" class="link">← Ana menü</button>
+      <button id="edBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
     <p class="small">Sol tık çizer, sağ tık siler.<br>Denerken iki topu WASD ve ok tuşlarıyla yönetebilirsin.</p>
   </aside>
@@ -97,14 +118,14 @@
   <div id="atolye" class="overlay hidden">
     <div class="card atolyeCard">
       <div class="atHead">
-        <h2>🛠 Atölye</h2>
+        <h2><i data-ic="wrench"></i>Atölye</h2>
         <input id="atSearch" placeholder="Bölüm ya da yapan ara…" autocomplete="off">
-        <button id="atClose" class="link" title="Ana menü">✕</button>
+        <button id="atClose" class="iconBtn" title="Ana menü"><i data-ic="close"></i></button>
       </div>
       <div id="atTabs" class="tabs">
         <button data-tab="new">Yeni</button>
         <button data-tab="popular">Popüler</button>
-        <button data-tab="packs">📦 Paketler</button>
+        <button data-tab="packs"><i data-ic="pack"></i>Paketler</button>
         <button data-tab="mine">Bölümlerim</button>
       </div>
       <div id="atBody"></div>
@@ -123,7 +144,7 @@
         <button id="joinBtn">Katıl</button>
       </div>
       <p id="onlineError" class="error"></p>
-      <button id="onlineBack" class="link">← Ana menü</button>
+      <button id="onlineBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
   </div>
 
@@ -140,7 +161,7 @@
       <p id="roomNote" class="note"></p>
       <div id="roomLevels"></div>
       <p class="small">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
-      <button id="roomLeave" class="link">← Odadan çık</button>
+      <button id="roomLeave" class="link"><i data-ic="back"></i>Odadan çık</button>
     </div>
   </div>
 
@@ -152,7 +173,7 @@
       <p id="lobbyNote" class="note"></p>
       <button id="startBtn" class="primary" disabled>BÖLÜMLERİ SEÇ</button>
       <p class="small">Katılmak için kendi zıplama tuşuna bas. Ayrılmak için bırak tuşuna bas.<br>Gamepad takılıysa A tuşuyla katılabilirsin.</p>
-      <button id="lobbyBack" class="link">← Ana menü</button>
+      <button id="lobbyBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
   </div>
 
@@ -161,7 +182,7 @@
     <div class="card wide">
       <h2>Bölüm seç</h2>
       <div id="levelGrid"></div>
-      <button id="backBtn">← Oyuncular</button>
+      <button id="backBtn"><i data-ic="back"></i>Oyuncular</button>
     </div>
   </div>
 
@@ -170,13 +191,14 @@
     <div class="card">
       <h2 id="completeTitle">Bölüm tamam!</h2>
       <p id="completeInfo"></p>
-      <button id="likeBtn" class="hidden">♡ Bu bölümü beğen</button>
+      <button id="likeBtn" class="hidden"><i data-ic="heart"></i>Bu bölümü beğen</button>
       <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
       <button id="toSelectBtn">Bölüm seçimi</button>
       <p id="completeHint" class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
     </div>
   </div>
 
+  <script src="js/ui.js"></script>
   <script src="js/config.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/input.js"></script>

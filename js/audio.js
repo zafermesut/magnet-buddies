@@ -6,19 +6,31 @@
 
 const Sound = {
   ctx: null,
-  settings: { sfx: true, music: true },
+  settings: { sfx: 0.8, music: 0.6 },   // ses seviyeleri 0..1
+  muted: { sfx: false, music: false },
+  BASE: { sfx: 0.55, music: 0.32 },
   lastT: -1,
   lastGame: null,
   lastPlayed: {},
 
   load() {
-    try { Object.assign(this.settings, JSON.parse(localStorage.getItem('sound') || '{}')); } catch (e) { /* yoksay */ }
+    try {
+      const saved = JSON.parse(localStorage.getItem('sound') || '{}');
+      for (const k of ['sfx', 'music']) {
+        // Eski kayıtlar açık/kapalıydı (true/false)
+        if (typeof saved[k] === 'boolean') this.muted[k] = !saved[k];
+        else if (typeof saved[k] === 'number') this.settings[k] = Math.min(1, Math.max(0, saved[k]));
+        if (saved.muted && typeof saved.muted[k] === 'boolean') this.muted[k] = saved.muted[k];
+      }
+    } catch (e) { /* yoksay */ }
     const start = () => { this.start(); removeEventListener('pointerdown', start); removeEventListener('keydown', start); };
     addEventListener('pointerdown', start);
     addEventListener('keydown', start);
   },
 
-  save() { try { localStorage.setItem('sound', JSON.stringify(this.settings)); } catch (e) { /* yoksay */ } },
+  save() { try { localStorage.setItem('sound', JSON.stringify(Object.assign({ muted: this.muted }, this.settings))); } catch (e) { /* yoksay */ } },
+
+  level(kind) { return this.muted[kind] ? 0 : this.settings[kind]; },
 
   start() {
     if (this.ctx) return;
@@ -28,10 +40,10 @@ const Sound = {
     this.out = ctx.createDynamicsCompressor();
     this.out.connect(ctx.destination);
     this.sfxGain = ctx.createGain();
-    this.sfxGain.gain.value = this.settings.sfx ? 0.55 : 0;
+    this.sfxGain.gain.value = this.BASE.sfx * this.level('sfx');
     this.sfxGain.connect(this.out);
     this.musicGain = ctx.createGain();
-    this.musicGain.gain.value = this.settings.music ? 0.32 : 0;
+    this.musicGain.gain.value = this.BASE.music * this.level('music');
     this.musicGain.connect(this.out);
     // Melodi için hafif yankı (lo-fi)
     this.echo = ctx.createDelay(1);
@@ -49,11 +61,22 @@ const Sound = {
   },
 
   toggle(kind) {
-    this.settings[kind] = !this.settings[kind];
+    this.muted[kind] = !this.muted[kind];
+    if (!this.muted[kind] && !this.settings[kind]) this.settings[kind] = 0.5;
+    this.apply(kind);
+  },
+
+  setVolume(kind, v) {
+    this.settings[kind] = Math.min(1, Math.max(0, v));
+    this.muted[kind] = this.settings[kind] === 0;
+    this.apply(kind);
+  },
+
+  apply(kind) {
     this.save();
     if (!this.ctx) return;
     const g = kind === 'sfx' ? this.sfxGain : this.musicGain;
-    g.gain.setTargetAtTime(this.settings[kind] ? (kind === 'sfx' ? 0.55 : 0.32) : 0, this.ctx.currentTime, 0.08);
+    g.gain.setTargetAtTime(this.BASE[kind] * this.level(kind), this.ctx.currentTime, 0.08);
   },
 
   makeNoise() {
@@ -107,7 +130,7 @@ const Sound = {
   // ---------- Ses efektleri ----------
 
   play(type, e = {}) {
-    if (!this.ctx || !this.settings.sfx) return;
+    if (!this.ctx || !this.level('sfx')) return;
     const now = this.ctx.currentTime;
     if (now - (this.lastPlayed[type] || 0) < 0.04) return;   // aynı anda üst üste binmesin
     this.lastPlayed[type] = now;

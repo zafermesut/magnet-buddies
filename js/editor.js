@@ -162,8 +162,8 @@ const Editor = {
     $('edErrors').innerHTML = this.errors.map(e => `<div>• ${esc(e)}</div>`).join('');
     const ok = !this.errors.length;
     for (const id of ['edTest', 'edShare', 'edOnline', 'edSave']) $(id).disabled = !ok;
-    $('edSaveMsg').textContent = !this.remote ? 'Henüz Atölye\'ye kaydedilmedi.'
-      : this.dirty ? 'Kaydedilmemiş değişiklik var.' : 'Atölye\'de kayıtlı ✓';
+    $('edSaveMsg').innerHTML = !this.remote ? 'Henüz Atölye\'ye kaydedilmedi.'
+      : this.dirty ? 'Kaydedilmemiş değişiklik var.' : `${icon('check')}Atölye'de kayıtlı`;
   },
 
   // ---------- Fare ----------

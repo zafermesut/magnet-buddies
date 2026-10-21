@@ -44,7 +44,7 @@ function levelButton(i, disabled, onClick) {
   const b = document.createElement('button');
   b.className = 'lvl';
   b.disabled = !!disabled;
-  b.innerHTML = `<span class="num">${i + 1}</span><span>${l.magnet ? '🧲 ' : ''}${esc(l.name)}</span><span class="best">${best ? '✓ ' + fmt(best) : ''}</span>`;
+  b.innerHTML = `<span class="num">${i + 1}</span><span>${l.magnet ? icon('magnet', 'mag') : ''}${esc(l.name)}</span><span class="best">${best ? icon('check') + fmt(best) : ''}</span>`;
   b.addEventListener('click', onClick);
   return b;
 }
@@ -171,7 +171,7 @@ function startCustom(def, fromAtolye = false) {
   levelIndex = -1;
   mode = 'local';
   if (joined.length < 2) joined = ['wasd', 'arrows'];
-  playLocal(def, `★ ${def.name}`);
+  playLocal(def, def.name);
 }
 
 function playLocal(def, title) {
@@ -368,8 +368,8 @@ function renderRoom() {
     b.disabled = locked;
     const c = room.custom;
     b.innerHTML = c.total > 1
-      ? `<span class="num">📦</span><span>${esc(c.packName || 'Paket')}</span><span class="best">${c.total} bölüm · ${c.index + 1}. sıradan</span>`
-      : `<span class="num">★</span><span>${c.magnet ? '🧲 ' : ''}${esc(c.name)}</span><span class="best">özel bölüm</span>`;
+      ? `<span class="num">${icon('pack')}</span><span>${esc(c.packName || 'Paket')}</span><span class="best">${c.total} bölüm · ${c.index + 1}. sıradan</span>`
+      : `<span class="num">${icon('star')}</span><span>${c.magnet ? icon('magnet', 'mag') : ''}${esc(c.name)}</span><span class="best">özel bölüm</span>`;
     b.addEventListener('click', () => Net.send({ t: 'start', custom: true }));
     grid.appendChild(b);
   }
@@ -398,7 +398,7 @@ Net.on('start', m => {
   state = 'playing';
   show(null);
   levelIntro(m.def ? 'Kendi bölümün' : `Bölüm ${m.level + 1}`, currentDef.name);
-  setHud(m.def ? `★ ${m.def.name}` : `${m.level + 1}. ${currentDef.name}`, currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
+  setHud(m.def ? m.def.name : `${m.level + 1}. ${currentDef.name}`, currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
     hint: 'A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem' + (game.magnet ? ' (basılı: mıknatıs) · E / sağ Shift kutup' : '') }]);
 });
 
@@ -432,7 +432,7 @@ $('edOnline').addEventListener('click', () => {
   pendingCustom = { def: Editor.def(), queue: [Editor.def()] };
   customSent = false;
   toOnlineForm();
-  $('onlineError').textContent = 'Oda kur: bölümün odada ★ ile çıkacak.';
+  $('onlineError').textContent = 'Oda kur: bölümün odada yıldızla işaretli çıkacak.';
 });
 $('lobbyBack').addEventListener('click', toHome);
 $('startBtn').addEventListener('click', toSelect);
@@ -515,22 +515,47 @@ function frame(now) {
 // Linkle gelen: ?oda=KOD (online odaya katıl) ya da ?bolum=... (paylaşılan bölümü aç).
 // editor.js bu dosyadan sonra yüklendiği için açılış, sayfa hazır olunca yapılır.
 // Ayar düğmeleri: ses efektleri, müzik, görüntü kalitesi (3D'de)
+// Ayarlar penceresi: ses ve müzik seviyesi, görüntü kalitesi
 function renderSettings() {
-  $('setSfx').classList.toggle('off', !Sound.settings.sfx);
-  $('setMusic').classList.toggle('off', !Sound.settings.music);
-  $('setQuality').classList.toggle('hidden', !renderer || !renderer.setQuality);
-  if (renderer && renderer.setQuality) {
-    $('setQuality').classList.toggle('off', renderer.quality !== 'high');
-    $('setQuality').title = renderer.quality === 'high' ? 'Görüntü kalitesi: yüksek' : 'Görüntü kalitesi: düşük (daha akıcı)';
+  for (const k of ['sfx', 'music']) {
+    const lvl = Sound.level(k);
+    $(k + 'Vol').value = Math.round(lvl * 100);
+    $(k + 'Vol').style.setProperty('--fill', Math.round(lvl * 100) + '%');
+    $(k + 'Val').textContent = lvl ? `%${Math.round(lvl * 100)}` : 'Kapalı';
+    $(k + 'Mute').classList.toggle('off', !lvl);
+  }
+  $('sfxMute').innerHTML = icon(Sound.level('sfx') ? 'volume' : 'mute');
+  const hasQ = !!(renderer && renderer.setQuality);
+  $('qualityRow').classList.toggle('hidden', !hasQ);
+  if (hasQ) {
+    for (const b of $('qualitySeg').children) b.classList.toggle('on', b.dataset.q === renderer.quality);
+    $('qualityNote').textContent = renderer.autoLowered ? 'otomatik düşürüldü' : '';
   }
 }
-$('setSfx').addEventListener('click', () => { Sound.start(); Sound.toggle('sfx'); renderSettings(); });
-$('setMusic').addEventListener('click', () => { Sound.start(); Sound.toggle('music'); renderSettings(); });
-$('setQuality').addEventListener('click', () => {
-  renderer.setQuality(renderer.quality === 'high' ? 'low' : 'high');
+function openSettings(open) {
+  $('settingsModal').classList.toggle('hidden', !open);
+  if (open) renderSettings();
+}
+$('setOpen').addEventListener('click', () => { Sound.start(); openSettings(true); });
+$('setClose').addEventListener('click', () => openSettings(false));
+$('settingsModal').addEventListener('pointerdown', e => { if (e.target === $('settingsModal')) openSettings(false); });
+for (const k of ['sfx', 'music']) {
+  $(k + 'Vol').addEventListener('input', e => { Sound.start(); Sound.setVolume(k, e.target.value / 100); renderSettings(); });
+  $(k + 'Mute').addEventListener('click', () => { Sound.start(); Sound.toggle(k); renderSettings(); });
+}
+for (const b of $('qualitySeg').children) b.addEventListener('click', () => {
+  renderer.autoLowered = false;
+  renderer.setQuality(b.dataset.q);
   renderSettings();
 });
-for (const b of document.querySelectorAll('#settings button')) b.addEventListener('mousedown', e => e.preventDefault());
+// Pencere açıkken tuşlar oyuna gitmesin; Esc pencereyi kapatır
+addEventListener('keydown', e => {
+  if ($('settingsModal').classList.contains('hidden')) return;
+  if (e.key === 'Escape') { openSettings(false); e.stopImmediatePropagation(); return; }
+  if (!$('settingsModal').contains(e.target)) e.stopImmediatePropagation();
+}, true);
+$('settingsModal').addEventListener('keydown', e => e.stopPropagation());   // kaydırıcının ok tuşları oyuncuyu yürütmesin
+$('setOpen').addEventListener('mousedown', e => e.preventDefault());
 
 function createRenderer() {
   if (window.Renderer3D && !new URLSearchParams(location.search).has('2d')) {
