@@ -219,6 +219,7 @@ class Room {
       lv: g.levers.map(l => r3(l.flipT)),
       l: g.lifts.map(l => r1(l.y)),
       m: g.movers.map(m => r1(m.x)),
+      v: g.screws.map(sc => (sc.got ? 1 : 0)),
       sp: g.springs.map(s => r3(s.t)),
       fx,
     };

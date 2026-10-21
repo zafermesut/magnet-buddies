@@ -161,6 +161,10 @@ const Sound = {
         this.tone(d, { type: 'square', f: e.on ? 300 : 420, f2: e.on ? 520 : 240, dur: 0.09, vol: 0.09, filter: 1800 });
         this.noise(d, { dur: 0.05, vol: 0.08, type: 'bandpass', freq: 2600, q: 3 });
         break;
+      case 'screw':
+        this.tone(d, { type: 'triangle', f: 1568, dur: 0.08, vol: 0.14 });
+        this.tone(d, { type: 'triangle', f: 2093, t: 0.06, dur: 0.18, vol: 0.12 });
+        break;
       case 'spring':
         this.tone(d, { type: 'triangle', f: 180, f2: 900, dur: 0.28, vol: 0.2 });
         this.tone(d, { type: 'sine', f: 360, f2: 1300, t: 0.02, dur: 0.22, vol: 0.08 });

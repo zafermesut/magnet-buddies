@@ -87,6 +87,39 @@ console.log('Harita ve kilitler');
   ok(levelUnlocked(L('firlatma'), new Set(['firlatma'])), 'daha önce geçilen bölüm sıra atlanmış olsa da açık kalır');
 }
 
+console.log('Vidalar');
+{
+  ok(LEVELS.every(l => new Game(LEVELS.indexOf(l), 2).screws.length === 3), 'her bölümde 3 vida var');
+  // Kaba ulaşılabilirlik: vidanın altında (kule ile ~4 karo, mıknatıslı bölümde fırlatmayla ~7 karo) durulacak bir yer,
+  // ya da yakınında onu oraya taşıyacak bir öğe (gezgin, asansör, yay, mıknatıslı tavan) olmalı
+  const bad = [];
+  LEVELS.forEach((l, i) => {
+    const g = new Game(i, 2), m = l.map, reach = g.magnet ? 7 : 4;
+    const solid = (r, c) => r >= m.length || '#PN-xyz='.includes(m[r][c]) || ('H'.includes(m[r][c]));
+    const stand = (r, c) => r >= 0 && r < m.length && c >= 0 && c < m[0].length && !'#PN'.includes(m[r][c]) && solid(r + 1, c);
+    const near = (r0, c0, k) => {
+      for (let r = r0; r <= Math.min(m.length - 1, r0 + k); r++) for (let c = c0 - 3; c <= c0 + 3; c++) if (stand(r, c)) return true;
+      return false;
+    };
+    const helper = (r0, c0) => {
+      for (let r = r0 - 2; r <= r0 + 7; r++) for (let c = c0 - 3; c <= c0 + 3; c++) {
+        const ch = m[r] && m[r][c];
+        if (ch && '=xyz^PN'.includes(ch)) return true;
+      }
+      return false;
+    };
+    g.screws.forEach(sc => {
+      const r = Math.floor(sc.y / T), c = Math.floor(sc.x / T);
+      if (!near(r, c, reach) && !helper(r, c)) bad.push(l.id + ' (' + r + ',' + c + ')');
+    });
+  });
+  ok(!bad.length, 'her vida ulaşılabilir görünüyor' + (bad.length ? ': ' + bad.join(', ') : ''));
+  const g = new Game(L('merhaba'), 1), p = g.players[0], sc = g.screws[0];
+  p.x = sc.x - 10; p.y = sc.y - 10;
+  run(g, [idle], 0.1);
+  ok(sc.got && g.screwMask === 1, 'oyuncu değince vida toplanır');
+}
+
 console.log('Fizik');
 {
   const g = new Game(L('merhaba'), 1); const p = g.players[0];

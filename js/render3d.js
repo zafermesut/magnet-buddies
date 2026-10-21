@@ -158,6 +158,8 @@ class Renderer3D {
       railH: new THREE.BoxGeometry(1, 0.05, 0.05),
       stopPost: new RoundedBoxGeometry(0.16, 0.5, 0.3, 2, 0.04),
       metalCrate: new RoundedBoxGeometry(0.95, 0.95, 0.9, 2, 0.08),
+      nutHead: new THREE.CylinderGeometry(0.17, 0.17, 0.09, 6),
+      nutShaft: new THREE.CylinderGeometry(0.06, 0.06, 0.22, 10),
       rivet: new THREE.SphereGeometry(0.045, 8, 6),
       signBar: new THREE.BoxGeometry(0.42, 0.11, 0.06),
       poleField: new THREE.BoxGeometry(0.9, 1, 0.5),
@@ -182,6 +184,7 @@ class Renderer3D {
       rail: std('#6d71b8', { roughness: 0.5, metalness: 0.5 }),
       springPad: std('#ffa94d', { roughness: 0.4, emissive: '#ff922b', emissiveIntensity: 0.25 }),
       metalCrate: std('#9ea3c7', { roughness: 0.3, metalness: 0.8 }),
+      nut: std('#eef0ff', { roughness: 0.25, metalness: 0.7, emissive: '#b9bdf5', emissiveIntensity: 0.8 }),
       sign: new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }),
     };
     this.ballMats = PLAYER_COLORS.map(c => new THREE.MeshPhysicalMaterial({
@@ -578,6 +581,20 @@ class Renderer3D {
       this.poleObjs.push({ mat });
     }
 
+    // Vidalar: dönen gümüş cıvata
+    this.screwObjs = game.screws.map(sc => {
+      const g = new THREE.Group();
+      const head = new THREE.Mesh(this.geo.nutHead, this.mat.nut);
+      const shaft = new THREE.Mesh(this.geo.nutShaft, this.mat.nut);
+      shaft.position.y = -0.15;
+      head.castShadow = true;
+      g.add(head, shaft);
+      g.position.set(wx(sc.x + sc.w / 2), wy(sc.y + sc.h / 2), 0.1);
+      g.scale.setScalar(1.7);
+      this.levelGroup.add(g);
+      return { sc, g };
+    });
+
     // Gezgin platformlar: ince metal platform, altında gidip geldiği ray ve uçlarda durdurucular
     this.moverObjs = game.movers.map(M => {
       const w = wx(M.w);
@@ -890,6 +907,7 @@ class Renderer3D {
         case 'pickup': this.burst(x, y, 16, PALETTE.key, { speed: 3, gravity: 1, life: 0.6 }); break;
         case 'unlock': this.burst(x, y, 40, PALETTE.key, { speed: 5, gravity: 3, life: 0.9, size: 0.09 }); break;
         case 'lever': this.burst(x, y, 14, e.color || '#fff', { speed: 2.4, gravity: 1, life: 0.45, up: true }); break;
+        case 'screw': this.burst(x, y, 16, '#e3e6fb', { speed: 3, gravity: 0, life: 0.5 }); break;
         case 'spring': this.burst(x, y, 12, '#ffc078', { speed: 2.6, gravity: 2, life: 0.4, up: true }); break;
         case 'click': this.burst(x, y, 12, e.color || '#fff', { speed: 2.5, gravity: 1, life: 0.45, up: true }); break;
         case 'swap': this.burst(x, y, 18, e.color || '#fff', { speed: 3, gravity: 0, life: 0.4 }); break;
@@ -1007,6 +1025,11 @@ class Renderer3D {
       o.mat.emissiveIntensity = 0.25 + o.glow * (0.9 + 0.3 * Math.sin(t * 10));
     }
     for (const o of this.poleObjs) o.mat.opacity = 0.4 + 0.08 * Math.sin(t * 3);
+    this.screwObjs.forEach((o, i) => {
+      o.g.visible = !o.sc.got;
+      o.g.rotation.set(0.5, t * 2.4 + i, 0.35);
+      o.g.position.y = wy(o.sc.y + o.sc.h / 2) + Math.sin(t * 2.5 + i) * 0.05;
+    });
     for (const o of this.moverObjs) o.g.position.set(wx(o.M.x + o.M.w / 2), wy(o.M.y + o.M.h / 2), 0);
     for (const o of this.springObjs) {
       // Fırlatınca önce basılır, sonra sönen bir sekmeyle açılır

@@ -74,6 +74,7 @@ function applySnapshot(g, s) {
   (s.sw || []).forEach((o, i) => { g.switches[i + 1] = !!o; });
   (s.lv || []).forEach((t, i) => { if (g.levers[i]) g.levers[i].flipT = t; });
   (s.l || []).forEach((y, i) => { if (g.lifts[i]) setTarget(g.lifts[i], g.lifts[i].x, y); });
+  (s.v || []).forEach((o, i) => { if (g.screws[i]) g.screws[i].got = !!o; });
   (s.m || []).forEach((x, i) => { if (g.movers[i]) setTarget(g.movers[i], x, g.movers[i].y); });
   (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
   for (const e of s.fx) g.effects.push(e);

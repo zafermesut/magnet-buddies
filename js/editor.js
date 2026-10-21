@@ -21,6 +21,7 @@ const EDITOR_TOOLS = [
   { id: 'stop', ch: ':', label: 'Ray sonu', cls: 'tStop', tip: 'Gezgin platform burada döner. İçinden geçilir.' },
   { id: 'spring', ch: '^', label: 'Yay', cls: 'tSpring', tip: 'Üstüne basanı ~4 karo fırlatır; zıplama basılıysa ~5 karo. Altında duvar olmalı.' },
   { id: 'box', ch: 'H', label: 'Ağır kutu', cls: 'tH', tip: '2×2 karo. İki kişi birlikte iter.' },
+  { id: 'screw', ch: 'V', label: 'Vida', cls: 'tScrew', tip: 'İsteğe bağlı toplanır; bölüm başına en fazla 3.' },
   { id: 'crate', ch: 'M', label: 'Metal sandık', cls: 'tCrate', tip: 'Tek kişi iter; mıknatıs kutbu ne olursa olsun çeker. Düğmeye basabilir.' },
   { id: 'magP', ch: 'P', label: '+ mıknatıs', cls: 'tMagP', tip: 'Sabit mıknatıs bloğu: − kutuptakini çeker (tavana yapışılır, duvara tırmanılır), + kutuptakini iter.' },
   { id: 'magN', ch: 'N', label: '− mıknatıs', cls: 'tMagN', tip: 'Sabit mıknatıs bloğu: + kutuptakini çeker (tavana yapışılır, duvara tırmanılır), − kutuptakini iter.' },

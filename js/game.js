@@ -56,6 +56,7 @@ class Game {
     this.keys = []; this.doors = []; this.buttons = []; this.gates = []; this.boxes = [];
     this.levers = []; this.lifts = []; this.springs = []; this.movers = [];
     this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
+    this.screws = [];              // vidalar (isteğe bağlı toplanır): { x, y, w, h, got }
     this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
     this.oneway = [];
     this.switches = { 1: false, 2: false, 3: false };   // şalterlerin açık tuttuğu kanallar
@@ -95,6 +96,7 @@ class Game {
         }
         else if (ch === 'P' || ch === 'N') this.fixed.push({ x: x + T / 2, y: y + T / 2, c, r, pol: ch === 'P' ? 1 : -1 });
         else if (ch === 'p' || ch === 'n') this.poleCells.set(r * cols + c, ch === 'p' ? 1 : -1);
+        else if (ch === 'V') this.screws.push({ x: x + 10, y: y + 10, w: T - 20, h: T - 20, got: false });
         else if ('456'.includes(ch)) this.levers.push({ channel: +ch - 3, x, y, w: T, h: T, flipT: -9 });
         else if (ch === '^') this.springs.push({ x: x + 4, y: y + T - 12, w: T - 8, h: 12, t: -9 });
         else if (ch === '=' && map[r][c - 1] !== '=') {
@@ -356,6 +358,7 @@ class Game {
     }
 
     this.updateSprings();
+    this.updateScrews();
     this.updateKeys(dt);
     this.updateDoors(dt);
     this.updateButtons();
@@ -532,6 +535,20 @@ class Game {
       }
     }
   }
+
+  // Vida: herhangi bir oyuncu değince toplanır (bölümü bitirmek için gerekmez)
+  updateScrews() {
+    for (const s of this.screws) {
+      if (s.got) continue;
+      if (this.players.some(p => !p.inExit && overlap(grow(p, 2), s))) {
+        s.got = true;
+        this.fx('screw', s.x + s.w / 2, s.y + s.h / 2);
+      }
+    }
+  }
+
+  // Toplanan vidalar bit maskesi olarak (1. vida = 1, 2. = 2, 3. = 4)
+  get screwMask() { return this.screws.reduce((m, s, i) => (s.got ? m | (1 << i) : m), 0); }
 
   updateKeys(dt) {
     const ph = PHYS;

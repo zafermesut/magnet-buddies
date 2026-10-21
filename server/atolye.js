@@ -252,16 +252,22 @@ function createAtolye({ dataDir, validateLevel, levelIds = [], publicUrl, google
     if (p === '/api/progress' && (m === 'GET' || m === 'POST')) {
       if (!user) return fail(res, 401, 'Önce giriş yap.');
       const mine = D.progress[user.id] = D.progress[user.id] || {};
+      const nuts = D.screws[user.id] = D.screws[user.id] || {};
       if (m === 'POST') {
         const body = await readJson(req);
-        const sent = body && typeof body.levels === 'object' && body.levels && !Array.isArray(body.levels) ? body.levels : {};
-        for (const [id, secs] of Object.entries(sent).slice(0, 100)) {
+        const obj = v => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+        for (const [id, secs] of Object.entries(obj(body && body.levels)).slice(0, 100)) {
           if (!levelIds.includes(id) || typeof secs !== 'number' || !(secs >= 1 && secs < 36000)) continue;
           if (!mine[id] || secs < mine[id]) mine[id] = Math.round(secs * 100) / 100;
         }
+        // Vidalar: bölüm başına 3 bitlik maske, birikerek birleşir
+        for (const [id, mask] of Object.entries(obj(body && body.screws)).slice(0, 100)) {
+          if (!levelIds.includes(id) || !Number.isInteger(mask) || mask < 0 || mask > 7) continue;
+          nuts[id] = (nuts[id] || 0) | mask;
+        }
         store.save();
       }
-      return send(res, 200, { levels: mine });
+      return send(res, 200, { levels: mine, screws: nuts });
     }
 
     // ----- Bölümler -----

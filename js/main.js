@@ -48,22 +48,39 @@ function saveProgress() {
 }
 const bestOf = i => progress[LEVELS[i].id];
 
-// Yeni süreyi kaydet; girişliyse hesaba da yaz
-function recordProgress(i, secs) {
-  const id = LEVELS[i].id;
-  if (progress[id] && progress[id] <= secs) return;
-  progress[id] = Math.round(secs * 100) / 100;
-  saveProgress();
-  if (Atolye.me) Atolye.api('POST', '/api/progress', { levels: { [id]: progress[id] } });
+// Toplanan vidalar: bölüm kimliği → bit maskesi (1., 2., 3. vida). Bölüm bitince kaydedilir, birikir.
+let screws = {};
+try { screws = JSON.parse(localStorage.getItem('screws-v1') || '{}') || {}; } catch (e) { screws = {}; }
+const saveScrews = () => { try { localStorage.setItem('screws-v1', JSON.stringify(screws)); } catch (e) { /* yoksay */ } };
+const screwsOf = i => screws[LEVELS[i].id] || 0;
+const bitCount = m => (m & 1) + (m >> 1 & 1) + (m >> 2 & 1);
+const totalScrews = () => LEVELS.reduce((n, l, i) => n + bitCount(screwsOf(i)), 0);
+
+// Yeni süreyi ve vidaları kaydet; girişliyse hesaba da yaz
+function recordProgress(i, secs, mask = 0) {
+  const id = LEVELS[i].id, sent = {};
+  if (!progress[id] || secs < progress[id]) {
+    progress[id] = Math.round(secs * 100) / 100;
+    saveProgress();
+    sent.levels = { [id]: progress[id] };
+  }
+  if ((screwsOf(i) | mask) !== screwsOf(i)) {
+    screws[id] = screwsOf(i) | mask;
+    saveScrews();
+    sent.screws = { [id]: screws[id] };
+  }
+  if (Atolye.me && (sent.levels || sent.screws)) Atolye.api('POST', '/api/progress', sent);
 }
 
 // Giriş yapılınca: tarayıcıdaki ilerlemeyi hesaba gönder, hesaptakini geri al
 async function syncProgress() {
   if (!Atolye.me) return;
-  const r = await Atolye.api('POST', '/api/progress', { levels: progress });
+  const r = await Atolye.api('POST', '/api/progress', { levels: progress, screws });
   if (!r.ok || !r.json.levels) return;
   for (const [id, secs] of Object.entries(r.json.levels)) if (!progress[id] || secs < progress[id]) progress[id] = secs;
+  for (const [id, m] of Object.entries(r.json.screws || {})) screws[id] = (screws[id] || 0) | m;
   saveProgress();
+  saveScrews();
   if (state === 'select') renderLevelGrid();
 }
 
@@ -104,6 +121,7 @@ function renderMap(el, { done, pick, canPick = true, compact = false, note = nul
     return `<button class="stop ${cls}" data-i="${i}" style="left:${p.x / 10}%;top:${p.y}px" title="${i + 1}. ${esc(l.name)}">
       <span class="dot">${open[i] ? i + 1 : icon('lock')}${l.magnet ? `<span class="badge">${icon('magnet')}</span>` : ''}</span>
       <span class="lbl">${esc(l.name)}</span>${best && !compact ? `<span class="time">${icon('check')}${fmt(best)}</span>` : ''}
+      ${open[i] && !compact ? `<span class="nuts">${[0, 1, 2].map(k => `<i class="${screwsOf(i) >> k & 1 ? 'got' : ''}"></i>`).join('')}</span>` : ''}
     </button>`;
   }).join('');
   const last = pts[n - 1];
@@ -238,7 +256,7 @@ function toSelect() {
 function renderLevelGrid() {
   const done = new Set(Object.keys(progress));
   const cleared = LEVELS.filter(l => done.has(l.id)).length;
-  $('mapCount').innerHTML = `<b>${cleared}</b> / ${LEVELS.length} bölüm`;
+  $('mapCount').innerHTML = `<b>${cleared}</b> / ${LEVELS.length} bölüm · <b>${totalScrews()}</b> / ${LEVELS.length * 3} vida`;
   $('mapBar').style.width = `${(cleared / LEVELS.length) * 100}%`;
   $('mapNote').textContent = '';
   renderMap($('levelGrid'), { done, pick: startLevel, note: $('mapNote') });
@@ -310,6 +328,18 @@ function lobbyInput() {
 
 // ---------- Ortak: HUD ve bölüm sonu ----------
 
+// Oyun içinde toplanan vidalar (bölümde vida varsa)
+let shownScrews = -1;
+function updateScrewHud() {
+  const el = $('screwHud');
+  if (!game || !game.screws || (state !== 'playing' && state !== 'complete')) { if (shownScrews !== -1) { el.classList.add('hidden'); shownScrews = -1; } return; }
+  const n = game.screws.length, got = game.screws.filter(s => s.got).length, key = n * 10 + got;
+  if (key === shownScrews) return;
+  shownScrews = key;
+  el.classList.toggle('hidden', !n);
+  el.innerHTML = `<span class="nut"></span>${got}/${n}`;
+}
+
 function setHud(title, def, rows) {
   $('levelName').textContent = title;
   $('levelHint').textContent = def.hint || 'Arkadaşının yaptığı bölüm. Kolay gelsin!';
@@ -321,11 +351,13 @@ function showComplete(i, secs) {
   completeAt = performance.now();
   const custom = i < 0;
   const prevBest = custom ? 0 : bestOf(i);
-  if (!custom) recordProgress(i, secs);
+  const mask = game && game.screwMask || 0;
+  if (!custom) recordProgress(i, secs, mask);
   const lastLevel = custom || i === LEVELS.length - 1;
   $('completeTitle').textContent = lastLevel ? 'Tüm bölümler bitti!' : 'Bölüm tamam!';
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
-    (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '');
+    (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '') +
+    (game && game.screws && game.screws.length ? ` · vida <b>${bitCount(mask)}/${game.screws.length}</b>` : '');
   if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
   // Alan 1'in finali: pusula parçası bulundu, pusula ilk kez kıpırdar
   const final = !custom && LEVELS[i].final;
@@ -606,6 +638,7 @@ function frame(now) {
   }
 
   if (state === 'editor' && Editor.game) game = Editor.game;
+  updateScrewHud();
   if (renderer.quality !== shownQuality) { shownQuality = renderer.quality; renderSettings(); }   // otomatik düşürülmüş olabilir
   if (state === 'playing' || state === 'complete') Sound.processEffects(game);
   else Sound.setHum(false);

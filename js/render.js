@@ -207,6 +207,16 @@ class Renderer {
       ctx.fillStyle = rgbaHex(CHANNEL_COLORS[L.channel], g.channelOn(L.channel) ? 1 : 0.5);
       ctx.fillRect(L.x + 4, L.y + 4, L.w - 8, 4);
     }
+    for (const sc of g.screws) {
+      if (sc.got) continue;
+      const cx = sc.x + sc.w / 2, cy = sc.y + sc.h / 2 + Math.sin(t * 2.5) * 2;
+      ctx.fillStyle = '#e3e6fb';
+      ctx.beginPath();
+      for (let k = 0; k < 6; k++) { const a = k * Math.PI / 3 + t; ctx.lineTo(cx + Math.cos(a) * 8, cy + Math.sin(a) * 8); }
+      ctx.fill();
+      ctx.fillStyle = '#8c90c8';
+      ctx.fillRect(cx - 1, cy - 5, 2, 10);
+    }
     for (const f of g.fixed) {
       const x = f.c * T, y = f.r * T, col = POLE_COLORS[f.pol];
       ctx.fillStyle = col;

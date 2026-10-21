@@ -133,6 +133,9 @@ const level = (extra = {}) => Object.assign({ name: 'Deneme', magnet: false, map
     r = await c.post('/api/progress', { levels: { kule: 20, merhaba: 8 } });
     ok(r.json.levels.kule === 12.35 && r.json.levels.merhaba === 8, 'birleştirmede her bölüm için en iyi süre kalır');
     ok((await d.get('/api/progress')).json.levels.kule === undefined, 'ilerleme hesaba özel');
+    await c.post('/api/progress', { screws: { kule: 1, yokboyle: 7, merhaba: 9 } });
+    r = await c.post('/api/progress', { screws: { kule: 4 } });
+    ok(r.json.screws.kule === 5 && r.json.screws.merhaba === undefined && r.json.screws.yokboyle === undefined, 'vidalar birikerek birleşir, geçersizler alınmaz');
 
     console.log('Kalıcılık');
     await sleep(400);

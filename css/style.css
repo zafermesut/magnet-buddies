@@ -323,6 +323,7 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tBtn { background: transparent; border-bottom: 5px solid var(--ch); border-radius: 2px; height: 10px; }
 .tool i.tLever { background: linear-gradient(var(--ch), var(--ch)) 70% 0 / 4px 70% no-repeat, linear-gradient(#8c90c8, #8c90c8) bottom / 100% 4px no-repeat; transform: rotate(18deg); }
 .tool i.tGate { background: repeating-linear-gradient(90deg, var(--ch) 0 3px, transparent 3px 6px); }
+.tool i.tScrew { background: #d9dcf2; clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
 .tool i.tCrate { background: #9ea3c7; box-shadow: inset 0 0 0 2px #5d6194; }
 .tool i.tMagP, .tool i.tMagN { position: relative; }
 .tool i.tMagP { background: #ff8787; } .tool i.tMagN { background: #66d9e8; }
@@ -546,3 +547,13 @@ button.stop:hover .dot { transform: translateY(-3px) scale(1.05); }
   84% { transform: rotate(28deg); }
   100% { transform: rotate(35deg); }
 }
+
+/* ---------- Vidalar ---------- */
+.nut { display: inline-block; width: 14px; height: 14px; background: #d9dcf2;
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); box-shadow: inset 0 0 0 3px #8c90c8; }
+#screwHud { position: absolute; top: 12px; left: 16px; display: flex; align-items: center; gap: 7px; padding: 7px 12px; font-weight: 700; font-size: 14px; }
+#screwHud .nut { width: 16px; height: 16px; }
+.stop .nuts { display: flex; gap: 3px; margin-top: -2px; }
+.stop .nuts i { width: 8px; height: 8px; background: rgba(255, 255, 255, .15);
+  clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); }
+.stop .nuts i.got { background: #d9dcf2; }
