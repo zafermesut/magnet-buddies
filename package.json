@@ -5,7 +5,7 @@
   "description": "Arkadaşlarla birlikte çözülen, mıknatıslı co-op top bulmacası",
   "scripts": {
     "start": "node server/server.js",
-    "test": "node test/sim.test.js && node test/server.test.js"
+    "test": "node test/sim.test.js && node test/server.test.js && node test/atolye.test.js"
   },
   "engines": {
     "node": ">=18"

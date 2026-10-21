@@ -10,8 +10,19 @@ const path = require('path');
 const vm = require('vm');
 const os = require('os');
 const { WebSocketServer } = require('ws');
+const { createAtolye } = require('./atolye');
 
 const ROOT = path.join(__dirname, '..');
+
+// Gizli ayarlar depoya girmeyen .env dosyasından (ANAHTAR=değer satırları); ortam değişkenleri önceliklidir
+const envFile = process.env.ENV_FILE || path.join(ROOT, '.env');
+if (fs.existsSync(envFile)) {
+  for (const line of fs.readFileSync(envFile, 'utf8').split('\n')) {
+    const mm = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
+    if (mm && process.env[mm[1]] === undefined) process.env[mm[1]] = mm[2].replace(/^(['"])(.*)\1$/, '$2');
+  }
+}
+
 const PORT = Number(process.env.PORT) || 3000;
 const STEP = 1 / 60;
 const MAX_MEMBERS = 4;
@@ -22,6 +33,15 @@ for (const f of ['config.js', 'levels.js', 'game.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), sim, { filename: f });
 }
 const { Game, LEVELS, validateLevel } = vm.runInContext('({ Game, LEVELS, validateLevel })', sim);
+
+// Atölye: oyuncuların bölümleri ve paketleri (veriler DATA_DIR altında, varsayılan: data/)
+const atolye = createAtolye({
+  dataDir: process.env.DATA_DIR || path.join(ROOT, 'data'),
+  validateLevel,
+  publicUrl: (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/$/, ''),
+  google: { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET },
+  devLogin: process.env.DEV_LOGIN === '1',
+});
 
 // ---------- Statik dosyalar ----------
 
@@ -40,6 +60,7 @@ const THREE_PUBLIC = [path.join(THREE_ROOT, 'build'), path.join(THREE_ROOT, 'exa
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/health') { res.writeHead(200); res.end('ok'); return; }
+  if (atolye.handle(req, res, url)) return;
   if (url.pathname === '/info') {
     // localhost'tan açan kurucuya, aynı Wi-Fi'deki arkadaşlar için yerel ağ adresini söyler
     const lan = Object.values(os.networkInterfaces()).flat()

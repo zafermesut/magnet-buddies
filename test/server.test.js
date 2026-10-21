@@ -24,7 +24,8 @@ function client(name) {
 }
 
 (async () => {
-  const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'server.js')], { env: { ...process.env, PORT } });
+  const dataDir = require('fs').mkdtempSync(path.join(require('os').tmpdir(), 'mb-server-test-'));
+  const srv = spawn(process.execPath, [path.join(__dirname, '..', 'server', 'server.js')], { env: { ...process.env, PORT, DATA_DIR: dataDir, ENV_FILE: '/nonexistent' } });
   await new Promise(r => srv.stdout.on('data', d => { if (String(d).includes('hazır')) r(); }));
   try {
     console.log('Sunucu');
