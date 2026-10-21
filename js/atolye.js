@@ -3,6 +3,10 @@
 // Atölye: oyuncuların bölümleri ve paketleri. Gezmek ve oynamak hesapsız; kaydetmek, yayınlamak,
 // beğenmek ve bildirmek için Google ile giriş. Sunucu tarafı: server/atolye.js
 
+// Google'ın renkli "G" logosu (giriş düğmeleri için)
+const GOOGLE_G = '<svg class="gIcon" viewBox="0 0 48 48" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.8c4.3-4 6.9-9.9 6.9-17.2z"/><path fill="#FBBC05" d="M10.5 28.6c-.5-1.4-.8-3-.8-4.6s.3-3.2.8-4.6l-7.9-6.2C1 16.5 0 20.1 0 24s1 7.5 2.6 10.8l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.8c-2.1 1.4-4.8 2.3-8.5 2.3-6.3 0-11.6-4.1-13.5-9.9l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>';
+const googleButton = (id, text = 'Google ile giriş yap') => `<button id="${id}" class="google">${GOOGLE_G}<span>${text}</span></button>`;
+
 const VIS_LABELS = { private: '🔒 Gizli', link: '🔗 Linkle', public: '🌍 Herkese açık' };
 
 // Küçük önizleme: bölümün haritası karolar hâlinde
@@ -28,6 +32,7 @@ function drawLevelThumb(canvas, map) {
 
 const Atolye = {
   me: null,
+  stats: null,
   loginEnabled: false,
   tab: 'new',
   q: '',
@@ -56,7 +61,7 @@ const Atolye = {
   async loadMe() {
     if (!this.available()) return;
     const r = await this.api('GET', '/api/me');
-    if (r.ok) { this.me = r.json.user; this.loginEnabled = r.json.loginEnabled; }
+    if (r.ok) { this.me = r.json.user; this.stats = r.json.stats; this.loginEnabled = r.json.loginEnabled; }
     this.renderAccount();
   },
 
@@ -68,32 +73,94 @@ const Atolye = {
   async logout() {
     await this.api('POST', '/auth/logout', {});
     this.me = null;
+    this.stats = null;
     this.renderAccount();
     if (state === 'atolye') this.render();
   },
 
-  // Menülerde sol üstte: giriş düğmesi ya da ad + resim
+  avatar(cls = '') {
+    const m = this.me;
+    return m.avatar ? `<img class="${cls}" src="${esc(m.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="noav ${cls}">${esc((m.name[0] || '?').toUpperCase())}</span>`;
+  },
+
+  async rename() {
+    const name = prompt('Atölye\'de görünecek adın:', this.me.name);
+    if (!name) return;
+    const r = await this.api('POST', '/api/me', { name });
+    if (r.ok) { this.me = r.json.user; this.renderAccount(); } else alert(r.json.error);
+  },
+
+  // Hesap her yerde güncel: ana menüde profil kartı, diğer menülerde sol üstte küçük düğme, editörde kaydetme kutusu
   renderAccount() {
+    this.renderProfile();
+    this.renderEditorAccount();
     const el = $('account');
-    const visible = this.loginEnabled && (MENU_STATES.has(state) || state === 'atolye');
+    const visible = this.loginEnabled && state !== 'home' && (MENU_STATES.has(state) || state === 'atolye');
     el.classList.toggle('hidden', !visible);
     if (!visible) return;
     if (!this.me) {
-      el.innerHTML = '<button id="loginBtn" class="google">G&nbsp; Google ile giriş</button>';
+      el.innerHTML = googleButton('loginBtn', 'Giriş yap');
       $('loginBtn').onclick = () => this.login();
       return;
     }
-    const av = this.me.avatar ? `<img src="${esc(this.me.avatar)}" alt="" referrerpolicy="no-referrer">` : `<span class="noav">${esc(this.me.name[0] || '?')}</span>`;
-    el.innerHTML = `<button id="meBtn">${av}<span>${esc(this.me.name)}</span> ▾</button>
-      <div id="meMenu" class="panel hidden"><button id="renameBtn">Adımı değiştir</button><button id="logoutBtn">Çıkış yap</button></div>`;
+    el.innerHTML = `<button id="meBtn">${this.avatar()}<span>${esc(this.me.name)}</span> ▾</button>
+      <div id="meMenu" class="panel hidden"><button id="mineBtn">📂 Bölümlerim</button><button id="renameBtn">✎ Adımı değiştir</button><button id="logoutBtn">Çıkış yap</button></div>`;
     $('meBtn').onclick = () => $('meMenu').classList.toggle('hidden');
-    $('renameBtn').onclick = async () => {
-      const name = prompt('Atölye\'de görünecek adın:', this.me.name);
-      if (!name) return;
-      const r = await this.api('POST', '/api/me', { name });
-      if (r.ok) { this.me = r.json.user; this.renderAccount(); } else alert(r.json.error);
-    };
+    $('mineBtn').onclick = () => this.open('mine');
+    $('renameBtn').onclick = () => this.rename();
     $('logoutBtn').onclick = () => this.logout();
+  },
+
+  // Ana menünün sağındaki profil kartı
+  renderProfile() {
+    const el = $('profile');
+    el.classList.toggle('hidden', !this.loginEnabled);
+    if (!this.loginEnabled) return;
+    if (!this.me) {
+      el.innerHTML = `
+        <div class="guestBall"><i></i><i></i></div>
+        <h3>Misafir oyuncu</h3>
+        <p class="small">Oynamak için hesap gerekmez. Giriş yaparsan:</p>
+        <ul class="perks">
+          <li><span>☁️</span>Bölümlerin kaydedilir, her cihazdan açarsın</li>
+          <li><span>🌍</span>Atölye'de herkesle paylaşırsın</li>
+          <li><span>❤️</span>Bölüm beğenir, paket kurarsın</li>
+        </ul>
+        ${googleButton('profileLogin')}
+        <p class="tiny">Yalnızca adın ve profil resmin kullanılır.</p>`;
+      $('profileLogin').onclick = () => this.login();
+      return;
+    }
+    const st = this.stats || { levels: 0, likes: 0, plays: 0 };
+    el.innerHTML = `
+      <div class="profTop">${this.avatar('big')}
+        <div><small>Hoş geldin</small><h3>${esc(this.me.name)}</h3><button id="profRename" class="link">✎ Adını değiştir</button></div>
+      </div>
+      <div class="stats">
+        <div><b>${st.levels}</b><span>Bölüm</span></div>
+        <div><b>${st.likes}</b><span>Beğeni</span></div>
+        <div><b>${st.plays}</b><span>Oynanma</span></div>
+      </div>
+      <button id="profMine">📂 Bölümlerim ve paketlerim</button>
+      <button id="profNew">✏️ Yeni bölüm yap</button>
+      <button id="profLogout" class="link">Çıkış yap</button>`;
+    $('profRename').onclick = () => this.rename();
+    $('profMine').onclick = () => this.open('mine');
+    $('profNew').onclick = () => toEditor();
+    $('profLogout').onclick = () => this.logout();
+  },
+
+  // Editörde Kaydet'in altında: kimin adına kaydedileceği ya da giriş düğmesi
+  renderEditorAccount() {
+    const el = $('edAccount');
+    if (!el) return;
+    if (!this.available()) { el.innerHTML = ''; return; }
+    if (!this.me) {
+      el.innerHTML = this.loginEnabled ? `<p class="small">Kaydetmek için giriş yap:</p>${googleButton('edLogin')}` : '';
+      if (this.loginEnabled) $('edLogin').onclick = () => this.login('/?editor=1');
+      return;
+    }
+    el.innerHTML = `<div class="edMe">${this.avatar()}<span>${esc(this.me.name)}</span></div>`;
   },
 
   // ---------- Atölye ekranı ----------
@@ -146,7 +213,7 @@ const Atolye = {
     const body = $('atBody');
     if (!this.me) {
       body.innerHTML = `<div class="atEmpty"><p>Bölümlerini kaydetmek ve her cihazdan görmek için giriş yap.</p>
-        ${this.loginEnabled ? '<button id="mineLogin" class="google">G&nbsp; Google ile giriş</button>' : '<p class="note">Bu sunucuda giriş kapalı.</p>'}</div>`;
+        ${this.loginEnabled ? googleButton('mineLogin') : '<p class="note">Bu sunucuda giriş kapalı.</p>'}</div>`;
       if ($('mineLogin')) $('mineLogin').onclick = () => this.login('/?atolye=mine');
       return;
     }
@@ -357,7 +424,9 @@ const Atolye = {
 
   // ---------- Küçük yardımcılar ----------
 
-  needLogin(next) {
+  async needLogin(next) {
+    if (!this.loginEnabled) await this.loadMe();   // sayfa, giriş açılmadan önce yüklenmiş olabilir
+    if (this.me) return;
     if (!this.loginEnabled) { alert('Bu sunucuda giriş kapalı.'); return; }
     if (confirm('Bunun için Google ile giriş yapman gerekiyor. Şimdi giriş yapılsın mı?')) this.login(next);
   },
@@ -379,7 +448,7 @@ const Atolye = {
   async saveFromEditor() {
     const msg = $('edSaveMsg');
     if (!this.available()) { msg.textContent = 'Kaydetmek için oyunu sunucudan aç.'; return; }
-    if (!this.me) return this.needLogin('/?editor=1');
+    if (!this.me) { await this.needLogin('/?editor=1'); if (!this.me) return; }
     const body = Object.assign(Editor.def(), { visibility: $('edVis').value });
     msg.textContent = 'Kaydediliyor…';
     const r = Editor.remote

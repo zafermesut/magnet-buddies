@@ -73,7 +73,54 @@ canvas { display: block; }
   display: flex; flex-direction: column; gap: 12px;
 }
 .card.wide { width: min(640px, 100%); }
-.card.home { width: min(500px, 100%); }
+.card.home { width: min(480px, 100%); }
+
+/* Ana menü: oyun kartı ve yanında profil kartı */
+.homeWrap { display: flex; gap: 18px; align-items: stretch; justify-content: center; width: min(820px, 100%); }
+button.big { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 16px 12px 14px; font-size: 21px; }
+button.big small { font-size: 12px; font-weight: 600; letter-spacing: 0; opacity: .7; }
+.wideBtn { font-size: 16px; padding: 13px; }
+.homeTiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { display: grid; grid-template-columns: auto 1fr; grid-template-rows: auto auto; column-gap: 10px; text-align: left; align-items: center; padding: 12px 14px; }
+.tile .ic { grid-row: span 2; font-size: 26px; }
+.tile b { font-size: 15px; }
+.tile small { font-size: 11px; color: #8e92c0; }
+
+.card.profile { width: 290px; flex-shrink: 0; text-align: left; gap: 10px; }
+.profile h3 { margin: 0; font-size: 21px; }
+.profile .tiny { margin: 0; font-size: 11px; color: #74779f; text-align: center; }
+.guestBall { position: relative; width: 64px; height: 64px; margin: 2px auto 0; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #a5b4fc, #5c63c9 70%); box-shadow: 0 6px 0 rgba(10, 8, 40, .45), inset -6px -8px 14px rgba(0, 0, 0, .25);
+  animation: bob 2.6s ease-in-out infinite; }
+.guestBall i { position: absolute; top: 24px; width: 10px; height: 13px; border-radius: 50%; background: #fff; }
+.guestBall i::after { content: ''; position: absolute; left: 3px; top: 4px; width: 5px; height: 6px; border-radius: 50%; background: #1d1b3a; }
+.guestBall i:first-child { left: 20px; } .guestBall i:last-child { left: 34px; }
+@keyframes bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+.profile .guestBall + h3 { text-align: center; }
+.profile .guestBall ~ .small { text-align: center; }
+.perks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: #c9cbef; }
+.perks li { display: flex; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
+.perks span { font-size: 16px; }
+.profTop { display: flex; gap: 12px; align-items: center; }
+.profTop small { color: #8e92c0; font-size: 12px; }
+.profTop .link { padding: 2px 0; font-size: 12px; }
+.profile img.big, .profile .noav.big { width: 60px; height: 60px; border-radius: 50%; flex-shrink: 0; box-shadow: 0 0 0 3px rgba(255, 255, 255, .15); }
+.noav { display: grid; place-items: center; background: #4dabf7; color: #fff; font-weight: 700; }
+.profile .noav.big { font-size: 26px; }
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 4px 0; }
+.stats div { display: flex; flex-direction: column; align-items: center; padding: 10px 4px; border-radius: 12px; background: rgba(255, 255, 255, .05); }
+.stats b { font-size: 22px; }
+.stats span { font-size: 11px; color: #8e92c0; }
+.profile .link { align-self: center; }
+
+@media (max-width: 760px) {
+  .homeWrap { flex-direction: column; align-items: center; }
+  .card.profile { width: min(480px, 100%); }
+  .overlay:has(.homeWrap) { overflow-y: auto; place-items: start center; padding-top: 64px; }
+  .home h1 { font-size: 30px; }
+  .card.home, .card.profile { padding: 20px; }
+  .logoMagnet { width: 44px; height: 44px; }
+}
 h1 { margin: 0; font-size: 46px; font-weight: 700; letter-spacing: -0.01em; text-shadow: 0 4px 0 rgba(10, 8, 40, 0.45); }
 .logo { display: flex; align-items: center; justify-content: center; gap: 12px; }
 .logoMagnet { width: 58px; height: 58px; animation: wobble 3.2s ease-in-out infinite; filter: drop-shadow(0 4px 0 rgba(10, 8, 40, 0.45)); }
@@ -170,10 +217,17 @@ input:focus { border-color: #4dabf7; }
 #account button { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; border-radius: 999px;
   background: rgba(20, 20, 45, 0.7); backdrop-filter: blur(6px); }
 #account img, #account .noav { width: 28px; height: 28px; border-radius: 50%; }
-#account .noav { display: grid; place-items: center; background: #4dabf7; color: #fff; font-weight: 700; }
+
 #meMenu { position: absolute; top: 46px; left: 0; display: flex; flex-direction: column; gap: 4px; padding: 6px; min-width: 170px; }
 #meMenu button { border-radius: 10px; padding: 8px 10px; }
-button.google, #account button.google { background: #fff; color: #1f1f1f; border: none; font-weight: 600; padding: 8px 14px; }
+button.google, #account button.google { display: flex; align-items: center; justify-content: center; gap: 10px;
+  background: #fff; color: #1f1f1f; border: none; font-weight: 600; padding: 10px 16px; box-shadow: 0 4px 0 rgba(10, 8, 40, .35); }
+#account button.google { padding: 7px 14px 7px 10px; }
+.gIcon { width: 18px; height: 18px; flex-shrink: 0; }
+#edAccount { display: flex; flex-direction: column; gap: 6px; }
+#edAccount button.google { padding: 8px; font-size: 13px; }
+.edMe { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #b9bce0; }
+.edMe img, .edMe .noav { width: 22px; height: 22px; border-radius: 50%; font-size: 11px; }
 button.google:hover:not(:disabled), #account button.google:hover:not(:disabled) { background: #f1f3f4; }
 .card .row > button { flex: 1; }
 

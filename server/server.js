@@ -10,6 +10,7 @@ const path = require('path');
 const vm = require('vm');
 const os = require('os');
 const { WebSocketServer } = require('ws');
+const crypto = require('crypto');
 const { createAtolye } = require('./atolye');
 
 const ROOT = path.join(__dirname, '..');
@@ -54,6 +55,17 @@ const TYPES = {
   '.ico': 'image/x-icon',
 };
 const PUBLIC = new Set(['index.html', 'css', 'js']);
+
+// Önbellek kırıcı: index.html'deki js/css adreslerine dosyaların içeriğinden bir sürüm eklenir (?v=...).
+// Böylece Cloudflare ya da tarayıcı eski dosyayı saklasa bile yeni yayından sonra hep yenisi yüklenir.
+const ASSET_VERSION = (() => {
+  const h = crypto.createHash('sha1');
+  for (const dir of ['js', 'css']) {
+    for (const f of fs.readdirSync(path.join(ROOT, dir)).sort()) h.update(f).update(fs.readFileSync(path.join(ROOT, dir, f)));
+  }
+  return h.digest('hex').slice(0, 10);
+})();
+const withVersion = html => html.replace(/(src|href)="((?:js|css)\/[^"?]+)"/g, `$1="$2?v=${ASSET_VERSION}"`);
 const THREE_ROOT = path.join(ROOT, 'node_modules', 'three');
 const THREE_PUBLIC = [path.join(THREE_ROOT, 'build'), path.join(THREE_ROOT, 'examples', 'jsm')];
 
@@ -85,6 +97,7 @@ const server = http.createServer((req, res) => {
   }
   fs.readFile(file, (err, data) => {
     if (err) { res.writeHead(404); res.end('Bulunamadı'); return; }
+    if (rel === 'index.html') data = withVersion(String(data));
     res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': cache });
     res.end(data);
   });

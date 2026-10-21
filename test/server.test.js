@@ -31,6 +31,7 @@ function client(name) {
     console.log('Sunucu');
     const page = await fetch(`http://localhost:${PORT}/`).then(r => r.text());
     ok(page.includes('<canvas'), 'ana sayfa sunuluyor');
+    ok(/src="js\/main\.js\?v=[0-9a-f]{10}"/.test(page) && /href="css\/style\.css\?v=/.test(page), 'js ve css adreslerinde sürüm var (eski önbellek kullanılmaz)');
     const leak = await fetch(`http://localhost:${PORT}/server/server.js`).then(r => r.status);
     const pkg = await fetch(`http://localhost:${PORT}/package.json`).then(r => r.status);
     ok(leak === 404 && pkg === 404, 'sunucu kodu ve proje dosyaları dışarı verilmiyor');

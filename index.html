@@ -36,24 +36,27 @@
     <div id="keysHelp">R yeniden başlat · Esc bölümler</div>
   </div>
 
-  <!-- Ana menü -->
+  <!-- Ana menü: solda oyun, sağda profil kartı -->
   <div id="home" class="overlay">
-    <div class="card home">
-      <div class="logo">
-        <svg class="logoMagnet" viewBox="0 0 64 64" aria-hidden="true">
-          <path d="M14 8 v26 a18 18 0 0 0 36 0 v-26" fill="none" stroke="#e6e8ff" stroke-width="12"/>
-          <rect x="8" y="5" width="12" height="13" rx="3" fill="#ff8787"/>
-          <rect x="44" y="5" width="12" height="13" rx="3" fill="#66d9e8"/>
-        </svg>
-        <h1 class="gameTitle"></h1>
+    <div class="homeWrap">
+      <div class="card home">
+        <div class="logo">
+          <svg class="logoMagnet" viewBox="0 0 64 64" aria-hidden="true">
+            <path d="M14 8 v26 a18 18 0 0 0 36 0 v-26" fill="none" stroke="#e6e8ff" stroke-width="12"/>
+            <rect x="8" y="5" width="12" height="13" rx="3" fill="#ff8787"/>
+            <rect x="44" y="5" width="12" height="13" rx="3" fill="#66d9e8"/>
+          </svg>
+          <h1 class="gameTitle"></h1>
+        </div>
+        <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
+        <button id="homeOnline" class="primary big">▶ ONLİNE OYNA<small>Arkadaşına link gönder, birlikte oynayın</small></button>
+        <button id="homeLocal" class="wideBtn">🎮 Aynı klavyede oyna</button>
+        <div class="homeTiles">
+          <button id="homeAtolye" class="tile"><span class="ic">🛠</span><b>Atölye</b><small>Oyuncuların bölümleri</small></button>
+          <button id="homeEditor" class="tile"><span class="ic">✏️</span><b>Bölüm editörü</b><small>Kendi bölümünü yap</small></button>
+        </div>
       </div>
-      <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
-      <button id="homeOnline" class="primary">ONLİNE · LİNKLE OYNA</button>
-      <button id="homeLocal">Aynı klavyede oyna</button>
-      <div class="row">
-        <button id="homeAtolye">🛠 Atölye</button>
-        <button id="homeEditor">Bölüm editörü</button>
-      </div>
+      <aside id="profile" class="card profile hidden"></aside>
     </div>
   </div>
 
@@ -79,6 +82,7 @@
         <button id="edSave">💾 Kaydet</button>
       </div>
       <p id="edSaveMsg" class="small"></p>
+      <div id="edAccount"></div>
     </div>
     <button id="edOnline">Online odada oyna</button>
     <button id="edShare">Linki kopyala</button>

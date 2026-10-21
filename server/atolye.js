@@ -227,7 +227,13 @@ function createAtolye({ dataDir, validateLevel, publicUrl, google, devLogin }) {
 
     // ----- Hesap -----
     if (p === '/api/me' && m === 'GET') {
-      return send(res, 200, { user: user && { id: user.id, name: user.name, avatar: user.avatar }, loginEnabled, google: !!(google && google.clientId) });
+      let stats = null;
+      if (user) {
+        const mine = Object.values(D.levels).filter(l => l.ownerId === user.id);
+        const packs = Object.values(D.packs).filter(pk => pk.ownerId === user.id);
+        stats = { levels: mine.length, packs: packs.length, likes: mine.concat(packs).reduce((n, i) => n + i.likes, 0), plays: mine.reduce((n, l) => n + l.plays, 0) };
+      }
+      return send(res, 200, { user: user && { id: user.id, name: user.name, avatar: user.avatar }, stats, loginEnabled, google: !!(google && google.clientId) });
     }
     if (p === '/api/me' && m === 'POST') {
       if (!user) return fail(res, 401, 'Önce giriş yap.');

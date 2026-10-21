@@ -136,6 +136,7 @@ function toHome() {
   state = 'home';
   game = menuGame();
   show('home');
+  Atolye.loadMe();   // profil kartındaki sayılar güncel kalsın
 }
 
 // ---------- Aynı klavye ----------
