@@ -129,7 +129,7 @@ class Room {
       this.send(m, {
         t: 'room', code: this.code, state: this.state, level: this.level,
         host: this.host.id, you: m.id,
-        custom: this.custom ? { name: this.custom.name, magnet: this.custom.magnet } : null,
+        custom: this.custom ? { name: this.custom.name, magnet: this.custom.magnet, index: this.queueIndex || 0, total: (this.queue || []).length || 1, packName: this.packName } : null,
         members: this.members.map(x => ({ id: x.id, name: x.name, playing: this.inGame.includes(x) })),
       });
     }
@@ -222,17 +222,21 @@ class Room {
         if (m === this.host && this.state === 'lobby') this.start(msg.custom ? -1 : msg.level | 0);
         break;
       case 'custom': {
-        // Kurucunun editörde yaptığı bölüm: yalnızca bilinen alanlar alınır ve doğrulanır
+        // Kurucunun getirdiği bölüm ya da paket (sıralı kuyruk, en fazla 30 bölüm).
+        // Yalnızca bilinen alanlar alınır ve her bölüm doğrulanır.
         if (m !== this.host || this.state !== 'lobby' || !msg.def) break;
-        const d = msg.def;
-        const def = {
-          name: String(d.name || '').slice(0, 24).trim(),
-          magnet: !!d.magnet,
-          map: Array.isArray(d.map) ? d.map.slice(0, 20).map(r => String(r).slice(0, 48)) : [],
-        };
-        const errs = validateLevel(def);
-        if (errs.length) { this.send(m, { t: 'error', msg: 'Bölüm geçersiz: ' + errs[0] }); break; }
-        this.custom = def;
+        const clean = d => ({
+          name: String((d && d.name) || '').slice(0, 24).trim(),
+          magnet: !!(d && d.magnet),
+          map: d && Array.isArray(d.map) ? d.map.slice(0, 20).map(r => String(r).slice(0, 48)) : [],
+        });
+        const queue = (Array.isArray(msg.queue) && msg.queue.length ? msg.queue.slice(0, 30) : [msg.def]).map(clean);
+        const bad = queue.map(validateLevel).find(e => e.length);
+        if (bad) { this.send(m, { t: 'error', msg: 'Bölüm geçersiz: ' + bad[0] }); break; }
+        this.queue = queue;
+        this.queueIndex = 0;
+        this.packName = queue.length > 1 ? String(msg.packName || '').slice(0, 24) : null;
+        this.custom = queue[0];
         this.sendRoom();
         break;
       }
@@ -242,7 +246,11 @@ class Room {
       case 'next':
         if (this.state === 'complete') {
           if (this.level >= 0 && this.level < LEVELS.length - 1) this.start(this.level + 1);
-          else this.toLobby();
+          else if (this.level === -1 && this.queue && this.queueIndex < this.queue.length - 1) {
+            // Pakette sıradaki bölüm
+            this.custom = this.queue[++this.queueIndex];
+            this.start(-1);
+          } else this.toLobby();
         }
         break;
       case 'lobby':
@@ -254,7 +262,7 @@ class Room {
 
 // ---------- WebSocket ----------
 
-const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 8192 });
+const wss = new WebSocketServer({ server, path: '/ws', maxPayload: 64 * 1024 });   // 30 bölümlük paket sığsın
 
 function cleanName(s) {
   const n = String(s || '').replace(/[\u0000-\u001f]/g, '').trim().slice(0, 16);

@@ -18,6 +18,9 @@
   <div id="fade"></div>
   <div id="levelIntro"><span id="introNum"></span><b id="introName"></b></div>
 
+  <!-- Hesap: menülerde sol üstte Google ile giriş ya da ad + resim -->
+  <div id="account" class="hidden"></div>
+
   <!-- Ses, müzik ve kalite ayarları (her ekranda) -->
   <div id="settings">
     <button id="setSfx" title="Ses efektleri">🔊</button>
@@ -47,7 +50,10 @@
       <p class="tagline">Arkadaşlarınla birlikte çözülen top bulmacaları.<br>Bölümleri tek başına geçemezsin.</p>
       <button id="homeOnline" class="primary">ONLİNE · LİNKLE OYNA</button>
       <button id="homeLocal">Aynı klavyede oyna</button>
-      <button id="homeEditor">Bölüm editörü</button>
+      <div class="row">
+        <button id="homeAtolye">🛠 Atölye</button>
+        <button id="homeEditor">Bölüm editörü</button>
+      </div>
     </div>
   </div>
 
@@ -63,6 +69,17 @@
     </div>
     <div id="edErrors" class="error"></div>
     <button id="edTest" class="primary">DENE</button>
+    <div class="edSaveBox">
+      <div class="row">
+        <select id="edVis" title="Kimler görebilir?">
+          <option value="private">🔒 Gizli</option>
+          <option value="link">🔗 Linkle</option>
+          <option value="public">🌍 Herkese açık</option>
+        </select>
+        <button id="edSave">💾 Kaydet</button>
+      </div>
+      <p id="edSaveMsg" class="small"></p>
+    </div>
     <button id="edOnline">Online odada oyna</button>
     <button id="edShare">Linki kopyala</button>
     <div class="edFoot">
@@ -71,6 +88,24 @@
     </div>
     <p class="small">Sol tık çizer, sağ tık siler.<br>Denerken iki topu WASD ve ok tuşlarıyla yönetebilirsin.</p>
   </aside>
+
+  <!-- Atölye: oyuncuların bölümleri ve paketleri -->
+  <div id="atolye" class="overlay hidden">
+    <div class="card atolyeCard">
+      <div class="atHead">
+        <h2>🛠 Atölye</h2>
+        <input id="atSearch" placeholder="Bölüm ya da yapan ara…" autocomplete="off">
+        <button id="atClose" class="link" title="Ana menü">✕</button>
+      </div>
+      <div id="atTabs" class="tabs">
+        <button data-tab="new">Yeni</button>
+        <button data-tab="popular">Popüler</button>
+        <button data-tab="packs">📦 Paketler</button>
+        <button data-tab="mine">Bölümlerim</button>
+      </div>
+      <div id="atBody"></div>
+    </div>
+  </div>
 
   <!-- Online: oda kur / katıl -->
   <div id="onlineForm" class="overlay hidden">
@@ -131,6 +166,7 @@
     <div class="card">
       <h2 id="completeTitle">Bölüm tamam!</h2>
       <p id="completeInfo"></p>
+      <button id="likeBtn" class="hidden">♡ Bu bölümü beğen</button>
       <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
       <button id="toSelectBtn">Bölüm seçimi</button>
       <p id="completeHint" class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
@@ -146,6 +182,7 @@
   <script src="js/render.js"></script>
   <script src="js/main.js"></script>
   <script src="js/editor.js"></script>
+  <script src="js/atolye.js"></script>
   <!-- 3D çizim: modül olduğu için klasik script'lerden sonra, sayfa hazır olmadan önce çalışır -->
   <script type="module" src="js/render3d.js"></script>
 </body>

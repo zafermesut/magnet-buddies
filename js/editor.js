@@ -41,17 +41,37 @@ const Editor = {
   painting: 0,      // 0: yok, 1: çiz, 2: sil
   lastCell: null,   // sürüklerken atlanan hücreleri doldurmak için
   errors: [],
+  remote: null,     // Atölye'de kayıtlıysa: { id, visibility }
+  dirty: false,     // son kayıttan sonra değişiklik var mı
 
-  load(def) {
+  // remote: Atölye'deki kayıt (yoksa null: yeni, kaydedilmemiş bölüm)
+  load(def, remote = null, dirty = false) {
     this.level = { name: def.name, magnet: !!def.magnet, map: def.map.slice() };
     this.grid = def.map.map(r => [...r]);
+    this.remote = remote;
+    this.dirty = dirty;
+    if ($('edVis')) $('edVis').value = remote ? remote.visibility : 'private';
     this.refresh(false);
   },
 
   loadSaved() {
     let def = null;
     try { def = JSON.parse(localStorage.getItem(EDITOR_KEY) || 'null'); } catch (e) { def = null; }
-    this.load(def && def.map ? def : blankLevel());
+    if (def && def.map) this.load(def, def.remote || null, !!def.dirty);
+    else this.load(blankLevel());
+  },
+
+  setRemote(remote) {
+    this.remote = remote;
+    this.dirty = false;
+    if (remote) $('edVis').value = remote.visibility;
+    this.saveDraft();
+    this.renderPanel();
+  },
+
+  // Taslak tarayıcıda saklanır (Google girişine gidip dönünce kaybolmasın)
+  saveDraft() {
+    try { localStorage.setItem(EDITOR_KEY, JSON.stringify(Object.assign(this.def(), { remote: this.remote, dirty: this.dirty }))); } catch (e) { /* yoksay */ }
   },
 
   def() {
@@ -63,7 +83,7 @@ const Editor = {
     const def = this.def();
     this.errors = validateLevel(def);
     try { this.game = new Game(def, 0); } catch (e) { this.game = null; }
-    if (save) { try { localStorage.setItem(EDITOR_KEY, JSON.stringify(def)); } catch (e) { /* yoksay */ } }
+    if (save) { this.dirty = true; this.saveDraft(); }
     this.renderPanel();
   },
 
@@ -141,7 +161,9 @@ const Editor = {
     $('edSize').textContent = `${this.cols} × ${this.rows}`;
     $('edErrors').innerHTML = this.errors.map(e => `<div>• ${esc(e)}</div>`).join('');
     const ok = !this.errors.length;
-    for (const id of ['edTest', 'edShare', 'edOnline']) $(id).disabled = !ok;
+    for (const id of ['edTest', 'edShare', 'edOnline', 'edSave']) $(id).disabled = !ok;
+    $('edSaveMsg').textContent = !this.remote ? 'Henüz Atölye\'ye kaydedilmedi.'
+      : this.dirty ? 'Kaydedilmemiş değişiklik var.' : 'Atölye\'de kayıtlı ✓';
   },
 
   // ---------- Fare ----------
@@ -213,7 +235,9 @@ const Editor = {
     ctx.restore();
   },
 
+  // Atölye'de kayıtlı ve gizli değilse kısa link; değilse bölüm linkin içine sığdırılır
   shareLink() {
+    if (this.remote && this.remote.visibility !== 'private' && !this.dirty) return `${location.origin}/?b=${this.remote.id}`;
     return `${shareOrigin}${location.pathname}?bolum=${encodeLevel(this.def())}`;
   },
 };

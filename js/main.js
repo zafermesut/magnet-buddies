@@ -11,7 +11,7 @@ let renderer = null;        // sayfa hazır olunca kurulur: 3D (Three.js) ya da 
 Input.init();
 
 const STEP = 1 / 60;
-const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor'];
+const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor', 'atolye'];
 
 let mode = 'local';         // local | online
 let state = 'home';
@@ -22,7 +22,7 @@ let acc = 0, last = performance.now(), completeAt = 0;
 let room = null;            // online: sunucudan gelen son oda bilgisi
 let currentDef = LEVELS[0]; // oynanan bölümün tanımı (hazır ya da kendi bölümün)
 let editorTest = false;     // editörden "Dene" ile mi oynanıyor
-let pendingCustom = null;   // online odaya götürülecek kendi bölümün
+let pendingCustom = null;   // online odaya götürülecek bölüm(ler): { def, queue, packName }
 let customSent = false;
 
 document.title = GAME_TITLE;
@@ -57,6 +57,7 @@ function show(id) {
   // Editörde bölüm sol paneli açıkta bırakacak şekilde çizilir
   renderer.padLeft = id === 'editor' ? 260 : 0;
   renderer.padTop = id === 'editor' ? 24 : 70;
+  if (typeof Atolye !== 'undefined') Atolye.renderAccount();
 }
 
 // ---------- Menü arka planı: botların zıplayıp birbirini mıknatısla fırlattığı canlı sahne ----------
@@ -78,7 +79,7 @@ const MENU_LEVEL = {
     '############################',
   ],
 };
-const MENU_STATES = new Set(['home', 'lobby', 'select', 'onlineForm', 'room']);
+const MENU_STATES = new Set(['home', 'lobby', 'select', 'onlineForm', 'room', 'atolye']);
 let demo = null;
 
 function menuGame() {
@@ -131,6 +132,7 @@ function toHome() {
   room = null;
   pendingCustom = null;
   editorTest = false;
+  Atolye.play = null;
   state = 'home';
   game = menuGame();
   show('home');
@@ -162,9 +164,9 @@ function startLevel(i) {
   playLocal(LEVELS[i], `${i + 1}. ${LEVELS[i].name}`);
 }
 
-// Editörden "Dene": tek başına deneyen biri iki topu WASD ve ok tuşlarıyla yönetebilir
-function startCustom(def) {
-  editorTest = true;
+// Editörden "Dene" ya da Atölye'den oyna: tek başına deneyen biri iki topu WASD ve ok tuşlarıyla yönetebilir
+function startCustom(def, fromAtolye = false) {
+  editorTest = !fromAtolye;
   levelIndex = -1;
   mode = 'local';
   if (joined.length < 2) joined = ['wasd', 'arrows'];
@@ -177,7 +179,10 @@ function playLocal(def, title) {
   acc = 0;
   state = 'playing';
   show(null);
-  levelIntro(levelIndex >= 0 ? `Bölüm ${levelIndex + 1}` : 'Kendi bölümün', def.name);
+  const ap = !editorTest && Atolye.play;
+  levelIntro(levelIndex >= 0 ? `Bölüm ${levelIndex + 1}`
+    : ap && ap.pack ? `${ap.pack.name} · ${ap.index + 1}/${ap.pack.levels.length}`
+    : ap ? `Atölye · ${ap.level.author.name}` : 'Kendi bölümün', def.name);
   const sources = Input.sources();
   setHud(title, def, joined.map((id, k) => {
     const s = sources.find(x => x.id === id);
@@ -238,6 +243,14 @@ function showComplete(i, secs) {
   if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
   $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'BÖLÜM SEÇİMİ') : 'SONRAKİ BÖLÜM';
   $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Bölüm seçimi';
+  // Atölye'den oynanan bölüm: oynanma kaydı, beğen düğmesi, pakette sıradaki bölüm
+  $('likeBtn').classList.add('hidden');
+  if (mode === 'local' && !editorTest && Atolye.play) {
+    Atolye.onComplete();
+    $('completeTitle').textContent = Atolye.hasNext() ? 'Bölüm tamam!' : Atolye.play.pack ? 'Paket bitti!' : 'Bölüm tamam!';
+    $('nextBtn').textContent = Atolye.hasNext() ? 'SONRAKİ BÖLÜM' : 'ATÖLYE\'YE DÖN';
+    $('toSelectBtn').textContent = 'Tekrar oyna';
+  }
   $('completeHint').textContent = mode === 'online'
     ? 'Herhangi biriniz devam ettirebilir (zıplama tuşu da olur).'
     : 'Herhangi bir oyuncunun zıplama tuşu da devam ettirir.';
@@ -247,6 +260,7 @@ function showComplete(i, secs) {
 function next() {
   if (mode === 'online') { Net.send({ t: 'next' }); return; }
   if (editorTest) toEditor();
+  else if (Atolye.play) Atolye.next();
   else if (levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
   else toSelect();
 }
@@ -254,12 +268,14 @@ function next() {
 function backToChooser() {
   if (mode === 'online') Net.send({ t: 'lobby' });
   else if (editorTest) toEditor();
+  else if (Atolye.play) Atolye.back();
   else toSelect();
 }
 
 function restart() {
   if (mode === 'online') Net.send({ t: 'restart' });
   else if (editorTest) startCustom(currentDef);
+  else if (Atolye.play) startCustom(currentDef, true);
   else startLevel(levelIndex);
 }
 
@@ -349,7 +365,10 @@ function renderRoom() {
     const b = document.createElement('button');
     b.className = 'lvl custom';
     b.disabled = locked;
-    b.innerHTML = `<span class="num">★</span><span>${room.custom.magnet ? '🧲 ' : ''}${esc(room.custom.name)}</span><span class="best">kendi bölümün</span>`;
+    const c = room.custom;
+    b.innerHTML = c.total > 1
+      ? `<span class="num">📦</span><span>${esc(c.packName || 'Paket')}</span><span class="best">${c.total} bölüm · ${c.index + 1}. sıradan</span>`
+      : `<span class="num">★</span><span>${c.magnet ? '🧲 ' : ''}${esc(c.name)}</span><span class="best">özel bölüm</span>`;
     b.addEventListener('click', () => Net.send({ t: 'start', custom: true }));
     grid.appendChild(b);
   }
@@ -358,7 +377,10 @@ function renderRoom() {
 Net.on('room', m => {
   room = m;
   // Editörden gelen kurucu kendi bölümünü odaya yükler (sunucu doğrular)
-  if (pendingCustom && !customSent && m.host === m.you) { customSent = true; Net.send({ t: 'custom', def: pendingCustom }); }
+  if (pendingCustom && !customSent && m.host === m.you) {
+    customSent = true;
+    Net.send({ t: 'custom', def: pendingCustom.def, queue: pendingCustom.queue, packName: pendingCustom.packName });
+  }
   history.replaceState(null, '', `${location.pathname}?oda=${m.code}`);
   if (m.state === 'lobby' || (state !== 'playing' && state !== 'complete')) {
     if (state !== 'room') { state = 'room'; game = menuGame(); show('room'); }
@@ -406,7 +428,7 @@ $('homeEditor').addEventListener('click', () => toEditor());
 $('edBack').addEventListener('click', toHome);
 $('edTest').addEventListener('click', () => startCustom(Editor.def()));
 $('edOnline').addEventListener('click', () => {
-  pendingCustom = Editor.def();
+  pendingCustom = { def: Editor.def(), queue: [Editor.def()] };
   customSent = false;
   toOnlineForm();
   $('onlineError').textContent = 'Oda kur: bölümün odada ★ ile çıkacak.';
@@ -415,7 +437,7 @@ $('lobbyBack').addEventListener('click', toHome);
 $('startBtn').addEventListener('click', toSelect);
 $('backBtn').addEventListener('click', toLobby);
 $('nextBtn').addEventListener('click', next);
-$('toSelectBtn').addEventListener('click', () => (editorTest ? restart() : backToChooser()));
+$('toSelectBtn').addEventListener('click', () => (editorTest || (mode === 'local' && Atolye.play) ? restart() : backToChooser()));
 $('onlineBack').addEventListener('click', toHome);
 $('createBtn').addEventListener('click', () => goOnline({ t: 'create' }));
 $('joinBtn').addEventListener('click', () => goOnline({ t: 'join', code: $('joinCode').value }));
@@ -526,7 +548,17 @@ addEventListener('DOMContentLoaded', () => {
   renderSettings();
   const params = new URLSearchParams(location.search);
   const linkCode = params.get('oda'), shared = params.get('bolum');
-  if (linkCode) {
+  Atolye.loadMe();
+  if (params.get('b') || params.get('p') || params.has('atolye')) {
+    // Atölye linkleri: ?b=bölüm, ?p=paket, ?atolye[=sekme]
+    history.replaceState(null, '', location.pathname);
+    Atolye.open(params.get('atolye') || 'new');
+    if (params.get('b')) Atolye.openLevel(params.get('b'));
+    else if (params.get('p')) Atolye.openPack(params.get('p'));
+  } else if (params.has('editor')) {
+    history.replaceState(null, '', location.pathname);
+    toEditor();
+  } else if (linkCode) {
     toOnlineForm();
     $('joinCode').value = linkCode.toUpperCase().slice(0, 4);
     $('onlineError').textContent = $('onlineName').value ? '' : 'Takma adını yaz ve Katıl\'a bas.';

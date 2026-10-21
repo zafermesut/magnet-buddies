@@ -130,6 +130,17 @@ function client(name) {
     const sCustom = await b.wait(m => m.t === 's' && m.p.length === 2 && m.p[0][1] < 7 * 40);
     ok(!!sCustom, 'sunucu kendi bölümünü simüle ediyor');
 
+    console.log('Paket kuyruğu');
+    a.send({ t: 'lobby' });
+    await a.wait(m => m.t === 'room' && m.state === 'lobby' && m.custom && m.custom.total === 1);
+    const second = Object.assign({}, mine, { name: 'İkinci bölüm' });
+    a.send({ t: 'custom', def: mine, queue: [mine, second], packName: 'Benim paketim' });
+    const withQueue = await b.wait(m => m.t === 'room' && m.custom && m.custom.total === 2);
+    ok(withQueue && withQueue.custom.packName === 'Benim paketim' && withQueue.custom.index === 0, 'paket kuyruğu odaya yüklendi');
+    a.msgs.length = 0; b.msgs.length = 0;
+    a.send({ t: 'start', custom: true });
+    ok(!!(await b.wait(m => m.t === 'start' && m.def && m.def.name === 'Benim bölümüm')), 'paketin 1. bölümü başladı');
+
     b.ws.close();
     const back = await a.wait(m => m.t === 'room' && m.state === 'lobby' && m.members.length === 1);
     ok(!!back, 'oyuncu ayrılınca tek kalan odaya döner');
