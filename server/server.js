@@ -33,7 +33,8 @@ const sim = vm.createContext({ console, Math, Map, Set });
 for (const f of ['config.js', 'levels.js', 'game.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), sim, { filename: f });
 }
-const { Game, LEVELS, validateLevel } = vm.runInContext('({ Game, LEVELS, validateLevel })', sim);
+const { Game, LEVELS, validateLevel, levelUnlocked } = vm.runInContext('({ Game, LEVELS, validateLevel, levelUnlocked })', sim);
+const LEVEL_IDS = new Set(LEVELS.map(l => l.id));
 
 // Atölye: oyuncuların bölümleri ve paketleri (veriler DATA_DIR altında, varsayılan: data/)
 const atolye = createAtolye({
@@ -131,9 +132,17 @@ class Room {
     this.custom = null;      // kurucunun editörde yaptığı bölüm (level -1)
     this.tick = 0;
     this.fxT = -1;
+    this.cleared = new Set();   // bu odada geçilen bölümler
   }
 
   get host() { return this.members[0]; }
+
+  // Odada açık bölümler: herkesin geçtiklerinin ve odada geçilenlerin birleşimi
+  get done() {
+    const all = new Set(this.cleared);
+    for (const m of this.members) for (const id of m.done) all.add(id);
+    return all;
+  }
 
   send(m, msg) { if (m.ws.readyState === 1) m.ws.send(JSON.stringify(msg)); }
   broadcast(msg) { const s = JSON.stringify(msg); for (const m of this.members) if (m.ws.readyState === 1) m.ws.send(s); }
@@ -142,7 +151,7 @@ class Room {
     for (const m of this.members) {
       this.send(m, {
         t: 'room', code: this.code, state: this.state, level: this.level,
-        host: this.host.id, you: m.id,
+        host: this.host.id, you: m.id, done: [...this.done],
         custom: this.custom ? { name: this.custom.name, magnet: this.custom.magnet, index: this.queueIndex || 0, total: (this.queue || []).length || 1, packName: this.packName } : null,
         members: this.members.map(x => ({ id: x.id, name: x.name, playing: this.inGame.includes(x) })),
       });
@@ -181,6 +190,7 @@ class Room {
     if (this.tick % 2 === 0 || g.done) this.broadcast(this.snapshot());
     if (g.done) {
       this.state = 'complete';
+      if (this.level >= 0) this.cleared.add(LEVELS[this.level].id);
       this.broadcast({ t: 'complete', level: this.level, time: g.doneT });
     }
   }
@@ -237,7 +247,10 @@ class Room {
         break;
       }
       case 'start':
-        if (m === this.host && this.state === 'lobby') this.start(msg.custom ? -1 : msg.level | 0);
+        if (m !== this.host || this.state !== 'lobby') break;
+        if (msg.custom) this.start(-1);
+        else if (levelUnlocked(msg.level | 0, this.done)) this.start(msg.level | 0);
+        else this.send(m, { t: 'error', msg: 'Bu bölüm henüz kilitli.' });
         break;
       case 'custom': {
         // Kurucunun getirdiği bölüm ya da paket (sıralı kuyruk, en fazla 30 bölüm).
@@ -288,7 +301,7 @@ function cleanName(s) {
 }
 
 wss.on('connection', ws => {
-  const member = { id: nextId++, name: 'İsimsiz', ws, input: {} };
+  const member = { id: nextId++, name: 'İsimsiz', ws, input: {}, done: new Set() };
   let room = null;
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
@@ -299,6 +312,8 @@ wss.on('connection', ws => {
     if (!msg || typeof msg.t !== 'string') return;
 
     if (!room) {
+      // Oyuncunun geçtiği bölümler (kilitler için); yalnızca gerçek bölüm kimlikleri alınır
+      if (Array.isArray(msg.done)) member.done = new Set(msg.done.slice(0, 200).map(String).filter(id => LEVEL_IDS.has(id)));
       if (msg.t === 'create') {
         member.name = cleanName(msg.name);
         room = new Room(newCode());

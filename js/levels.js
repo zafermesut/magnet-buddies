@@ -298,6 +298,20 @@ const LEVELS = [
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
 
+// Alan 1 · Hurdalık haritasının kısımları (sırası LEVELS ile aynı)
+const PARTS = [
+  { name: 'Uyanış', ids: ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu'] },
+  { name: 'Hurda yığınları', ids: ['salter', 'merdiven', 'asansor', 'zipzip', 'hepsi-birden'] },
+  { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'miknatis-ustasi'] },
+];
+const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
+
+// Kilit: ilk bölüm, önceki bölümü geçilmiş ya da kendisi daha önce geçilmiş bölüm açıktır.
+// done: geçilen bölüm kimlikleri (Set). Online odada odadakilerin hepsinin birleşimi kullanılır.
+function levelUnlocked(i, done) {
+  return i === 0 || done.has(LEVELS[i].id) || (i > 0 && done.has(LEVELS[i - 1].id));
+}
+
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
 const LEVEL_CHARS = '#.SEKD123abcH456-xyz^';

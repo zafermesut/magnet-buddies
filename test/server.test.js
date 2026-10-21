@@ -112,6 +112,23 @@ function client(name) {
     const st2 = await a.wait(m => m.t === 'start' && m.level === 1);
     ok(!!st2, 'herhangi bir oyuncu sonraki bölüme geçirebilir');
 
+    console.log('Kilitler');
+    a.msgs.length = 0;
+    a.send({ t: 'lobby' });
+    const lobby = await a.wait(m => m.t === 'room' && m.state === 'lobby');
+    ok(lobby.done.includes('merhaba'), 'odada geçilen bölüm odanın listesine eklenir');
+    a.msgs.length = 0;
+    a.send({ t: 'start', level: 9 });
+    ok(!!(await a.wait(m => m.t === 'error' && /kilitli/.test(m.msg))), 'kilitli bölüm başlatılamaz');
+    const c = client('Cem'); await c.open;
+    c.send({ t: 'join', name: 'Cem', code: roomA.code, done: ['zipzip', 'uydurma'] });
+    const withC = await a.wait(m => m.t === 'room' && m.members.length === 3);
+    ok(withC.done.includes('zipzip') && !withC.done.includes('uydurma'), 'katılanın geçtiği bölümler odaya eklenir (yalnızca gerçek bölümler)');
+    a.send({ t: 'start', level: 9 });
+    ok(!!(await a.wait(m => m.t === 'start' && m.level === 9)), 'odadan biri açtıysa bölüm herkes için açık');
+    c.ws.close();
+    await sleep(150);
+
     console.log('Kendi bölümün online');
     a.send({ t: 'lobby' });
     await a.wait(m => m.t === 'room' && m.state === 'lobby');

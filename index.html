@@ -54,7 +54,7 @@
     <div id="levelInfo" class="panel"><b id="levelName"></b><span id="levelHint"></span></div>
     <div id="timer" class="panel">0:00</div>
     <div id="controls"></div>
-    <div id="keysHelp">R yeniden başlat · Esc bölümler</div>
+    <div id="keysHelp">R yeniden başlat · Esc harita</div>
   </div>
 
   <!-- Ana menü: solda oyun, sağda profil kartı -->
@@ -161,6 +161,7 @@
       <p class="small">Linki arkadaşlarına gönder. En fazla 4 kişi.</p>
       <div id="roomMembers"></div>
       <p id="roomNote" class="note"></p>
+      <div id="roomMap" class="map compact"></div>
       <div id="roomLevels"></div>
       <p class="small">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
       <button id="roomLeave" class="link"><i data-ic="back"></i>Odadan çık</button>
@@ -173,18 +174,22 @@
       <h2>Aynı klavyede</h2>
       <div id="slots"></div>
       <p id="lobbyNote" class="note"></p>
-      <button id="startBtn" class="primary" disabled>BÖLÜMLERİ SEÇ</button>
+      <button id="startBtn" class="primary" disabled>HARİTAYA GEÇ</button>
       <p class="small">Katılmak için kendi zıplama tuşuna bas. Ayrılmak için eylem tuşuna bas.<br>Gamepad takılıysa A tuşuyla katılabilirsin.</p>
       <button id="lobbyBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
   </div>
 
-  <!-- Bölüm seçimi -->
+  <!-- Hurdalık haritası (bölüm seçimi) -->
   <div id="select" class="overlay hidden">
-    <div class="card wide">
-      <h2>Bölüm seç</h2>
-      <div id="levelGrid"></div>
-      <button id="backBtn"><i data-ic="back"></i>Oyuncular</button>
+    <div class="card mapCard">
+      <div class="mapHead">
+        <div><small>Alan 1</small><h2>Hurdalık</h2></div>
+        <div class="mapProg"><span id="mapCount"></span><div class="bar"><i id="mapBar"></i></div></div>
+      </div>
+      <div id="levelGrid" class="map"></div>
+      <p id="mapNote" class="note"></p>
+      <button id="backBtn" class="link back"><i data-ic="back"></i>Oyuncular</button>
     </div>
   </div>
 
@@ -195,7 +200,7 @@
       <p id="completeInfo"></p>
       <button id="likeBtn" class="hidden"><i data-ic="heart"></i>Bu bölümü beğen</button>
       <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
-      <button id="toSelectBtn">Bölüm seçimi</button>
+      <button id="toSelectBtn">Harita</button>
       <p id="completeHint" class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
     </div>
   </div>

@@ -65,6 +65,18 @@ console.log('Kendi bölümün');
   ok(g.levelIndex === -1 && g.magnet && g.players.length === 2 && g.exit, 'kendi bölüm nesnesiyle oyun kurulur');
 }
 
+console.log('Harita ve kilitler');
+{
+  const flat = PARTS.flatMap(p => p.ids);
+  ok(flat.length === LEVELS.length && flat.every((id, i) => LEVELS[i].id === id), 'her bölüm sırasıyla tek bir kısımda');
+  ok(new Set(LEVELS.map(l => l.id)).size === LEVELS.length, 'bölüm kimlikleri benzersiz');
+  const none = new Set();
+  ok(levelUnlocked(0, none) && !levelUnlocked(1, none), 'başta yalnızca ilk bölüm açık');
+  const some = new Set(['merhaba', 'anahtar']);
+  ok(levelUnlocked(2, some) && !levelUnlocked(3, some), 'geçilen bölümün ardındaki açılır, ötesi kilitli');
+  ok(levelUnlocked(L('firlatma'), new Set(['firlatma'])), 'daha önce geçilen bölüm sıra atlanmış olsa da açık kalır');
+}
+
 console.log('Fizik');
 {
   const g = new Game(L('merhaba'), 1); const p = g.players[0];

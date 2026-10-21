@@ -70,14 +70,61 @@ async function syncProgress() {
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function levelButton(i, disabled, onClick) {
-  const l = LEVELS[i], best = bestOf(i);
-  const b = document.createElement('button');
-  b.className = 'lvl';
-  b.disabled = !!disabled;
-  b.innerHTML = `<span class="num">${i + 1}</span><span>${l.magnet ? icon('magnet', 'mag') : ''}${esc(l.name)}</span><span class="best">${best ? icon('check') + fmt(best) : ''}</span>`;
-  b.addEventListener('click', onClick);
-  return b;
+// ---------- Hurdalık haritası ----------
+// Bölümler kıvrılan bir patika üzerinde duraklar: her kısım bir satır, satır sonunda yol aşağı kıvrılıp
+// ters yöne devam eder. Geçilen duraklar turuncu, sıradaki yeşil ve nabız gibi atar, kilitliler sönük.
+const MAP_COLS = 5;
+function renderMap(el, { done, pick, canPick = true, compact = false, note = null }) {
+  const rowH = compact ? 108 : 142, head = 26, n = LEVELS.length + 1;   // sonda "devamı yakında"
+  const rows = Math.ceil(n / MAP_COLS);
+  const pts = [];
+  for (let k = 0; k < n; k++) {
+    const row = Math.floor(k / MAP_COLS), col = k % MAP_COLS, x = row % 2 ? MAP_COLS - 1 - col : col;
+    pts.push({ x: (x + 0.5) / MAP_COLS * 1000, y: row * rowH + head + (compact ? 28 : 36) + (x % 2 ? -6 : 6), row });
+  }
+  // Aynı satırda yumuşak dalga, satır değişince dışarı doğru U dönüşü
+  const seg = (a, b) => {
+    if (a.row === b.row) { const mx = (a.x + b.x) / 2; return `C ${mx} ${a.y} ${mx} ${b.y} ${b.x} ${b.y}`; }
+    const out = a.x > 500 ? 95 : -95;
+    return `C ${a.x + out} ${a.y} ${b.x + out} ${b.y} ${b.x} ${b.y}`;
+  };
+  const pathTo = k => pts.slice(0, k + 1).map((p, j) => (j ? seg(pts[j - 1], p) : `M ${p.x} ${p.y}`)).join(' ');
+  const open = LEVELS.map((l, i) => levelUnlocked(i, done));
+  // Aydınlık yol: yalnızca iki ucu da açık duraklar arasında
+  const lit = pts.slice(1, LEVELS.length).map((p, j) => (open[j] && open[j + 1] ? `M ${pts[j].x} ${pts[j].y} ${seg(pts[j], p)}` : '')).join(' ');
+  const current = LEVELS.findIndex((l, i) => open[i] && !done.has(l.id));
+
+  const parts = PARTS.map((p, r) => {
+    const first = levelIndexById(p.ids[0]), cleared = p.ids.filter(id => done.has(id)).length;
+    return `<div class="partHead" style="top:${Math.floor(first / MAP_COLS) * rowH}px"><b>${r + 1}. Kısım</b>${esc(p.name)}<span>${cleared}/${p.ids.length}</span></div>`;
+  }).join('');
+  const stops = LEVELS.map((l, i) => {
+    const p = pts[i], best = bestOf(i);
+    const cls = !open[i] ? 'locked' : done.has(l.id) ? 'done' : i === current ? 'current' : 'open';
+    return `<button class="stop ${cls}" data-i="${i}" style="left:${p.x / 10}%;top:${p.y}px" title="${i + 1}. ${esc(l.name)}">
+      <span class="dot">${open[i] ? i + 1 : icon('lock')}${l.magnet ? `<span class="badge">${icon('magnet')}</span>` : ''}</span>
+      <span class="lbl">${esc(l.name)}</span>${best && !compact ? `<span class="time">${icon('check')}${fmt(best)}</span>` : ''}
+    </button>`;
+  }).join('');
+  const last = pts[n - 1];
+  const soon = `<div class="stop soon" style="left:${last.x / 10}%;top:${last.y}px"><span class="dot">${icon('pack')}</span><span class="lbl">Devamı yakında</span></div>`;
+
+  el.style.height = rows * rowH + 'px';
+  el.classList.toggle('readonly', !canPick);
+  el.innerHTML = `<svg viewBox="0 0 1000 ${rows * rowH}" preserveAspectRatio="none" aria-hidden="true">
+      <path class="trail" d="${pathTo(n - 1)}"/>${lit ? `<path class="trailLit" d="${lit}"/>` : ''}
+    </svg>${parts}${stops}${soon}`;
+  for (const b of el.querySelectorAll('button.stop')) {
+    b.addEventListener('click', () => {
+      const i = +b.dataset.i;
+      if (!open[i]) {
+        b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
+        if (note) note.textContent = `Önce ${i}. bölüm "${LEVELS[i - 1].name}" geçilmeli.`;
+        return;
+      }
+      if (canPick) pick(i);
+    });
+  }
 }
 
 // ---------- Ekran geçişleri ----------
@@ -189,9 +236,12 @@ function toSelect() {
 }
 
 function renderLevelGrid() {
-  const grid = $('levelGrid');
-  grid.innerHTML = '';
-  LEVELS.forEach((l, i) => grid.appendChild(levelButton(i, false, () => startLevel(i))));
+  const done = new Set(Object.keys(progress));
+  const cleared = LEVELS.filter(l => done.has(l.id)).length;
+  $('mapCount').innerHTML = `<b>${cleared}</b> / ${LEVELS.length} bölüm`;
+  $('mapBar').style.width = `${(cleared / LEVELS.length) * 100}%`;
+  $('mapNote').textContent = '';
+  renderMap($('levelGrid'), { done, pick: startLevel, note: $('mapNote') });
 }
 
 function startLevel(i) {
@@ -277,8 +327,14 @@ function showComplete(i, secs) {
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
     (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '');
   if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
-  $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'BÖLÜM SEÇİMİ') : 'SONRAKİ BÖLÜM';
-  $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Bölüm seçimi';
+  // Kısmın son bölümü ilk kez geçildi: küçük kutlama ve haritada sıradaki kısım açılır
+  const part = custom ? -1 : partOf(i);
+  if (part >= 0 && !prevBest && PARTS[part].ids[PARTS[part].ids.length - 1] === LEVELS[i].id) {
+    $('completeTitle').textContent = `${PARTS[part].name} tamam!`;
+    $('completeInfo').innerHTML += `<br><span class="partDone">${icon('star')}${part + 1}. Kısım bitti${PARTS[part + 1] ? ` · sırada <b>${esc(PARTS[part + 1].name)}</b>` : ''}</span>`;
+  }
+  $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'HARİTA') : 'SONRAKİ BÖLÜM';
+  $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Harita';
   // Atölye'den oynanan bölüm: oynanma kaydı, beğen düğmesi, pakette sıradaki bölüm
   $('likeBtn').classList.add('hidden');
   if (mode === 'local' && !editorTest && Atolye.play) {
@@ -357,7 +413,7 @@ async function goOnline(msg) {
     return;
   }
   $('onlineError').textContent = '';
-  Net.send(Object.assign({ name }, msg));
+  Net.send(Object.assign({ name, done: Object.keys(progress) }, msg));
 }
 
 // Kurucu oyunu localhost'tan açtıysa link arkadaşlarda çalışmaz; yerel ağ adresiyle değiştir
@@ -396,7 +452,8 @@ function renderRoom() {
   const grid = $('roomLevels');
   grid.innerHTML = '';
   const locked = !isHost || !enough || room.state !== 'lobby';
-  LEVELS.forEach((l, i) => grid.appendChild(levelButton(i, locked, () => Net.send({ t: 'start', level: i }))));
+  // Odadakilerden biri bir bölümü açtıysa herkes için açık
+  renderMap($('roomMap'), { done: new Set(room.done || []), pick: i => Net.send({ t: 'start', level: i }), canPick: !locked, compact: true, note: $('roomNote') });
   if (room.custom) {
     const b = document.createElement('button');
     b.className = 'lvl custom';
