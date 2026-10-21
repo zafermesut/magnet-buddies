@@ -10,4 +10,4 @@ açarsınız. İleri bölümlerde herkes bir mıknatısa dönüşür: aynı kutu
 fırlatır ya da boşluğun karşısına itersin, zıt kutuptakini yukarı ya da kendine çekersin.
 Ölüm yok, acele yok; bölüm herkes kapıya girince biter.
 
-[![Hemen oyna](https://img.shields.io/badge/%E2%96%B6%20Hemen%20oyna-magnet--buddies.onrender.com-69db7c?style=for-the-badge)](https://magnet-buddies.onrender.com)
+[![Hemen oyna](https://img.shields.io/badge/%E2%96%B6%20Hemen%20oyna-magnet.bilen.dev-69db7c?style=for-the-badge)](https://magnet.bilen.dev)
