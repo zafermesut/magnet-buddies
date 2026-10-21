@@ -71,13 +71,17 @@ function applySnapshot(g, s) {
   s.g.forEach((o, i) => { g.gates[i].open = !!o; });
   s.b.forEach((o, i) => { g.buttons[i].pressed = !!o; });
   s.x.forEach((a, i) => { const b = g.boxes[i]; setTarget(b, a[0], a[1]); b.pushers = a[2]; });
+  (s.sw || []).forEach((o, i) => { g.switches[i + 1] = !!o; });
+  (s.lv || []).forEach((t, i) => { if (g.levers[i]) g.levers[i].flipT = t; });
+  (s.l || []).forEach((y, i) => { if (g.lifts[i]) setTarget(g.lifts[i], g.lifts[i].x, y); });
+  (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
   for (const e of s.fx) g.effects.push(e);
   if (g.effects.length > 60) g.effects = g.effects.filter(e => g.t - e.t < 1.2);
 }
 
 function smoothNet(g, dt) {
   const k = Math.min(1, dt * 20);
-  for (const o of [...g.players, ...g.keys, ...g.boxes]) {
+  for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts]) {
     if (o.tx === undefined) continue;
     o.x += (o.tx - o.x) * k;
     o.y += (o.ty - o.y) * k;

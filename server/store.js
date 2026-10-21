@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const EMPTY = () => ({ version: 1, users: {}, sessions: {}, levels: {}, packs: {}, likes: {}, reports: {} });
+const EMPTY = () => ({ version: 1, users: {}, sessions: {}, levels: {}, packs: {}, likes: {}, reports: {}, progress: {} });
 
 class Store {
   constructor(dir) {

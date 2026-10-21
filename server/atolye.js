@@ -27,7 +27,7 @@ function isClean(text) {
 
 const cleanText = (s, max) => String(s || '').replace(/[\u0000-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-function createAtolye({ dataDir, validateLevel, publicUrl, google, devLogin }) {
+function createAtolye({ dataDir, validateLevel, levelIds = [], publicUrl, google, devLogin }) {
   const store = new Store(dataDir);
   const D = store.data;
   const secure = publicUrl.startsWith('https://');
@@ -244,6 +244,24 @@ function createAtolye({ dataDir, validateLevel, publicUrl, google, devLogin }) {
       user.name = name;
       store.save();
       return send(res, 200, { user: { id: user.id, name: user.name, avatar: user.avatar } });
+    }
+
+    // ----- İlerleme: oyunun bölümlerindeki en iyi süreler (hesaba bağlı) -----
+    // POST gönderilen süreleri kayıtlıyla birleştirir (her bölüm için en iyisi kalır) ve sonucu döner.
+    // Misafirken tarayıcıda biriken ilerleme, giriş yapınca bu yolla hesaba eklenir.
+    if (p === '/api/progress' && (m === 'GET' || m === 'POST')) {
+      if (!user) return fail(res, 401, 'Önce giriş yap.');
+      const mine = D.progress[user.id] = D.progress[user.id] || {};
+      if (m === 'POST') {
+        const body = await readJson(req);
+        const sent = body && typeof body.levels === 'object' && body.levels && !Array.isArray(body.levels) ? body.levels : {};
+        for (const [id, secs] of Object.entries(sent).slice(0, 100)) {
+          if (!levelIds.includes(id) || typeof secs !== 'number' || !(secs >= 1 && secs < 36000)) continue;
+          if (!mine[id] || secs < mine[id]) mine[id] = Math.round(secs * 100) / 100;
+        }
+        store.save();
+      }
+      return send(res, 200, { levels: mine });
     }
 
     // ----- Bölümler -----

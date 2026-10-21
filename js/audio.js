@@ -156,6 +156,15 @@ const Sound = {
       case 'click':
         this.tone(d, { type: 'square', f: 880, f2: 660, dur: 0.06, vol: 0.08, filter: 2500 });
         break;
+      case 'lever':
+        // Metalik "klonk": açılırken yükselen, kapanırken alçalan
+        this.tone(d, { type: 'square', f: e.on ? 300 : 420, f2: e.on ? 520 : 240, dur: 0.09, vol: 0.09, filter: 1800 });
+        this.noise(d, { dur: 0.05, vol: 0.08, type: 'bandpass', freq: 2600, q: 3 });
+        break;
+      case 'spring':
+        this.tone(d, { type: 'triangle', f: 180, f2: 900, dur: 0.28, vol: 0.2 });
+        this.tone(d, { type: 'sine', f: 360, f2: 1300, t: 0.02, dur: 0.22, vol: 0.08 });
+        break;
       case 'swap':
         this.tone(d, { f: 420, f2: 840, dur: 0.16, vol: 0.18 });
         this.tone(d, { f: 630, f2: 1260, t: 0.03, dur: 0.14, vol: 0.08 });

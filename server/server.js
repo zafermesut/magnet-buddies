@@ -39,6 +39,7 @@ const { Game, LEVELS, validateLevel } = vm.runInContext('({ Game, LEVELS, valida
 const atolye = createAtolye({
   dataDir: process.env.DATA_DIR || path.join(ROOT, 'data'),
   validateLevel,
+  levelIds: LEVELS.map(l => l.id),
   publicUrl: (process.env.PUBLIC_URL || `http://localhost:${PORT}`).replace(/\/$/, ''),
   google: { clientId: process.env.GOOGLE_CLIENT_ID, clientSecret: process.env.GOOGLE_CLIENT_SECRET },
   devLogin: process.env.DEV_LOGIN === '1',
@@ -186,7 +187,7 @@ class Room {
 
   snapshot() {
     const g = this.game;
-    const fx = g.effects.filter(e => e.t > this.fxT).map(e => ({ type: e.type, x: r1(e.x), y: r1(e.y), t: r3(e.t), color: e.color, power: e.power }));
+    const fx = g.effects.filter(e => e.t > this.fxT).map(e => ({ type: e.type, x: r1(e.x), y: r1(e.y), t: r3(e.t), color: e.color, power: e.power, on: e.on }));
     this.fxT = g.t;
     const keyIndex = new Map(g.keys.map((k, i) => [k, i]));
     const playerIndex = new Map(g.players.map((p, i) => [p, i]));
@@ -203,6 +204,10 @@ class Room {
       g: g.gates.map(x => (x.open ? 1 : 0)),
       b: g.buttons.map(x => (x.pressed ? 1 : 0)),
       x: g.boxes.map(b => [r1(b.x), r1(b.y), b.pushers]),
+      sw: [1, 2, 3].map(c => (g.switches[c] ? 1 : 0)),
+      lv: g.levers.map(l => r3(l.flipT)),
+      l: g.lifts.map(l => r1(l.y)),
+      sp: g.springs.map(s => r3(s.t)),
       fx,
     };
   }

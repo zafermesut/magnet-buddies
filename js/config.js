@@ -24,6 +24,11 @@ const PHYS = {
   keySize: 22,
   maxSpeed: 900,
 
+  // Hurdalık öğeleri
+  liftSpeed: 120,      // asansör (px/sn)
+  springV: 860,        // yayın fırlatma hızı: ~4 karo; zıplama tuşu basılıysa springBoost katı (~5 karo)
+  springBoost: 1.12,
+
   // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
   // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.
   magnetRange: 280,

@@ -53,17 +53,22 @@ class Game {
     this.grid = [];
     this.blockers = [];
     this.keys = []; this.doors = []; this.buttons = []; this.gates = []; this.boxes = [];
+    this.levers = []; this.lifts = []; this.springs = [];
+    this.oneway = [];
+    this.switches = { 1: false, 2: false, 3: false };   // şalterlerin açık tuttuğu kanallar
     this.spawn = null; this.exit = null;
     const doorCells = [], gateCells = {};
 
     for (let r = 0; r < rows; r++) {
       this.grid.push([]);
       this.blockers.push([]);
+      this.oneway.push([]);
       for (let c = 0; c < cols; c++) {
         const ch = map[r][c];
         const x = c * T, y = r * T;
         this.grid[r].push(ch === '#');
         this.blockers[r].push(null);
+        this.oneway[r].push(ch === '-');
         if (ch === 'S' && !this.spawn) this.spawn = { x, y };
         else if (ch === 'E') {
           // Kapı karodan geniştir; yanında duvar varsa duvara taşmasın diye o tarafa yaslanır
@@ -79,6 +84,17 @@ class Game {
         else if ('123'.includes(ch)) this.buttons.push({ channel: +ch, x: x + 3, y: y + T - 8, w: T - 6, h: 8, pressed: false });
         else if ('abc'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
         else if (ch === 'H') this.boxes.push(makeBody('box', x, y, 2 * T, 2 * T, { push: { 1: 0, '-1': 0 }, pushers: 0 }));
+        else if ('456'.includes(ch)) this.levers.push({ channel: +ch - 3, x, y, w: T, h: T, flipT: -9 });
+        else if (ch === '^') this.springs.push({ x: x + 4, y: y + T - 12, w: T - 8, h: 12, t: -9 });
+        else if ('xyz'.includes(ch) && map[r][c - 1] !== ch) {
+          // Asansör: yan yana aynı harfler tek platformdur. Üstündeki ilk duvarın bir karo altına kadar çıkar.
+          let w = 1;
+          while (map[r][c + w] === ch) w++;
+          let ceil = r - 1;
+          while (ceil >= 0 && ![...map[ceil].slice(c, c + w)].includes('#')) ceil--;
+          const topY = Math.min(y, (ceil + 2) * T);
+          this.lifts.push(makeBody('lift', x, y, w * T, T, { channel: 'xyz'.indexOf(ch) + 1, topY, supported: true, onGround: true }));
+        }
       }
     }
 
@@ -123,6 +139,11 @@ class Game {
     return false;
   }
 
+  // Bir kanal açık mı: düğmesine basılıyor ya da şalteri açık
+  channelOn(ch) {
+    return this.switches[ch] || this.buttons.some(b => b.channel === ch && b.pressed);
+  }
+
   fx(type, x, y, extra) {
     this.effects.push(Object.assign({ type, x, y, t: this.t }, extra));
   }
@@ -156,6 +177,8 @@ class Game {
     const r = dy > 0 ? Math.floor((b.y + b.h - 0.001) / T) : Math.floor(b.y / T);
     for (let c = c0; c <= c1; c++) {
       if (this.blocked(c, r)) { b.y = dy > 0 ? r * T - b.h : (r + 1) * T; hit = 'tile'; break; }
+      // Tek yönlü platform: yalnızca yukarıdan gelen üstüne basar, alttan geçilir
+      if (dy > 0 && !hit && this.oneway[r] && this.oneway[r][c] && b.y + b.h - dy <= r * T + 0.01) { b.y = r * T - b.h; hit = 'tile'; break; }
     }
     for (const o of this.solids) {
       if (o === b || !overlap(b, o)) continue;
@@ -194,7 +217,7 @@ class Game {
     if (this.done) return;
     this.t += dt;
     const ph = PHYS;
-    this.solids = this.players.filter(p => !p.inExit).concat(this.boxes);
+    this.solids = this.players.filter(p => !p.inExit).concat(this.boxes, this.lifts);
 
     // 1) Oyuncu girişleri
     this.players.forEach((p, i) => {
@@ -216,10 +239,10 @@ class Game {
         this.fx('swap', p.x + p.w / 2, p.y + p.h / 2, { color: POLE_COLORS[p.pol] });
       }
       // Eylem: kısa dokunuş anahtarı bırakır, basılı tutmak mıknatısı açar
-      if (actEdge) p.actT = 0;
+      if (actEdge) { p.actT = 0; p.usedLever = this.flipLever(p); }
       if (inp.action) p.actT += dt;
-      p.magnetOn = this.magnet && inp.action;
-      if (actRelease && p.actT < 0.2) this.dropKey(p);
+      p.magnetOn = this.magnet && inp.action && !p.usedLever;
+      if (actRelease && p.actT < 0.2 && !p.usedLever) this.dropKey(p);
 
       const want = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
       p.want = want;
@@ -254,8 +277,10 @@ class Game {
       b.push[1] = 0; b.push[-1] = 0;
     }
 
+    this.updateLifts(dt);
+
     // 3) Yerçekimi ve hareket: alttakiler önce hareket eder, üstündekiler onunla taşınır
-    const movers = this.solids.slice().sort((a, b) => (b.y + b.h) - (a.y + a.h));
+    const movers = this.solids.filter(o => o.kind !== 'lift').sort((a, b) => (b.y + b.h) - (a.y + a.h));
     for (const b of movers) { b.dx = 0; b.blockedBy = null; b.boxHit = null; }
     for (const b of movers) {
       b.vy = Math.min(b.vy + ph.gravity * dt, ph.maxFall);
@@ -287,6 +312,7 @@ class Game {
       if (q && q.boxHit) q.boxHit.push[p.want]++;
     }
 
+    this.updateSprings();
     this.updateKeys(dt);
     this.updateDoors(dt);
     this.updateButtons();
@@ -349,6 +375,62 @@ class Game {
     }
   }
 
+  // Şalter: yanında eylem tuşuna basınca kanalını açar ya da kapatır (aynı kanaldaki şalterler birlikte döner)
+  flipLever(p) {
+    const lv = this.levers.find(l => overlap(grow(p, 6), l));
+    if (!lv) return false;
+    this.switches[lv.channel] = !this.switches[lv.channel];
+    for (const l of this.levers) if (l.channel === lv.channel) l.flipT = this.t;
+    this.fx('lever', lv.x + T / 2, lv.y + T * 0.6, { color: CHANNEL_COLORS[lv.channel], on: this.switches[lv.channel] });
+    return true;
+  }
+
+  // Asansör: kanalı açıkken yukarı, kapalıyken aşağı gider; üstündekileri taşır, kimseyi ezmez
+  updateLifts(dt) {
+    const free = this.keys.filter(k => !k.used && !k.holder);
+    const bodies = this.solids.filter(o => o.kind !== 'lift').concat(free);
+    for (const L of this.lifts) {
+      const target = this.channelOn(L.channel) ? L.topY : L.oy;
+      const dy = Math.max(-PHYS.liftSpeed * dt, Math.min(PHYS.liftSpeed * dt, target - L.y));
+      if (Math.abs(dy) < 0.01) { L.y = target; continue; }
+      // Üstündekiler: asansöre basanlar ve onların üstündekiler
+      const riders = new Set();
+      let grew = true;
+      while (grew) {
+        grew = false;
+        for (const b of bodies) {
+          if (riders.has(b)) continue;
+          const base = b.ground === L || riders.has(b.ground) ||
+            (dy < 0 && overlap(b, { x: L.x, y: L.y + dy, w: L.w, h: L.h }));   // yükselirken çarptığı da kalkar
+          if (base) { riders.add(b); grew = true; }
+        }
+      }
+      const moved = [...riders];
+      const ok = moved.every(b => !this.rectBlocked(b.x, b.y + dy, b.w, b.h)) &&
+        !this.rectBlocked(L.x, L.y + dy, L.w, L.h) &&
+        // Aşağı inerken altında biri varsa durur
+        !(dy > 0 && bodies.some(b => !riders.has(b) && overlap(b, { x: L.x, y: L.y + dy, w: L.w, h: L.h })));
+      if (!ok) continue;
+      L.y += dy;
+      for (const b of moved) b.y += dy;
+    }
+  }
+
+  // Yay: üstüne basanı yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
+  updateSprings() {
+    for (const s of this.springs) {
+      const pad = { x: s.x, y: s.y - 2, w: s.w, h: s.h + 2 };
+      for (const p of this.players) {
+        if (p.inExit || !p.onGround || p.vy < 0 || !overlap(p, pad)) continue;
+        p.vy = -PHYS.springV * (p.prevJump ? PHYS.springBoost : 1);
+        p.cut = true; p.coyote = 0; p.jumpBuf = 0;
+        p.squash = -0.3;
+        s.t = this.t;
+        this.fx('spring', s.x + s.w / 2, s.y);
+      }
+    }
+  }
+
   updateKeys(dt) {
     const ph = PHYS;
     for (const k of this.keys) {
@@ -366,6 +448,9 @@ class Game {
       k.onGround = false;
       this.moveX(k, k.vx * dt);
       this.moveY(k, k.vy * dt);
+      for (const s of this.springs) {
+        if (k.onGround && overlap(k, { x: s.x, y: s.y - 2, w: s.w, h: s.h + 2 })) { k.vy = -PHYS.springV * 0.9; s.t = this.t; }
+      }
       if (k.y > this.H + 150) { k.x = k.ox; k.y = k.oy; k.vx = k.vy = 0; this.fx('respawn', k.x + k.w / 2, k.y, { color: '#ffd43b' }); }
       for (const p of this.players) {
         if (p.inExit || this.keys.some(o => o.holder === p)) continue;
@@ -414,7 +499,7 @@ class Game {
       if (b.pressed && !was) this.fx('click', b.x + b.w / 2, b.y, { color: CHANNEL_COLORS[b.channel] });
     }
     for (const g of this.gates) {
-      const want = this.buttons.some(b => b.channel === g.channel && b.pressed);
+      const want = this.channelOn(g.channel);
       if (want) g.open = true;
       else if (g.open) {
         // İçinde biri varken kapanmaz

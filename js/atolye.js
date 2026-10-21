@@ -70,6 +70,7 @@ const Atolye = {
     const r = await this.api('GET', '/api/me');
     if (r.ok) { this.me = r.json.user; this.stats = r.json.stats; this.loginEnabled = r.json.loginEnabled; }
     this.renderAccount();
+    if (this.me) syncProgress();
   },
 
   // Google'a gidip geri dönünce kaldığın yere döner (editördeki taslak tarayıcıda saklı kalır)

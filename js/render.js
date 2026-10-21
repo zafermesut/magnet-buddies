@@ -84,6 +84,7 @@ class Renderer {
     this.drawDoors(ctx, game);
     this.drawGates(ctx, game, t);
     this.drawButtons(ctx, game);
+    this.drawScrap(ctx, game, t);
     this.drawExit(ctx, game, t);
     for (const b of game.boxes) this.drawBox(ctx, b, game);
     if (game.magnet) for (const p of game.players) if (p.magnetOn && !p.inExit) this.drawField(ctx, p, t);
@@ -175,6 +176,48 @@ class Renderer {
       }
       ctx.fillStyle = col;
       ctx.fillRect(b.x + 3, b.y + b.h - 3 - h, b.w - 6, h);
+    }
+  }
+
+  // Hurdalık öğeleri: tek yönlü platform, şalter, asansör, yay
+  drawScrap(ctx, g, t) {
+    ctx.fillStyle = '#c27a4a';
+    for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
+      if (g.oneway[r][c]) ctx.fillRect(c * T, r * T, T, 7);
+    }
+    for (const l of g.levers) {
+      const col = CHANNEL_COLORS[l.channel], on = g.switches[l.channel];
+      const bx = l.x + T / 2, by = l.y + T;
+      ctx.fillStyle = '#8c90c8';
+      ctx.fillRect(bx - 11, by - 6, 22, 6);
+      const a = on ? 0.6 : -0.6;
+      const tx = bx + Math.sin(a) * 20, ty = by - 6 - Math.cos(a) * 20;
+      ctx.strokeStyle = '#8c90c8'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(bx, by - 6); ctx.lineTo(tx, ty); ctx.stroke();
+      ctx.fillStyle = col;
+      ctx.beginPath(); ctx.arc(tx, ty, 5, 0, Math.PI * 2); ctx.fill();
+    }
+    for (const L of g.lifts) {
+      ctx.fillStyle = '#3a3c6e';
+      ctx.fillRect(L.x - 3, L.topY, 3, L.oy + L.h - L.topY);
+      ctx.fillRect(L.x + L.w, L.topY, 3, L.oy + L.h - L.topY);
+      ctx.fillStyle = '#55588f';
+      ctx.fillRect(L.x, L.y, L.w, L.h);
+      ctx.fillStyle = rgbaHex(CHANNEL_COLORS[L.channel], g.channelOn(L.channel) ? 1 : 0.5);
+      ctx.fillRect(L.x + 4, L.y + 4, L.w - 8, 4);
+    }
+    for (const sp of g.springs) {
+      const since = t - sp.t;
+      const k = since >= 0 && since < 0.6 ? Math.exp(-since * 7) * Math.cos(since * 26) : 0;
+      const h = Math.max(4, 10 * (1 + k * 0.9));
+      ctx.fillStyle = '#8c90c8';
+      ctx.fillRect(sp.x, sp.y + sp.h - 3, sp.w, 3);
+      ctx.strokeStyle = '#8c90c8'; ctx.lineWidth = 2;
+      ctx.beginPath();
+      for (let i = 0; i <= 4; i++) ctx.lineTo(sp.x + (i % 2 ? sp.w - 6 : 6), sp.y + sp.h - 3 - (h * i) / 4);
+      ctx.stroke();
+      ctx.fillStyle = '#ffa94d';
+      ctx.fillRect(sp.x - 1, sp.y + sp.h - 3 - h - 4, sp.w + 2, 4);
     }
   }
 

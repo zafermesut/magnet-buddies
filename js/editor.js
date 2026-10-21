@@ -3,20 +3,21 @@
 // Bölüm editörü: ızgaraya çiz, aynı klavyede dene, linkle paylaş ya da online odada oyna.
 // Bölüm hazır bölümlerle aynı biçimdedir ({ name, map, magnet }), Game ve sunucu onu aynen kullanır.
 
+// Renkli araçlar (düğme, şalter, kapak, asansör) seçili renge göre karakter koyar: chs[renk - 1]
 const EDITOR_TOOLS = [
-  { ch: '#', label: 'Duvar' },
-  { ch: '.', label: 'Sil' },
-  { ch: 'S', label: 'Başlangıç' },
-  { ch: 'E', label: 'Çıkış' },
-  { ch: 'K', label: 'Anahtar' },
-  { ch: 'D', label: 'Kilitli kapı' },
-  { ch: '1', label: 'Düğme', channel: 1 },
-  { ch: 'a', label: 'Kapak', channel: 1 },
-  { ch: '2', label: 'Düğme', channel: 2 },
-  { ch: 'b', label: 'Kapak', channel: 2 },
-  { ch: '3', label: 'Düğme', channel: 3 },
-  { ch: 'c', label: 'Kapak', channel: 3 },
-  { ch: 'H', label: 'Ağır kutu' },
+  { id: 'wall', ch: '#', label: 'Duvar', cls: 'twall' },
+  { id: 'erase', ch: '.', label: 'Sil', cls: 'terase' },
+  { id: 'start', ch: 'S', label: 'Başlangıç', cls: 'tS' },
+  { id: 'exit', ch: 'E', label: 'Çıkış', cls: 'tE' },
+  { id: 'key', ch: 'K', label: 'Anahtar', cls: 'tK', tip: 'Anahtarı kilitli kapıya götürünce kapı açılır.' },
+  { id: 'door', ch: 'D', label: 'Kilitli kapı', cls: 'tD' },
+  { id: 'button', chs: '123', label: 'Düğme', cls: 'tBtn', tip: 'Üstünde biri dururken aynı renkteki kapakları açar, asansörleri kaldırır.' },
+  { id: 'lever', chs: '456', label: 'Şalter', cls: 'tLever', tip: 'Eylem tuşuyla çevrilir; aynı renkteki kapaklar ve asansörler açık kalır.' },
+  { id: 'gate', chs: 'abc', label: 'Kapak', cls: 'tGate', tip: 'Aynı renkteki düğme ya da şalter açar.' },
+  { id: 'lift', chs: 'xyz', label: 'Asansör', cls: 'tLift', tip: 'Yan yana çiz: tek platform olur. Aynı renk açılınca yukarı çıkar, üstündeki ilk duvarın bir karo altında durur.' },
+  { id: 'oneway', ch: '-', label: 'Platform', cls: 'tOne', tip: 'İnce platform: alttan geçilir, üstüne basılır.' },
+  { id: 'spring', ch: '^', label: 'Yay', cls: 'tSpring', tip: 'Üstüne basanı ~4 karo fırlatır; zıplama basılıysa ~5 karo. Altında duvar olmalı.' },
+  { id: 'box', ch: 'H', label: 'Ağır kutu', cls: 'tH', tip: '2×2 karo. İki kişi birlikte iter.' },
 ];
 
 const EDITOR_KEY = 'editor-level-v1';
@@ -35,7 +36,8 @@ function blankLevel() {
 const Editor = {
   level: null,      // { name, magnet, map: string[] }
   grid: null,       // düzenlenen karolar: string[][]
-  tool: '#',
+  toolId: 'wall',
+  channel: 1,
   game: null,       // önizleme için oyuncusuz Game
   hover: null,
   painting: 0,      // 0: yok, 1: çiz, 2: sil
@@ -86,6 +88,10 @@ const Editor = {
     if (save) { this.dirty = true; this.saveDraft(); }
     this.renderPanel();
   },
+
+  // Seçili araç ve renge göre konacak karakter
+  get toolDef() { return EDITOR_TOOLS.find(t => t.id === this.toolId); },
+  get tool() { const t = this.toolDef; return t.chs ? t.chs[this.channel - 1] : t.ch; },
 
   get rows() { return this.grid.length; },
   get cols() { return this.grid[0].length; },
@@ -145,17 +151,25 @@ const Editor = {
     for (const t of EDITOR_TOOLS) {
       const b = document.createElement('button');
       b.className = 'tool';
-      b.dataset.ch = t.ch;
-      const swatch = t.channel ? `<i style="background:${CHANNEL_COLORS[t.channel]}"></i>` : `<i class="t${t.ch === '.' ? 'erase' : t.ch === '#' ? 'wall' : t.ch}"></i>`;
-      b.innerHTML = swatch + t.label;
-      b.addEventListener('click', () => { this.tool = t.ch; this.renderPanel(); });
+      b.dataset.id = t.id;
+      b.innerHTML = `<i class="${t.cls}"></i>${t.label}`;
+      b.addEventListener('click', () => { this.toolId = t.id; this.renderPanel(); });
       tools.appendChild(b);
     }
+    const colors = $('edColors');
+    colors.innerHTML = '<span>Renk</span>' + [1, 2, 3].map(c =>
+      `<button data-ch="${c}" title="${c}. renk" style="--c:${CHANNEL_COLORS[c]}"></button>`).join('');
+    for (const b of colors.querySelectorAll('button')) b.addEventListener('click', () => { this.channel = +b.dataset.ch; this.renderPanel(); });
   },
 
   renderPanel() {
     if (!this.level) return;
-    for (const b of document.querySelectorAll('#edTools .tool')) b.classList.toggle('on', b.dataset.ch === this.tool);
+    const cur = this.toolDef;
+    for (const b of document.querySelectorAll('#edTools .tool')) b.classList.toggle('on', b.dataset.id === this.toolId);
+    $('edTools').style.setProperty('--ch', CHANNEL_COLORS[this.channel]);
+    for (const b of document.querySelectorAll('#edColors button')) b.classList.toggle('on', +b.dataset.ch === this.channel);
+    $('edColors').classList.toggle('dim', !cur.chs);
+    $('edTip').textContent = cur.tip || '';
     if (document.activeElement !== $('edName')) $('edName').value = this.level.name;
     $('edMagnet').checked = this.level.magnet;
     $('edSize').textContent = `${this.cols} × ${this.rows}`;

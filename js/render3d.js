@@ -147,6 +147,14 @@ class Renderer3D {
       halo: new THREE.TorusGeometry(1, 0.05, 10, 48),
       spark: new THREE.IcosahedronGeometry(1, 0),
       confetti: new THREE.PlaneGeometry(1, 0.55),
+      plank: new RoundedBoxGeometry(1.0, 0.18, 0.86, 2, 0.05),
+      leverBase: new RoundedBoxGeometry(0.72, 0.2, 0.5, 2, 0.06),
+      leverStick: new THREE.CylinderGeometry(0.05, 0.05, 0.72, 10),
+      knob: new THREE.SphereGeometry(0.15, 18, 14),
+      springBase: new RoundedBoxGeometry(0.82, 0.08, 0.6, 2, 0.03),
+      coil: new THREE.TorusGeometry(0.26, 0.035, 8, 24),
+      springPad: new RoundedBoxGeometry(0.8, 0.1, 0.62, 2, 0.04),
+      rail: new THREE.BoxGeometry(0.06, 1, 0.06),
     };
     this.mat = {
       block: std(PALETTE.block, { roughness: 0.82 }),
@@ -162,6 +170,11 @@ class Renderer3D {
       key: std(PALETTE.key, { roughness: 0.25, metalness: 0.85, emissive: '#ff9d00', emissiveIntensity: 0.35 }),
       eyeWhite: std('#ffffff', { roughness: 0.3 }),
       pupil: std('#15142c', { roughness: 0.2 }),
+      plank: std('#c27a4a', { roughness: 0.55, metalness: 0.35, emissive: '#5a2d14', emissiveIntensity: 0.25 }),
+      metal: std('#8c90c8', { roughness: 0.35, metalness: 0.7 }),
+      lift: std('#9a9ee0', { roughness: 0.45, metalness: 0.3, emissive: '#3b3f9a', emissiveIntensity: 0.35 }),
+      rail: std('#6d71b8', { roughness: 0.5, metalness: 0.5 }),
+      springPad: std('#ffa94d', { roughness: 0.4, emissive: '#ff922b', emissiveIntensity: 0.25 }),
     };
     this.ballMats = PLAYER_COLORS.map(c => new THREE.MeshPhysicalMaterial({
       map: ballTexture(c), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15,
@@ -472,6 +485,76 @@ class Renderer3D {
       return { b, cap, capMat, press: b.pressed ? 1 : 0 };
     });
 
+    // Tek yönlü platformlar: karonun üst kenarında ince paslı tahta
+    const planks = [];
+    for (let r = 0; r < H; r++) for (let c = 0; c < W; c++) if (game.oneway[r][c]) planks.push([c, r]);
+    if (planks.length) inst(this.geo.plank, this.mat.plank, planks, (o, c, r) => o.position.set(c + 0.5, -r - 0.09, 0));
+
+    // Şalterler: kanal renginde topuzlu kol; açıkken sağa, kapalıyken sola yatar
+    this.leverObjs = game.levers.map(l => {
+      const col = CHANNEL_COLORS[l.channel];
+      const g = new THREE.Group();
+      g.position.set(wx(l.x + T / 2), wy(l.y + T), 0);
+      const base = new THREE.Mesh(this.geo.leverBase, this.mat.metal);
+      base.position.y = 0.1;
+      base.castShadow = base.receiveShadow = true;
+      const arm = new THREE.Group();
+      arm.position.y = 0.18;
+      const stick = new THREE.Mesh(this.geo.leverStick, this.mat.metal);
+      stick.position.y = 0.36;
+      const knobMat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.4, roughness: 0.3 });
+      const knob = new THREE.Mesh(this.geo.knob, knobMat);
+      knob.position.y = 0.74;
+      stick.castShadow = knob.castShadow = true;
+      arm.add(stick, knob);
+      g.add(base, arm);
+      this.levelGroup.add(g);
+      const on = !!game.switches[l.channel];
+      return { l, arm, knobMat, angle: on ? -0.6 : 0.6 };
+    });
+
+    // Asansörler: kanal renginde şeritli platform ve iki yanında raylar
+    this.liftObjs = game.lifts.map(L => {
+      const w = wx(L.w), col = CHANNEL_COLORS[L.channel];
+      const g = new THREE.Group();
+      const body = new THREE.Mesh(new RoundedBoxGeometry(w, 1, 0.9, 2, 0.08), this.mat.lift);
+      body.castShadow = body.receiveShadow = true;
+      const stripMat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 1.2, roughness: 0.3 });
+      const strip = new THREE.Mesh(new THREE.BoxGeometry(w - 0.16, 0.08, 0.04), stripMat);
+      strip.position.set(0, 0.36, 0.46);
+      g.add(body, strip);
+      this.levelGroup.add(g);
+      // Raylar: en üst noktadan dinlenme yerinin altına kadar
+      const top = wy(L.topY), bottom = wy(L.oy + L.h), len = top - bottom;
+      for (const sx of [-1, 1]) {
+        const rail = new THREE.Mesh(this.geo.rail, this.mat.rail);
+        rail.scale.y = len;
+        rail.position.set(wx(L.x + L.w / 2) + sx * (w / 2 + 0.05), bottom + len / 2, -0.38);
+        this.levelGroup.add(rail);
+      }
+      return { L, g, stripMat };
+    });
+
+    // Yaylar: taban, yay halkaları ve turuncu pedal
+    this.springObjs = game.springs.map(sp => {
+      const g = new THREE.Group();
+      g.position.set(wx(sp.x + sp.w / 2), wy(sp.y + sp.h), 0);
+      const base = new THREE.Mesh(this.geo.springBase, this.mat.metal);
+      base.position.y = 0.04;
+      const coils = new THREE.Group();
+      for (let i = 0; i < 3; i++) {
+        const c = new THREE.Mesh(this.geo.coil, this.mat.metal);
+        c.rotation.x = Math.PI / 2;
+        c.position.y = 0.1 + i * 0.09;
+        coils.add(c);
+      }
+      const pad = new THREE.Mesh(this.geo.springPad, this.mat.springPad);
+      pad.castShadow = base.receiveShadow = true;
+      g.add(base, coils, pad);
+      this.levelGroup.add(g);
+      return { sp, coils, pad };
+    });
+
     // Çıkış kapısı
     this.exitObj = null;
     if (game.exit) {
@@ -712,6 +795,8 @@ class Renderer3D {
         case 'land': this.burst(x, y, 9, '#d8d4ff', { speed: 2.2, gravity: 2, life: 0.35, size: 0.06 }); break;
         case 'pickup': this.burst(x, y, 16, PALETTE.key, { speed: 3, gravity: 1, life: 0.6 }); break;
         case 'unlock': this.burst(x, y, 40, PALETTE.key, { speed: 5, gravity: 3, life: 0.9, size: 0.09 }); break;
+        case 'lever': this.burst(x, y, 14, e.color || '#fff', { speed: 2.4, gravity: 1, life: 0.45, up: true }); break;
+        case 'spring': this.burst(x, y, 12, '#ffc078', { speed: 2.6, gravity: 2, life: 0.4, up: true }); break;
         case 'click': this.burst(x, y, 12, e.color || '#fff', { speed: 2.5, gravity: 1, life: 0.45, up: true }); break;
         case 'swap': this.burst(x, y, 18, e.color || '#fff', { speed: 3, gravity: 0, life: 0.4 }); break;
         case 'enter': this.burst(x, y, 20, PALETTE.exit, { speed: 2.5, gravity: -2, life: 0.8, up: true }); break;
@@ -811,6 +896,24 @@ class Renderer3D {
       o.press += ((o.b.pressed ? 1 : 0) - o.press) * Math.min(1, dt * 14);
       o.cap.position.y = 0.16 - o.press * 0.09;
       o.capMat.emissiveIntensity = 0.2 + o.press * 1.6;
+    }
+    for (const o of this.leverObjs) {
+      const target = game.switches[o.l.channel] ? -0.6 : 0.6;
+      o.angle += (target - o.angle) * Math.min(1, dt * 12);
+      o.arm.rotation.z = o.angle;
+      o.knobMat.emissiveIntensity = game.switches[o.l.channel] ? 1.4 : 0.35;
+    }
+    for (const o of this.liftObjs) {
+      o.g.position.set(wx(o.L.x + o.L.w / 2), wy(o.L.y + o.L.h / 2), 0);
+      o.stripMat.emissiveIntensity = game.channelOn(o.L.channel) ? 1.8 : 0.5;
+    }
+    for (const o of this.springObjs) {
+      // Fırlatınca önce basılır, sonra sönen bir sekmeyle açılır
+      const since = game.t - o.sp.t;
+      const k = since >= 0 && since < 0.6 ? Math.exp(-since * 7) * Math.cos(since * 26) : 0;
+      const h = Math.max(0.35, 1 + k * 0.9);
+      o.coils.scale.y = h;
+      o.pad.position.y = 0.1 + 0.27 * h + 0.06;
     }
     game.boxes.forEach((b, i) => {
       const m = this.boxObjs[i];

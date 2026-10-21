@@ -126,6 +126,14 @@ const level = (extra = {}) => Object.assign({ name: 'Deneme', magnet: false, map
     ok((await anon.get(`/api/packs/${pid}`)).json.levels.length === 1, 'silinen bölüm paketten de düşer');
     ok((await b.del(`/api/packs/${pid}`)).status === 403, 'başkası paketi silemez');
 
+    console.log('İlerleme');
+    ok((await anon.post('/api/progress', { levels: { kule: 10 } })).status === 401, 'girişsiz ilerleme kaydedilmez');
+    r = await c.post('/api/progress', { levels: { kule: 12.345, yokboyle: 5, merhaba: 0.2, salter: 'x' } });
+    ok(r.status === 200 && r.json.levels.kule === 12.35 && Object.keys(r.json.levels).length === 1, 'yalnızca gerçek bölümlerin geçerli süreleri kaydedilir');
+    r = await c.post('/api/progress', { levels: { kule: 20, merhaba: 8 } });
+    ok(r.json.levels.kule === 12.35 && r.json.levels.merhaba === 8, 'birleştirmede her bölüm için en iyi süre kalır');
+    ok((await d.get('/api/progress')).json.levels.kule === undefined, 'ilerleme hesaba özel');
+
     console.log('Kalıcılık');
     await sleep(400);
     srv.kill();

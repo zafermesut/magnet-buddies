@@ -5,13 +5,13 @@
 
 const SCHEMES = [
   // hint: temel kontroller · magnetHint: mıknatıslı bölümlerde eklenen kontroller
-  { id: 'wasd', label: 'W A S D', hint: 'A D yürü · W zıpla · S bırak', magnetHint: 'S basılı mıknatıs · E kutup', join: 'W',
+  { id: 'wasd', label: 'W A S D', hint: 'A D yürü · W zıpla · S eylem', magnetHint: 'S basılı mıknatıs · E kutup', join: 'W',
     left: ['KeyA'], right: ['KeyD'], jump: ['KeyW', 'Space'], action: ['KeyS'], swap: ['KeyE'] },
-  { id: 'arrows', label: 'Ok tuşları', hint: '← → yürü · ↑ zıpla · ↓ bırak', magnetHint: '↓ basılı mıknatıs · sağ Shift kutup', join: '↑',
+  { id: 'arrows', label: 'Ok tuşları', hint: '← → yürü · ↑ zıpla · ↓ eylem', magnetHint: '↓ basılı mıknatıs · sağ Shift kutup', join: '↑',
     left: ['ArrowLeft'], right: ['ArrowRight'], jump: ['ArrowUp'], action: ['ArrowDown'], swap: ['ShiftRight'] },
-  { id: 'ijkl', label: 'I J K L', hint: 'J L yürü · I zıpla · K bırak', magnetHint: 'K basılı mıknatıs · U kutup', join: 'I',
+  { id: 'ijkl', label: 'I J K L', hint: 'J L yürü · I zıpla · K eylem', magnetHint: 'K basılı mıknatıs · U kutup', join: 'I',
     left: ['KeyJ'], right: ['KeyL'], jump: ['KeyI'], action: ['KeyK'], swap: ['KeyU'] },
-  { id: 'numpad', label: 'Numpad', hint: '4 6 yürü · 8 zıpla · 5 bırak', magnetHint: '5 basılı mıknatıs · 7 kutup', join: 'Num 8',
+  { id: 'numpad', label: 'Numpad', hint: '4 6 yürü · 8 zıpla · 5 eylem', magnetHint: '5 basılı mıknatıs · 7 kutup', join: 'Num 8',
     left: ['Numpad4'], right: ['Numpad6'], jump: ['Numpad8'], action: ['Numpad5'], swap: ['Numpad7'] },
 ];
 
@@ -38,7 +38,7 @@ const Input = {
     const list = SCHEMES.map(s => ({ id: s.id, label: s.label, hint: s.hint, magnetHint: s.magnetHint, join: s.join }));
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const p of pads) {
-      if (p && p.connected) list.push({ id: 'pad' + p.index, label: 'Gamepad ' + (p.index + 1), hint: 'Çubuk yürü · A zıpla · B bırak', magnetHint: 'B basılı mıknatıs · X/Y kutup', join: 'A' });
+      if (p && p.connected) list.push({ id: 'pad' + p.index, label: 'Gamepad ' + (p.index + 1), hint: 'Çubuk yürü · A zıpla · B eylem', magnetHint: 'B basılı mıknatıs · X/Y kutup', join: 'A' });
     }
     return list;
   },

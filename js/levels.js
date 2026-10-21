@@ -7,6 +7,11 @@
 //   K  anahtar                   D  kilitli kapı (anahtarla açılır, komşu D'ler tek kapıdır)
 //   1 2 3  düğme                 a b c  düğmeye bağlı kapak (1→a, 2→b, 3→c)
 //   H  ağır kutu (sol üst köşesi; 2x2 karo). İtmek için gereken kişi: boxNeed
+//   4 5 6  şalter (4→a, 5→b, 6→c; eylem tuşuyla çevrilir, açık kalır)
+//   -  tek yönlü platform (alttan geçilir, üstüne basılır)
+//   x y z  asansör (1/2/3 kanalı açıkken yukarı çıkar; yan yana aynı harfler tek platform,
+//          üstündeki ilk duvarın bir karo altında durur)
+//   ^  yay (altında duvar olmalı)
 //
 // magnet: true olan bölümlerde mıknatıs açıktır. pols: oyuncuların başlangıç kutupları (1 = +, -1 = −).
 //
@@ -14,6 +19,7 @@
 
 const LEVELS = [
   {
+    id: 'merhaba',
     name: 'Merhaba',
     hint: 'Yürü, zıpla ve hep birlikte kapıya girin. Çukura düşen arkadaşının yanında doğar.',
     map: [
@@ -32,6 +38,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'anahtar',
     name: 'Anahtar',
     hint: 'Anahtarı kapıya götürün. Eylem tuşu anahtarı bırakır ya da arkadaşına atar.',
     map: [
@@ -50,6 +57,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'kule',
     name: 'Kule',
     hint: 'Anahtar tek başına ulaşılamayacak kadar yüksekte. Biriniz diğerinin üstüne çıkıp oradan zıplasın.',
     map: [
@@ -68,6 +76,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'nobetci',
     name: 'Nöbetçi',
     hint: 'Düğmenin üstünde duran kapağı açık tutar. Sırayla birbirinize kapı açın.',
     map: [
@@ -86,6 +95,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'agir-kutu',
     name: 'Ağır kutu',
     hint: 'Kutu tek kişiyle kıpırdamaz. Birlikte itin ve duvarın dibine basamak yapın.',
     boxNeed: 2,
@@ -105,6 +115,84 @@ const LEVELS = [
     ],
   },
   {
+    id: 'salter',
+    name: 'Şalter',
+    hint: 'Düğme yalnızca üstünde dururken açık tutar; şalter ise bir kez çevrilince açık kalır. Şalteri eylem tuşuyla çevir. Aynı renkteki şalterler aynı kapağı açar.',
+    map: [
+      '################################',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#........a..........b..........#',
+      '#.SS.1...a.....5....b....4...E.#',
+      '################################',
+    ],
+  },
+  {
+    id: 'merdiven',
+    name: 'Merdiven',
+    hint: 'İnce platformlardan alttan geçilir, üstlerine basılır. En üst basamak tek başına zıplanamayacak kadar yüksek: birbirinizin üstüne çıkın.',
+    map: [
+      '################################',
+      '#.....K.............D..........#',
+      '#....----...........D..........#',
+      '#...................D..........#',
+      '#...................D..........#',
+      '#....----...........D..........#',
+      '#...................D..........#',
+      '#........---........D..........#',
+      '#...................D..........#',
+      '#....---............D..........#',
+      '#.SS................D........E.#',
+      '################################',
+    ],
+  },
+  {
+    id: 'asansor',
+    name: 'Asansör',
+    hint: 'Asansör, aynı renkteki düğmeye basılı tutulunca yukarı çıkar. Biriniz düğmede dursun, öbürü yukarı çıksın; sonra yukarıdaki düğmeyle sıra değişir.',
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#............##................#',
+      '#..................1........E..#',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#..............#################',
+      '#.1..SS........#################',
+      '#############xx#################',
+      '################################',
+    ],
+  },
+  {
+    id: 'zipzip',
+    name: 'Zıp zıp',
+    hint: 'Yay seni yukarı fırlatır. Yaya inerken zıplama tuşunu basılı tutarsan daha yükseğe çıkarsın.',
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#...................4.......E..#',
+      '#................###############',
+      '#.............a..###############',
+      '#.............a..###############',
+      '#.............a..###############',
+      '#.1..SS.......a.^###############',
+      '################################',
+    ],
+  },
+  {
+    id: 'hepsi-birden',
     name: 'Hepsi birden',
     hint: 'Kutu, kule, anahtar ve düğme: öğrendiğiniz her şey bu bölümde.',
     boxNeed: 2,
@@ -124,6 +212,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'firlatma',
     name: 'Fırlatma',
     hint: 'Aynı kutuptasınız. Biriniz diğerinin üstüne çıksın, alttaki mıknatısı açınca (eylem tuşunu basılı tut) üstteki fırlar. Yukarı çıkan kutbunu değiştirip arkadaşını çekerek alsın.',
     magnet: true,
@@ -144,6 +233,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'ucurum',
     name: 'Uçurum',
     hint: 'Boşluk zıplanamayacak kadar geniş. Aynı kutupta biri diğerini karşıya itsin, karşıya geçen kutbunu değiştirip öbürünü çeksin.',
     magnet: true,
@@ -164,6 +254,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'metal-anahtar',
     name: 'Metal anahtar',
     hint: 'Anahtar metaldir: mıknatısı açınca kutbun ne olursa olsun sana gelir.',
     magnet: true,
@@ -183,6 +274,7 @@ const LEVELS = [
     ],
   },
   {
+    id: 'miknatis-ustasi',
     name: 'Mıknatıs ustası',
     hint: 'Önce uçurum, sonra yüksek duvar. İtmek mi çekmek mi, hangisi ne zaman?',
     magnet: true,
@@ -204,9 +296,11 @@ const LEVELS = [
   },
 ];
 
+const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
+
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.
@@ -228,6 +322,9 @@ function validateLevel(def) {
     if (ch !== 'H') return;
     const fits = c + 1 < cols && r + 1 < rows && row[c + 1] === '.' && def.map[r + 1][c] === '.' && def.map[r + 1][c + 1] === '.';
     if (!fits) errs.push('Ağır kutunun 2×2 boş yeri olmalı.');
+  }));
+  def.map.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch === '^' && (r + 1 >= rows || def.map[r + 1][c] !== '#')) errs.push('Yayın altında duvar olmalı.');
   }));
   if (typeof def.name !== 'string' || !def.name.trim() || def.name.length > L.name) errs.push(`Bölüme bir ad ver (en fazla ${L.name} harf).`);
   return [...new Set(errs)];

@@ -30,17 +30,48 @@ for (const el of document.querySelectorAll('.gameTitle')) el.textContent = GAME_
 
 // ---------- İlerleme (en iyi süreler) ----------
 
+// Bölüm kimliğine göre en iyi süre: { kule: 12.3 }. Araya yeni bölüm girse de kayıt kaymaz.
+// Misafirken yalnızca bu tarayıcıda durur; giriş yapınca hesaptakiyle birleştirilir (her bölümde en iyi süre kalır).
+const V1_ORDER = ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu', 'hepsi-birden', 'firlatma', 'ucurum', 'metal-anahtar', 'miknatis-ustasi'];
 let progress = {};
-try { progress = JSON.parse(localStorage.getItem('progress-v1') || '{}'); } catch (e) { progress = {}; }
+try {
+  progress = JSON.parse(localStorage.getItem('progress-v2') || 'null');
+  if (!progress) {
+    // Eski kayıt bölüm sırasına göreydi
+    progress = {};
+    const old = JSON.parse(localStorage.getItem('progress-v1') || '{}');
+    for (const [i, secs] of Object.entries(old)) if (V1_ORDER[i]) progress[V1_ORDER[i]] = secs;
+  }
+} catch (e) { progress = {}; }
 function saveProgress() {
-  try { localStorage.setItem('progress-v1', JSON.stringify(progress)); } catch (e) { /* yoksay */ }
+  try { localStorage.setItem('progress-v2', JSON.stringify(progress)); } catch (e) { /* yoksay */ }
+}
+const bestOf = i => progress[LEVELS[i].id];
+
+// Yeni süreyi kaydet; girişliyse hesaba da yaz
+function recordProgress(i, secs) {
+  const id = LEVELS[i].id;
+  if (progress[id] && progress[id] <= secs) return;
+  progress[id] = Math.round(secs * 100) / 100;
+  saveProgress();
+  if (Atolye.me) Atolye.api('POST', '/api/progress', { levels: { [id]: progress[id] } });
+}
+
+// Giriş yapılınca: tarayıcıdaki ilerlemeyi hesaba gönder, hesaptakini geri al
+async function syncProgress() {
+  if (!Atolye.me) return;
+  const r = await Atolye.api('POST', '/api/progress', { levels: progress });
+  if (!r.ok || !r.json.levels) return;
+  for (const [id, secs] of Object.entries(r.json.levels)) if (!progress[id] || secs < progress[id]) progress[id] = secs;
+  saveProgress();
+  if (state === 'select') renderLevelGrid();
 }
 
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function levelButton(i, disabled, onClick) {
-  const l = LEVELS[i], best = progress[i];
+  const l = LEVELS[i], best = bestOf(i);
   const b = document.createElement('button');
   b.className = 'lvl';
   b.disabled = !!disabled;
@@ -154,6 +185,10 @@ function toSelect() {
   state = 'select';
   game = menuGame();
   show('select');
+  renderLevelGrid();
+}
+
+function renderLevelGrid() {
   const grid = $('levelGrid');
   grid.innerHTML = '';
   LEVELS.forEach((l, i) => grid.appendChild(levelButton(i, false, () => startLevel(i))));
@@ -235,8 +270,8 @@ function showComplete(i, secs) {
   state = 'complete';
   completeAt = performance.now();
   const custom = i < 0;
-  const prevBest = custom ? 0 : progress[i];
-  if (!custom && (!prevBest || secs < prevBest)) { progress[i] = secs; saveProgress(); }
+  const prevBest = custom ? 0 : bestOf(i);
+  if (!custom) recordProgress(i, secs);
   const lastLevel = custom || i === LEVELS.length - 1;
   $('completeTitle').textContent = lastLevel ? 'Tüm bölümler bitti!' : 'Bölüm tamam!';
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
