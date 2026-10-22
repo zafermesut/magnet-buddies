@@ -6,6 +6,10 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.2.1 · 22 Ekim 2026
+
+- iPhone'da tuşa basılı tutunca açılan büyüteç ve seçim balonu artık çıkmıyor.
+
 ## 0.2.0 · 22 Ekim 2026
 
 **Telefonda oyna**

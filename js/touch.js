@@ -48,6 +48,15 @@ const Touch = {
     addEventListener('pointerup', e => this.up(e));
     addEventListener('pointercancel', e => this.up(e));
     addEventListener('blur', () => { this.fingers.clear(); this.refresh(); });
+    // iPhone Safari uzun basınca büyüteç / seçim açar; pointer olayını engellemek yetmez, touchstart engellenmeli.
+    // Yalnızca tuşlara ve bölüme dokunuşta: HUD düğmelerinin (menü, ayarlar) tıklaması bozulmasın.
+    const block = e => {
+      if (!this.active()) return;
+      const onGame = e.target === document.getElementById('game');
+      if (onGame || [...e.changedTouches].some(t => this.hit(t.clientX, t.clientY))) e.preventDefault();
+    };
+    addEventListener('touchstart', block, { passive: false });
+    addEventListener('touchmove', block, { passive: false });
     for (const fn of this.hooks) fn();
     this.hooks = [];
   },
