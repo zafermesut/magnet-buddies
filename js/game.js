@@ -725,11 +725,38 @@ class Game {
       const want = this.channelOn(g.channel) !== !!g.inverse;
       if (want) g.open = true;
       else if (g.open) {
-        // İçinde biri varken kapanmaz
-        const occupied = this.solids.some(w => g.cells.some(q => overlap(w, cellRect(q))));
-        if (!occupied) g.open = false;
+        // Kutu ya da sandık içindeyken kapanmaz (takoz). Oyuncu ve anahtar ise dışarı itilir: yoksa kapağın içinde
+        // duran, düğmeden inen arkadaşına kapıyı açık tutardı
+        const inGate = w => g.cells.some(q => overlap(w, cellRect(q)));
+        if (this.boxes.some(inGate)) continue;
+        for (const o of this.players.concat(this.keys)) {
+          if ((o.kind === 'player' && o.inExit) || o.holder || o.used || !inGate(o)) continue;
+          this.expel(o, g);
+        }
+        g.open = false;
       }
     }
+  }
+
+  // Kapanan kapağın içindekini en kısa yoldan (sağ, sol, üst, alt) boş bir yere it
+  expel(o, g) {
+    const cs = g.cells.map(cellRect);
+    const x0 = Math.min(...cs.map(r => r.x)), x1 = Math.max(...cs.map(r => r.x + r.w));
+    const y0 = Math.min(...cs.map(r => r.y)), y1 = Math.max(...cs.map(r => r.y + r.h));
+    const spots = [
+      { x: x0 - o.w - 0.5, y: o.y, vx: -1 }, { x: x1 + 0.5, y: o.y, vx: 1 },
+      { x: o.x, y: y0 - o.h - 0.5, vx: 0 }, { x: o.x, y: y1 + 0.5, vx: 0 },
+    ].sort((a, b) => Math.hypot(a.x - o.x, a.y - o.y) - Math.hypot(b.x - o.x, b.y - o.y));
+    for (const s of spots) {
+      const r = { x: s.x, y: s.y, w: o.w, h: o.h };
+      if (this.rectBlocked(s.x, s.y, o.w, o.h, o) || this.solids.some(w => w !== o && overlap(w, r))) continue;
+      o.x = s.x; o.y = s.y;
+      o.vx = s.vx * 160;
+      if (o.kind === 'player') o.squash = 0.25;
+      this.fx('bonk', o.x + o.w / 2, o.y + o.h / 2);
+      return;
+    }
+    if (o.kind === 'player') this.respawn(o); else { o.x = o.ox; o.y = o.oy; o.vx = o.vy = 0; }
   }
 
   enterExit(p) {

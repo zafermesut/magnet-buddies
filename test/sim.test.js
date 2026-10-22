@@ -1154,6 +1154,19 @@ function gardenClimb(g, sp, stripEnd, wallX, topY, stripBottom) {
   ok(h.wantRestart, 'ikisi de düşünce bölüm baştan başlar');
 }
 
+{
+  // Kapak, içinde duran oyuncu varken de kapanır: oyuncu yana itilir (düğmeden inen arkadaşına açık tutamaz)
+  const g = new Game(L('uzun-atlama'), 2), [A, B] = g.players, gate = g.gates.find(x => x.channel === 1), btn = g.buttons[0];
+  A.x = btn.x; A.y = btn.y + btn.h - A.h;
+  const c = gate.cells[0].c;
+  B.x = c * T + 3; B.y = 11 * T - B.h;
+  run(g, [idle, idle], 0.3);
+  const openWhileHeld = gate.open;
+  A.x = 2 * T;
+  run(g, [idle, idle], 0.3);
+  ok(openWhileHeld && !gate.open && (B.x + B.w <= c * T || B.x >= (c + 1) * T), 'düğmeden inince kapak kapanır, içindeki yana itilir');
+}
+
 console.log('Fabrika öğeleri');
 {
   const mk = (map, n) => new Game({ name: 'Deneme', map }, n || 1);

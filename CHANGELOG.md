@@ -6,6 +6,10 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.3.2 · 22 Ekim 2026
+
+- Kapak artık içinde biri durunca açık kalmıyor: kapanırken içindekini yana iter. Böylece kapağın içinde bekleyip arkadaşınla birlikte geçmek yerine şalter ve düğmelerle çözmek gerekiyor. Ağır kutu ya da metal sandık içindeyse kapak yine açık kalır.
+
 ## 0.3.1 · 22 Ekim 2026
 
 - İkiniz de düşerseniz bölüm baştan başlar (biri düşerse yine en son durduğu yerde doğar).
