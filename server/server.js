@@ -67,7 +67,11 @@ const ASSET_VERSION = (() => {
   }
   return h.digest('hex').slice(0, 10);
 })();
-const withVersion = html => html.replace(/(src|href)="((?:js|css)\/[^"?]+)"/g, `$1="$2?v=${ASSET_VERSION}"`);
+// Oyunun sürümü (package.json). Sayfaya ve her WebSocket bağlantısına yazılır: sürümü eski kalan
+// açık sekme (ör. yayından önce açılmış) bunu görünce kendini yeniler.
+const GAME_VERSION = require('../package.json').version;
+const withVersion = html => html.replace(/(src|href)="((?:js|css)\/[^"?]+)"/g, `$1="$2?v=${ASSET_VERSION}"`)
+  .replace('__BUILD__', ASSET_VERSION).replace('__VERSION__', GAME_VERSION);
 const THREE_ROOT = path.join(ROOT, 'node_modules', 'three');
 const THREE_PUBLIC = [path.join(THREE_ROOT, 'build'), path.join(THREE_ROOT, 'examples', 'jsm')];
 
@@ -303,6 +307,7 @@ function cleanName(s) {
 wss.on('connection', ws => {
   const member = { id: nextId++, name: 'İsimsiz', ws, input: {}, done: new Set() };
   let room = null;
+  ws.send(JSON.stringify({ t: 'hello', build: ASSET_VERSION, version: GAME_VERSION }));
   ws.isAlive = true;
   ws.on('pong', () => { ws.isAlive = true; });
 

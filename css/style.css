@@ -159,6 +159,8 @@ h1 { margin: 0; font-size: 46px; font-weight: 700; letter-spacing: -0.01em; text
 h2 { margin: 0; font-size: 28px; }
 .tagline { margin: 0; color: #b9bce0; font-size: 15px; line-height: 1.5; }
 .small { margin: 0; color: #8e92c0; font-size: 12px; line-height: 1.5; }
+.setVersion { margin-top: 6px; }
+.setVersion a { color: #b9bce0; }
 .note { margin: 0; min-height: 18px; color: #ffd43b; font-size: 13px; }
 
 button {

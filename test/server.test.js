@@ -31,6 +31,13 @@ function client(name) {
     console.log('Sunucu');
     const page = await fetch(`http://localhost:${PORT}/`).then(r => r.text());
     ok(page.includes('<canvas'), 'ana sayfa sunuluyor');
+    const ver = require('../package.json').version;
+    const build = (page.match(/<meta name="build" content="([0-9a-f]+)" data-version="([^"]+)"/) || []);
+    ok(build[1] && build[2] === ver, `sayfaya sürüm yazılıyor (${build[2]}, ${build[1]})`);
+    const hc = client('Sürüm'); await hc.open;
+    const hello = await hc.wait(m => m.t === 'hello');
+    ok(hello && hello.build === build[1] && hello.version === ver, 'bağlanınca sunucu sürümünü bildiriyor');
+    hc.ws.close();
     ok(/src="js\/main\.js\?v=[0-9a-f]{10}"/.test(page) && /href="css\/style\.css\?v=/.test(page), 'js ve css adreslerinde sürüm var (eski önbellek kullanılmaz)');
     const leak = await fetch(`http://localhost:${PORT}/server/server.js`).then(r => r.status);
     const pkg = await fetch(`http://localhost:${PORT}/package.json`).then(r => r.status);

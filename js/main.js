@@ -529,6 +529,7 @@ Net.on('start', m => {
   currentDef = m.def || LEVELS[m.level];
   game = new Game(m.def || m.level, m.players.length);
   game.players.forEach((p, i) => { p.name = m.players[i].name; p.isMe = i === m.you; });
+  Echo.reset();
   state = 'playing';
   show(null);
   levelIntro(m.def ? 'Kendi bölümün' : `Bölüm ${m.level + 1}`, currentDef.name);
@@ -636,9 +637,11 @@ function frame(now) {
     $('timer').textContent = fmt(game.t);
     if (game.done) showComplete(levelIndex, game.doneT);
   } else if (state === 'playing' && mode === 'online') {
-    Net.sendInput(onlineInput());
+    const inp = onlineInput();
+    Net.sendInput(inp);
     Net.ping(now);
     smoothNet(game, dt);
+    Echo.frame(game, inp, now);
     $('timer').textContent = fmt(game.t);
   } else if (MENU_STATES.has(state) && game && game.isDemo) {
     acc += dt;
@@ -673,6 +676,9 @@ function renderSettings() {
     $(k + 'Mute').classList.toggle('off', !lvl);
   }
   $('sfxMute').innerHTML = icon(Sound.level('sfx') ? 'volume' : 'mute');
+  const ver = document.querySelector('meta[name="build"]').dataset.version;
+  $('versionRow').classList.toggle('hidden', !ver || ver.startsWith('__'));
+  $('versionText').textContent = 'Sürüm ' + ver;
   const hasQ = !!(renderer && renderer.setQuality);
   $('qualityRow').classList.toggle('hidden', !hasQ);
   if (hasQ) {

@@ -144,6 +144,10 @@ Oyun düz HTML, Canvas ve JavaScript ile yazıldı. Görüntü Three.js ile 2.5D
 ses ve müzik WebAudio ile anında üretiliyor. Online oyunda sunucu (Node.js ve WebSocket) aynı
 simülasyonu çalıştırır.
 
+## Sürümler
+
+Her sürümde neyin değiştiği [CHANGELOG.md](CHANGELOG.md) ve [Releases](https://github.com/zafermesut/magnet-buddies/releases) sayfasında. Oyunda hangi sürümü oynadığın Ayarlar penceresinin altında yazar.
+
 ## Lisans
 
 [MIT](LICENSE)
