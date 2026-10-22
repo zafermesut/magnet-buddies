@@ -388,7 +388,7 @@ class Game {
     for (const p of this.players) {
       p.squash += (0 - p.squash) * Math.min(1, dt * 10);
       if (!p.inExit && this.exit && p.exitCD <= 0 && p.supported && overlap(p, this.exit)) this.enterExit(p);
-      if (!p.inExit && p.y > this.H + 150) this.respawn(p);
+      if (!p.inExit && p.y > this.H + 150) this.fall(p);
     }
     for (const b of this.boxes) {
       if (b.y > this.H + 150) { b.x = b.ox; b.y = b.oy; b.vx = b.vy = 0; }
@@ -543,6 +543,23 @@ class Game {
 
   // Pres: tavandan iner, bir şeye (zemin, kutu, başka pres) değince bekleyip geri çıkar. Kanalı açıkken
   // yukarıda bekler; inerken kanal açılırsa geri döner. Altında kalan oyuncu ya da anahtar ezilmez, yana fırlar.
+  // Presin üstündekiler: üstüne basanlar ve onların üstündekiler (üst üste binenler birlikte taşınır)
+  pressRiders(P) {
+    const bodies = this.solids.filter(b => b.kind !== 'lift' && b.kind !== 'mover' && b.kind !== 'press')
+      .concat(this.keys.filter(k => !k.used && !k.holder));
+    const riders = new Set();
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const b of bodies) {
+        if (riders.has(b) || !(b.ground === P || riders.has(b.ground))) continue;
+        riders.add(b);
+        grew = true;
+      }
+    }
+    return [...riders];
+  }
+
   updatePresses(dt) {
     for (const P of this.presses) {
       P.dx = 0;
@@ -560,11 +577,15 @@ class Game {
         for (const b of this.boxes) {
           if (b.x < P.x + P.w && b.x + b.w > P.x && b.y >= P.y + P.h - 0.01) limit = Math.min(limit, b.y - P.h);
         }
+        // Üstündekiler presle birlikte iner (serbest düşseler pres onlardan hızlı iner, sekip dururlar)
+        const riders = this.pressRiders(P).filter(b => b.vy >= 0);
+        const y0 = P.y;
         if (next >= limit) {
           P.y = limit;
           P.dir = -1; P.pause = PHYS.pressRest;
           this.fx('press', P.x + P.w / 2, P.y + P.h);
         } else P.y = next;
+        for (const b of riders) if (!this.rectBlocked(b.x, b.y + P.y - y0, b.w, b.h, b)) b.y += P.y - y0;
         const head = { x: P.x, y: P.y, w: P.w, h: P.h };
         for (const o of this.players.concat(this.keys)) {
           if ((o.kind === 'player' && o.inExit) || o.holder || o.used || !overlap(o, head)) continue;
@@ -574,7 +595,7 @@ class Game {
         if (P.y <= P.topY + 0.01) { if (!hold) { P.dir = 1; P.pause = PHYS.pressWait; } continue; }
         const dy = -Math.min(PHYS.pressUp * dt, P.y - P.topY);
         // Üstündekiler de kalkar; tavana sıkışacaksa pres bekler
-        const riders = this.solids.filter(b => b !== P && b.ground === P).concat(this.keys.filter(k => k.ground === P));
+        const riders = this.pressRiders(P);
         if (riders.some(b => this.rectBlocked(b.x, b.y + dy, b.w, b.h, b))) continue;
         P.y += dy;
         for (const b of riders) b.y += dy;
@@ -725,6 +746,15 @@ class Game {
     p.x = this.exit.x + (this.exit.w - p.w) / 2;
     p.y = this.exit.y + this.exit.h - p.h;
     p.vy = -250;
+  }
+
+  // Düşen tek başınaysa en son durduğu yerde doğar. Kapıda olmayan herkes (2 sn içinde) düştüyse bölüm baştan
+  // başlar: wantRestart'ı oyunu yöneten (sunucu ya da aynı klavye) görür ve bölümü yeniden kurar.
+  fall(p) {
+    p.fellT = this.t;
+    const out = this.players.filter(o => !o.inExit);
+    if (out.length > 1 && out.every(o => o === p || o.y > this.H || (o.fellT !== undefined && this.t - o.fellT < 2))) this.wantRestart = true;
+    this.respawn(p);
   }
 
   // Çukura düşen, en son sağlam zeminde durduğu yerde doğar (arkadaşının yanında doğsaydı

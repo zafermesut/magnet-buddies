@@ -1141,6 +1141,19 @@ function gardenClimb(g, sp, stripEnd, wallX, topY, stripBottom) {
   ok(Array.isArray(g.lifts) && Array.isArray(g.levers) && Array.isArray(g.springs) && g.switches, 'yeni öğelerin durumu Game üzerinde');
 }
 
+{
+  // Biri düşerse son yerinde doğar; ikisi de düşerse bölüm baştan başlar
+  const g = new Game(L('gezgin'), 2), [A, B] = g.players;
+  run(g, [idle, idle], 0.3);
+  A.x = 8 * T; run(g, [() => I({ right: true }), idle], 4, g => g.effects.some(e => e.type === 'respawn'));
+  ok(!g.wantRestart, 'biri düşünce bölüm baştan başlamaz');
+  const h = new Game(L('gezgin'), 2);
+  run(h, [idle, idle], 0.3);
+  h.players.forEach(p => { p.x = 8 * T + p.index * 40; });
+  run(h, [() => I({ right: true }), () => I({ right: true })], 4, g => g.wantRestart);
+  ok(h.wantRestart, 'ikisi de düşünce bölüm baştan başlar');
+}
+
 console.log('Fabrika öğeleri');
 {
   const mk = (map, n) => new Game({ name: 'Deneme', map }, n || 1);

@@ -189,6 +189,7 @@ class Room {
     if (this.state !== 'playing') return;
     const g = this.game;
     g.step(STEP, this.inGame.map(m => m.input));
+    if (g.wantRestart) { this.start(this.level); return; }   // herkes düştü: bölüm baştan
     this.broadcast(this.snapshot());
     if (g.done) {
       this.state = 'complete';

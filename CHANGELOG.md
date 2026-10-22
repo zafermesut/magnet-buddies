@@ -6,6 +6,11 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.3.1 · 22 Ekim 2026
+
+- İkiniz de düşerseniz bölüm baştan başlar (biri düşerse yine en son durduğu yerde doğar).
+- Pres üstünde üst üste binenler artık birlikte, sarsılmadan iner ve çıkar.
+
 ## 0.3.0 · 22 Ekim 2026
 
 **Alan 2 · Fabrika** (Zor)

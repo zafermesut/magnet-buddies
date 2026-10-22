@@ -756,6 +756,7 @@ function frame(now) {
     while (acc >= STEP) { game.step(STEP, inputs); acc -= STEP; }
     $('timer').textContent = fmt(game.t);
     if (game.done) showComplete(levelIndex, game.doneT);
+    else if (game.wantRestart) restart();   // herkes düştü: bölüm baştan
   } else if (state === 'playing' && mode === 'online') {
     const inp = onlineInput();
     Net.sendInput(inp);
