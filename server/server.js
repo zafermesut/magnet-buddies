@@ -2,7 +2,8 @@
 
 // Online oda sunucusu: oyunun dosyalarını sunar ve WebSocket üzerinden odaları yönetir.
 // Simülasyon (js/game.js) burada tarayıcıdakiyle aynı kodla çalışır; sunucu tek doğru kaynaktır.
-// İstemciler yalnızca tuş durumunu gönderir, sunucu her 2 adımda bir durumu yayınlar.
+// İstemciler tuş durumunu gönderir, sunucu her adımda durumu yayınlar.
+// İstemci kendi topunu tahmin eder; yayındaki a (son tuş sırası, o tuşla geçen adım) ile uzlaştırır.
 
 const http = require('http');
 const fs = require('fs');
@@ -163,7 +164,7 @@ class Room {
     if (level < 0 && (level !== -1 || !this.custom)) return;
     this.level = level;
     this.inGame = this.members.slice(0, MAX_MEMBERS);
-    for (const m of this.inGame) m.input = { left: false, right: false, jump: false, action: false, swap: false };
+    for (const m of this.inGame) { m.input = { left: false, right: false, jump: false, action: false, swap: false }; m.seq = 0; m.seqT = 0; }
     this.game = new Game(level === -1 ? this.custom : level, this.inGame.length);
     this.state = 'playing';
     this.fxT = -1;
@@ -184,6 +185,7 @@ class Room {
     if (this.state !== 'playing') return;
     const g = this.game;
     g.step(STEP, this.inGame.map(m => m.input));
+    for (const m of this.inGame) m.seqT++;
     this.broadcast(this.snapshot());
     if (g.done) {
       this.state = 'complete';
@@ -206,7 +208,9 @@ class Room {
         r1(p.x), r1(p.y), r1(p.vx), r1(p.vy), p.pol, p.magnetOn ? 1 : 0, p.inExit ? 1 : 0,
         Math.round(p.squash * 100) / 100, p.facing,
         (p.affects || []).map(a => (playerIndex.has(a.o) ? ['p', playerIndex.get(a.o), a.repel ? 1 : 0] : boxIndex.has(a.o) ? ['b', boxIndex.get(a.o), 0] : ['k', keyIndex.get(a.o), 0])),
+        r3(p.magT), r3(p.gripT),
       ]),
+      a: this.inGame.map(m => [m.seq, m.seqT]),
       k: g.keys.map(k => [r1(k.x), r1(k.y), k.used ? 1 : 0, k.holder ? playerIndex.get(k.holder) : -1]),
       d: g.doors.map(d => [d.open ? 1 : 0, r3(d.openT)]),
       g: g.gates.map(x => (x.open ? 1 : 0)),
@@ -244,6 +248,8 @@ class Room {
       case 'i': {
         const b = msg.b | 0;
         m.input = { left: !!(b & 1), right: !!(b & 2), jump: !!(b & 4), action: !!(b & 8), swap: !!(b & 16) };
+        m.seq = msg.s >>> 0;
+        m.seqT = 0;
         break;
       }
       case 'start':

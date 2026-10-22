@@ -178,6 +178,7 @@ class Game {
   }
 
   fx(type, x, y, extra) {
+    if (this.predicting) return;
     this.effects.push(Object.assign({ type, x, y, t: this.t }, extra));
   }
 
@@ -223,7 +224,7 @@ class Game {
       }
       // Alttaki oyuncu zıplarsa üstündekini de kaldırır. Mıknatısı açık olan sabittir:
       // yoksa çektiği arkadaşı onu yukarı iter, ikisi birbirini sonsuza dek taşırdı.
-      if (dy < 0 && depth < 4 && b.kind === 'player' && o.kind === 'player' && !o.magnetOn) {
+      if (dy < 0 && depth < 4 && b.kind === 'player' && o.kind === 'player' && !o.magnetOn && !this.predicting) {
         this.moveY(o, b.y - (o.y + o.h), depth + 1);
         if (!overlap(b, o)) continue;
       }
@@ -253,53 +254,7 @@ class Game {
     this.solids = this.players.filter(p => !p.inExit).concat(this.boxes, this.lifts, this.movers);
 
     // 1) Oyuncu girişleri
-    this.players.forEach((p, i) => {
-      const inp = inputs[i] || NO_INPUT;
-      const jumpEdge = inp.jump && !p.prevJump, actEdge = inp.action && !p.prevAction;
-      const actRelease = !inp.action && p.prevAction, swapEdge = inp.swap && !p.prevSwap;
-      p.prevJump = inp.jump;
-      p.prevAction = inp.action;
-      p.prevSwap = inp.swap;
-      p.exitCD = Math.max(0, p.exitCD - dt);
-      p.magT = Math.max(0, p.magT - dt);
-      if (p.inExit) {
-        p.magnetOn = false;
-        if (jumpEdge || actEdge) this.leaveExit(p);
-        return;
-      }
-      // Kutup kapısının içindeyken kutup değişmez (kapının içinde sıkışılmasın)
-      if (this.magnet && swapEdge && !(this.poleCells.size && this.rectBlocked(p.x, p.y, p.w, p.h, { kind: 'player', pol: -p.pol }))) {
-        p.pol = -p.pol;
-        this.fx('swap', p.x + p.w / 2, p.y + p.h / 2, { color: POLE_COLORS[p.pol] });
-      }
-      // Eylem: kısa dokunuş anahtarı bırakır, basılı tutmak mıknatısı açar
-      if (actEdge) { p.actT = 0; p.usedLever = this.flipLever(p); }
-      if (inp.action) p.actT += dt;
-      p.magnetOn = this.magnet && inp.action && !p.usedLever;
-      if (actRelease && p.actT < 0.2 && !p.usedLever) this.dropKey(p);
-
-      const want = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
-      p.want = want;
-      // Mıknatısla savrulurken kontrol azalır; yoksa savrulma hemen sönerdi
-      const ctl = p.magT > 0 ? 0.25 : 1;
-      if (want) {
-        p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround && ctl === 1 ? ph.accel : ph.airAccel) * ctl * dt);
-        p.facing = want;
-      } else {
-        p.vx = approach(p.vx, 0, (p.onGround && ctl === 1 ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
-      }
-      // Zıt kutuplu mıknatısa yapışıkken arkadaşından destek alıp zıplayabilir
-      p.gripT = Math.max(0, p.gripT - dt);
-      p.coyote = p.supported || p.gripT > 0 ? ph.coyote : p.coyote - dt;
-      p.jumpBuf = jumpEdge ? ph.jumpBuffer : p.jumpBuf - dt;
-      if (p.jumpBuf > 0 && p.coyote > 0) {
-        p.vy = -ph.jumpV;
-        p.jumpBuf = 0; p.coyote = 0; p.cut = false;
-        p.squash = -0.22;
-        this.fx('jump', p.x + p.w / 2, p.y + p.h);
-      }
-      if (!inp.jump && p.vy < 0 && !p.cut) { p.vy *= ph.jumpCut; p.cut = true; }
-    });
+    this.players.forEach((p, i) => this.playerInput(p, inputs[i] || NO_INPUT, dt));
 
     this.applyMagnets(dt);
     this.applyFixed(dt);
@@ -384,6 +339,79 @@ class Game {
     }
   }
 
+  // Bir oyuncunun tuşları: kutup, eylem, yürüme, zıplama
+  playerInput(p, inp, dt) {
+    const ph = PHYS;
+    const jumpEdge = inp.jump && !p.prevJump, actEdge = inp.action && !p.prevAction;
+    const actRelease = !inp.action && p.prevAction, swapEdge = inp.swap && !p.prevSwap;
+    p.prevJump = inp.jump;
+    p.prevAction = inp.action;
+    p.prevSwap = inp.swap;
+    p.exitCD = Math.max(0, p.exitCD - dt);
+    p.magT = Math.max(0, p.magT - dt);
+    if (p.inExit) {
+      p.magnetOn = false;
+      if (jumpEdge || actEdge) this.leaveExit(p);
+      return;
+    }
+    // Kutup kapısının içindeyken kutup değişmez (kapının içinde sıkışılmasın)
+    if (this.magnet && swapEdge && !(this.poleCells.size && this.rectBlocked(p.x, p.y, p.w, p.h, { kind: 'player', pol: -p.pol }))) {
+      p.pol = -p.pol;
+      this.fx('swap', p.x + p.w / 2, p.y + p.h / 2, { color: POLE_COLORS[p.pol] });
+    }
+    // Eylem: kısa dokunuş anahtarı bırakır, basılı tutmak mıknatısı açar
+    if (actEdge) { p.actT = 0; p.usedLever = this.flipLever(p); }
+    if (inp.action) p.actT += dt;
+    p.magnetOn = this.magnet && inp.action && !p.usedLever;
+    if (actRelease && p.actT < 0.2 && !p.usedLever) this.dropKey(p);
+
+    const want = (inp.right ? 1 : 0) - (inp.left ? 1 : 0);
+    p.want = want;
+    // Mıknatısla savrulurken kontrol azalır; yoksa savrulma hemen sönerdi
+    const ctl = p.magT > 0 ? 0.25 : 1;
+    if (want) {
+      p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround && ctl === 1 ? ph.accel : ph.airAccel) * ctl * dt);
+      p.facing = want;
+    } else {
+      p.vx = approach(p.vx, 0, (p.onGround && ctl === 1 ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
+    }
+    // Zıt kutuplu mıknatısa yapışıkken arkadaşından destek alıp zıplayabilir
+    p.gripT = Math.max(0, p.gripT - dt);
+    p.coyote = p.supported || p.gripT > 0 ? ph.coyote : p.coyote - dt;
+    p.jumpBuf = jumpEdge ? ph.jumpBuffer : p.jumpBuf - dt;
+    if (p.jumpBuf > 0 && p.coyote > 0) {
+      p.vy = -ph.jumpV;
+      p.jumpBuf = 0; p.coyote = 0; p.cut = false;
+      p.squash = -0.22;
+      this.fx('jump', p.x + p.w / 2, p.y + p.h);
+    }
+    if (!inp.jump && p.vy < 0 && !p.cut) { p.vy *= ph.jumpCut; p.cut = true; }
+  }
+
+  // İstemci tarafı tahmin: yalnızca p'yi bir adım ilerletir, dünyanın geri kalanı yerinde durur.
+  // p oyunun kendi oyuncusu değil, onun kopyasıdır (skip: çizilen asıl oyuncu, çarpışmaya girmez).
+  // Başkalarını etkileyen her şey (şalter, anahtar, arkadaşını kaldırma, efektler) sunucuya bırakılır.
+  predict(p, inp, dt, skip) {
+    const ph = PHYS;
+    this.predicting = true;
+    this.solids = [p].concat(this.players.filter(o => o !== skip && !o.inExit), this.boxes, this.lifts, this.movers);
+    this.playerInput(p, inp, dt);
+    if (this.fixed.length) this.applyFixedTo(p, dt);
+    p.vy = Math.min(p.vy + ph.gravity * dt, ph.maxFall);
+    // Zemin kayıyorsa onunla taşınır (hızı sunucudan gelen durumlardan tahmin edilir)
+    const g = p.ground;
+    const carry = g && this.solids.includes(g) && g.kind !== 'lift' ? (g.ndx || 0) * dt : 0;
+    if (g && g.kind === 'lift') p.y += (g.ndy || 0) * dt;
+    p.onGround = false;
+    p.ground = null;
+    this.moveX(p, p.vx * dt + carry);
+    this.moveY(p, p.vy * dt);
+    p.supported = p.onGround;
+    this.updateSprings([p]);
+    p.squash += (0 - p.squash) * Math.min(1, dt * 10);
+    this.predicting = false;
+  }
+
   // Mıknatısı açık olan her oyuncu, menzilindeki diğer oyuncuları ve serbest anahtarları etkiler.
   applyMagnets(dt) {
     if (!this.magnet) return;
@@ -428,40 +456,43 @@ class Game {
   // (tavanda asılıyken yürünebilsin). Değdiği mıknatısa çekiliyorsa ona tutunmuş sayılır: zıplayabilir.
   applyFixed(dt) {
     if (!this.fixed.length) return;
+    for (const p of this.players) this.applyFixedTo(p, dt);
+  }
+
+  applyFixedTo(p, dt) {
     const ph = PHYS, R = ph.fixedRange;
-    for (const p of this.players) {
-      p.fixedOn = [];
-      p.wallSide = 0;
-      if (p.inExit) continue;
-      const px = p.x + p.w / 2, py = p.y + p.h / 2;
-      let ax = 0, ay = 0;
-      for (const f of this.fixed) {
-        const dx = px - f.x, dy = py - f.y, d = Math.hypot(dx, dy) || 1;
-        if (d > R) continue;
-        const sign = f.pol === p.pol ? 1 : -1, a = ph.fixedForce * (1 - (d / R) ** 2) * sign;
-        ax += dx / d * a; ay += dy / d * a;
-        p.fixedOn.push(f);
-        // Değiyor mu (kenar kenara)? Çekiliyorsa tutunur; yandaysa duvar zıplaması için tarafı
-        const touchX = Math.abs(dx) <= T / 2 + p.w / 2 + 1 && Math.abs(dy) < T / 2 + p.h / 2 - 4;
-        const touchY = Math.abs(dy) <= T / 2 + p.h / 2 + 1 && Math.abs(dx) < T / 2 + p.w / 2 - 4;
-        if (sign < 0 && (touchX || touchY)) {
-          p.gripT = 0.1;
-          if (touchX && !touchY) p.wallSide = dx < 0 ? -1 : 1;   // duvar hangi yanda (duvardan uzaklaşma yönü)
-        }
+    p.fixedOn = [];
+    p.wallSide = 0;
+    if (p.inExit) return;
+    const px = p.x + p.w / 2, py = p.y + p.h / 2;
+    let ax = 0, ay = 0;
+    for (const f of this.fixed) {
+      const dx = px - f.x, dy = py - f.y, d = Math.hypot(dx, dy) || 1;
+      if (d > R) continue;
+      const sign = f.pol === p.pol ? 1 : -1, a = ph.fixedForce * (1 - (d / R) ** 2) * sign;
+      ax += dx / d * a; ay += dy / d * a;
+      p.fixedOn.push(f);
+      // Değiyor mu (kenar kenara)? Çekiliyorsa tutunur; yandaysa duvar zıplaması için tarafı
+      const touchX = Math.abs(dx) <= T / 2 + p.w / 2 + 1 && Math.abs(dy) < T / 2 + p.h / 2 - 4;
+      const touchY = Math.abs(dy) <= T / 2 + p.h / 2 + 1 && Math.abs(dx) < T / 2 + p.w / 2 - 4;
+      if (sign < 0 && (touchX || touchY)) {
+        p.gripT = 0.1;
+        if (touchX && !touchY) p.wallSide = dx < 0 ? -1 : 1;   // duvar hangi yanda (duvardan uzaklaşma yönü)
       }
-      // Mıknatıslı duvara yapışıkken yalnızca duvara doğru çekilir: yavaşça kayar, zıpladıkça tırmanır
-      if (p.wallSide) ay = 0;
-      const am = Math.hypot(ax, ay);
-      if (am > ph.fixedMax) { ax *= ph.fixedMax / am; ay *= ph.fixedMax / am; }
-      p.vx += ax * dt;
-      p.vy += ay * dt;
-      if (p.wallSide && p.vy > ph.wallSlide) p.vy = ph.wallSlide;
-      if (p.cut === false && ay < 0) p.cut = true;
     }
+    // Mıknatıslı duvara yapışıkken yalnızca duvara doğru çekilir: yavaşça kayar, zıpladıkça tırmanır
+    if (p.wallSide) ay = 0;
+    const am = Math.hypot(ax, ay);
+    if (am > ph.fixedMax) { ax *= ph.fixedMax / am; ay *= ph.fixedMax / am; }
+    p.vx += ax * dt;
+    p.vy += ay * dt;
+    if (p.wallSide && p.vy > ph.wallSlide) p.vy = ph.wallSlide;
+    if (p.cut === false && ay < 0) p.cut = true;
   }
 
   // Şalter: yanında eylem tuşuna basınca kanalını açar ya da kapatır (aynı kanaldaki şalterler birlikte döner)
   flipLever(p) {
+    if (this.predicting) return false;
     const lv = this.levers.find(l => overlap(grow(p, 6), l));
     if (!lv) return false;
     this.switches[lv.channel] = !this.switches[lv.channel];
@@ -521,10 +552,10 @@ class Game {
   }
 
   // Yay: üstüne basanı yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
-  updateSprings() {
+  updateSprings(players = this.players) {
     for (const s of this.springs) {
       const pad = { x: s.x, y: s.y - 2, w: s.w, h: s.h + 2 };
-      for (const p of this.players) {
+      for (const p of players) {
         if (p.inExit || !p.onGround || p.vy < 0 || !overlap(p, pad)) continue;
         p.vy = -PHYS.springV * (p.prevJump ? PHYS.springBoost : 1);
         // Artık havada: sonraki karede normal zıplama yayın hızını ezmesin
@@ -586,6 +617,7 @@ class Game {
   }
 
   dropKey(p) {
+    if (this.predicting) return;
     const k = this.keys.find(o => o.holder === p);
     if (!k) return;
     k.holder = null;

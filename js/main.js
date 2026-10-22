@@ -10,7 +10,6 @@ const $ = id => document.getElementById(id);
 let renderer = null;        // sayfa hazır olunca kurulur: 3D (Three.js) ya da 2D yedek
 Input.init();
 
-const STEP = 1 / 60;
 const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor', 'atolye'];
 
 let mode = 'local';         // local | online
@@ -529,6 +528,8 @@ Net.on('start', m => {
   currentDef = m.def || LEVELS[m.level];
   game = new Game(m.def || m.level, m.players.length);
   game.players.forEach((p, i) => { p.name = m.players[i].name; p.isMe = i === m.you; });
+  Predict.reset(game, m.you);
+  Net.lastBits = -1;   // yeni bölümde tuş durumu yeni bir sırayla yeniden gönderilsin
   state = 'playing';
   show(null);
   levelIntro(m.def ? 'Kendi bölümün' : `Bölüm ${m.level + 1}`, currentDef.name);
@@ -636,8 +637,10 @@ function frame(now) {
     $('timer').textContent = fmt(game.t);
     if (game.done) showComplete(levelIndex, game.doneT);
   } else if (state === 'playing' && mode === 'online') {
-    Net.sendInput(onlineInput());
+    const inp = onlineInput();
+    Net.sendInput(inp);
     Net.ping(now);
+    Predict.step(game, inp, Net.seq, dt);
     smoothNet(game, dt);
     $('timer').textContent = fmt(game.t);
   } else if (MENU_STATES.has(state) && game && game.isDemo) {

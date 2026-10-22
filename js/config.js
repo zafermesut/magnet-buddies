@@ -4,6 +4,7 @@
 const GAME_TITLE = 'Magnet Buddies';
 
 const T = 40;   // karo boyutu (px)
+const STEP = 1 / 60;   // simülasyon adımı (sn); sunucu ve istemci aynı adımla ilerler
 const EXIT_W = 70;   // çıkış kapısının genişliği: iki top yan yana sığar
 
 // Fizik sabitleri. Tek başına zıplama ~109 px (2 karo aşılır, 3 karo aşılamaz);
