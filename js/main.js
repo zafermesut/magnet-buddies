@@ -606,6 +606,17 @@ addEventListener('keydown', e => {
 
 // ---------- Döngü ----------
 
+// Online oynarken sağ üstte ping
+function updatePingHud() {
+  const el = $('ping');
+  const show = mode === 'online' && (state === 'playing' || state === 'complete') && Net.rtt !== null;
+  el.classList.toggle('hidden', !show);
+  if (!show) return;
+  const ms = Math.round(Net.rtt);
+  el.textContent = `${ms} ms`;
+  el.className = 'panel ' + (ms < 80 ? 'good' : ms < 150 ? 'ok' : 'bad');
+}
+
 let slotsT = 0, shownQuality;
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
@@ -626,6 +637,7 @@ function frame(now) {
     if (game.done) showComplete(levelIndex, game.doneT);
   } else if (state === 'playing' && mode === 'online') {
     Net.sendInput(onlineInput());
+    Net.ping(now);
     smoothNet(game, dt);
     $('timer').textContent = fmt(game.t);
   } else if (MENU_STATES.has(state) && game && game.isDemo) {
@@ -637,6 +649,7 @@ function frame(now) {
     if (now - completeAt > 900 && anyJump) { completeAt = now + 1e9; next(); }
   }
 
+  updatePingHud();
   if (state === 'editor' && Editor.game) game = Editor.game;
   updateScrewHud();
   if (renderer.quality !== shownQuality) { shownQuality = renderer.quality; renderSettings(); }   // otomatik düşürülmüş olabilir

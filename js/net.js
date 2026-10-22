@@ -7,6 +7,8 @@ const Net = {
   ws: null,
   handlers: {},
   lastBits: -1,
+  rtt: null,         // son ölçülen gidiş-dönüş süresi (ms)
+  pingT: 0,
 
   available() { return location.protocol === 'http:' || location.protocol === 'https:'; },
 
@@ -21,11 +23,13 @@ const Net = {
       ws.onmessage = e => {
         let m;
         try { m = JSON.parse(e.data); } catch (err) { return; }
+        if (m.t === 'pong') { this.pong(m); return; }
         const h = this.handlers[m.t];
         if (h) h(m);
       };
       this.ws = ws;
       this.lastBits = -1;
+      this.rtt = null;
     });
   },
 
@@ -36,6 +40,19 @@ const Net = {
   on(type, fn) { this.handlers[type] = fn; },
 
   send(msg) { if (this.ws && this.ws.readyState === 1) this.ws.send(JSON.stringify(msg)); },
+
+  // Saniyede bir ping; yanıt gelince rtt güncellenir (hafif ortalama)
+  ping(now) {
+    if (now - this.pingT < 1000) return;
+    this.pingT = now;
+    this.send({ t: 'ping', c: performance.now() });
+  },
+
+  pong(m) {
+    const ms = performance.now() - m.c;
+    if (ms < 0 || ms > 10000) return;
+    this.rtt = this.rtt === null ? ms : this.rtt * 0.7 + ms * 0.3;
+  },
 
   // Yalnızca değişince gönderilir
   sendInput(i) {
@@ -81,10 +98,12 @@ function applySnapshot(g, s) {
   if (g.effects.length > 60) g.effects = g.effects.filter(e => g.t - e.t < 1.2);
 }
 
+// Kendi top daha sıkı izlenir: tuşa tepki gecikmesi azalır
 function smoothNet(g, dt) {
-  const k = Math.min(1, dt * 20);
+  const kOther = Math.min(1, dt * 20), kMe = Math.min(1, dt * 45);
   for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts, ...g.movers]) {
     if (o.tx === undefined) continue;
+    const k = o.isMe ? kMe : kOther;
     o.x += (o.tx - o.x) * k;
     o.y += (o.ty - o.y) * k;
   }

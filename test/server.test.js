@@ -64,6 +64,10 @@ function client(name) {
     const roomA = await a.wait(m => m.t === 'room');
     ok(roomA && /^[A-Z2-9]{4}$/.test(roomA.code), 'oda kuruldu, kod: ' + (roomA && roomA.code));
 
+    a.send({ t: 'ping', c: 1234.5 });
+    const pong = await a.wait(m => m.t === 'pong');
+    ok(pong && pong.c === 1234.5, 'ping yanıtı gönderilen zamanı geri döndürür');
+
     const bad = client('X'); await bad.open;
     bad.send({ t: 'join', name: 'X', code: 'ZZZZ' });
     ok(!!(await bad.wait(m => m.t === 'error')), 'olmayan odaya katılma hata verir');
@@ -83,6 +87,10 @@ function client(name) {
 
     const s0 = await a.wait(m => m.t === 's');
     ok(!!s0, 'durum yayını geliyor');
+    const n0 = a.msgs.filter(m => m.t === 's').length;
+    await sleep(500);
+    const rate = (a.msgs.filter(m => m.t === 's').length - n0) * 2;
+    ok(rate > 45, `durum saniyede ~60 kez yayınlanıyor (${rate}/sn)`);
     const x0 = s0.p[1][0];
     b.send({ t: 'i', b: 2 });   // sağ
     await sleep(600);

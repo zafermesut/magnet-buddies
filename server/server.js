@@ -130,7 +130,6 @@ class Room {
     this.game = null;
     this.inGame = [];        // bölüme katılan üyeler (sırası oyuncu numarasıdır)
     this.custom = null;      // kurucunun editörde yaptığı bölüm (level -1)
-    this.tick = 0;
     this.fxT = -1;
     this.cleared = new Set();   // bu odada geçilen bölümler
   }
@@ -168,7 +167,6 @@ class Room {
     this.game = new Game(level === -1 ? this.custom : level, this.inGame.length);
     this.state = 'playing';
     this.fxT = -1;
-    this.tick = 0;
     const players = this.inGame.map(m => ({ id: m.id, name: m.name }));
     const def = level === -1 ? this.custom : undefined;
     for (const m of this.members) this.send(m, { t: 'start', level, def, players, you: this.inGame.indexOf(m) });
@@ -186,8 +184,7 @@ class Room {
     if (this.state !== 'playing') return;
     const g = this.game;
     g.step(STEP, this.inGame.map(m => m.input));
-    this.tick++;
-    if (this.tick % 2 === 0 || g.done) this.broadcast(this.snapshot());
+    this.broadcast(this.snapshot());
     if (g.done) {
       this.state = 'complete';
       if (this.level >= 0) this.cleared.add(LEVELS[this.level].id);
@@ -313,6 +310,7 @@ wss.on('connection', ws => {
     let msg;
     try { msg = JSON.parse(data); } catch (e) { return; }
     if (!msg || typeof msg.t !== 'string') return;
+    if (msg.t === 'ping') { ws.send(JSON.stringify({ t: 'pong', c: Number(msg.c) || 0 })); return; }   // gecikme ölçümü
 
     if (!room) {
       // Oyuncunun geçtiği bölümler (kilitler için); yalnızca gerçek bölüm kimlikleri alınır
