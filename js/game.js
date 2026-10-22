@@ -550,11 +550,21 @@ class Game {
       if (P.dir > 0 && hold) P.dir = -1;                   // durdurulunca geri çekilir
       if (P.pause > 0 && !(P.dir < 0 && hold)) { P.pause -= dt; continue; }
       if (P.dir > 0) {
-        let dy = PHYS.pressDown * dt;
-        // Zemine ya da kutuya değene kadar
-        while (dy > 0.5 && (this.rectBlocked(P.x, P.y + dy, P.w, P.h) || this.boxes.some(b => overlap(b, { x: P.x, y: P.y + dy, w: P.w, h: P.h })))) dy /= 2;
-        if (dy <= 0.5) { P.dir = -1; P.pause = PHYS.pressRest; this.fx('press', P.x + P.w / 2, P.y + P.h); continue; }
-        P.y += dy;
+        // Zemine ya da kutuya tam değecek kadar iner (yarım piksel boşluk kalırsa üstüne yürünemez)
+        const next = P.y + PHYS.pressDown * dt;
+        let limit = Infinity;
+        const c0 = Math.floor(P.x / T), c1 = Math.floor((P.x + P.w - 0.001) / T);
+        for (let r = Math.floor((P.y + P.h) / T); r <= Math.floor((next + P.h - 0.001) / T); r++) {
+          for (let c = c0; c <= c1; c++) if (this.blocks(null, c, r)) limit = Math.min(limit, r * T - P.h);
+        }
+        for (const b of this.boxes) {
+          if (b.x < P.x + P.w && b.x + b.w > P.x && b.y >= P.y + P.h - 0.01) limit = Math.min(limit, b.y - P.h);
+        }
+        if (next >= limit) {
+          P.y = limit;
+          P.dir = -1; P.pause = PHYS.pressRest;
+          this.fx('press', P.x + P.w / 2, P.y + P.h);
+        } else P.y = next;
         const head = { x: P.x, y: P.y, w: P.w, h: P.h };
         for (const o of this.players.concat(this.keys)) {
           if ((o.kind === 'player' && o.inExit) || o.holder || o.used || !overlap(o, head)) continue;
