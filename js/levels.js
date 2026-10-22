@@ -20,6 +20,10 @@
 //   p n  kutup kapısı (+ / −): yalnızca aynı kutuptaki oyuncuyu geçirir
 //   C  pusula parçası (anahtar gibi taşınır, kilitli kapıyı açar)
 //   V  vida (isteğe bağlı toplanır; bölüm başına en fazla 3)
+//   < >  taşıyıcı bant (zemin; üstündekini sola / sağa taşır)
+//   7 8 9  pres (1/2/3 kanalı; yan yana aynı rakamlar tek blok). Bulunduğu yerden aşağı iner, bir şeye
+//          değince geri çıkar; kanalı açıkken yukarıda bekler. Altında kalan yana fırlar.
+//   t u w  zamanlı düğme (1/2/3 kanalı; bırakıldıktan sonra kanalı birkaç saniye daha açık tutar)
 //
 // magnet: true olan bölümlerde mıknatıs açıktır. pols: oyuncuların başlangıç kutupları (1 = +, -1 = −).
 //
@@ -641,30 +645,160 @@ const LEVELS = [
       '#######===.....######........#################',
     ],
   },
+  // ---------- Alan 2 · Fabrika ----------
+  {
+    id: 'uzun-atlama',
+    name: 'Uzun atlama',
+    hint: 'Bant hız verir: üstünde koşarak zıplarsan çukuru aşarsın. Kapıyı biri tutsun, karşıda şalter onu açık tutar.',
+    map: [
+      '################################',
+      '#.......#......................#',
+      '#.......#......................#',
+      '#.......#......................#',
+      '#.......#......................#',
+      '#.......#......................#',
+      '#.......#.................V....#',
+      '#..V....#..................5...#',
+      '#.......a.......V.........##...#',
+      '#.......a.................##...#',
+      '#.SS.1..a.............4...bb.E.#',
+      '########>>>>>>.....#############',
+    ],
+  },
+  {
+    id: 'pres-hatti',
+    name: 'Pres hattı',
+    hint: 'Pres inip kalkar; altında kalan yana fırlar. Anahtar raftadır. Koridorun sonundaki düğme presleri yukarıda tutar.',
+    map: [
+      '################################',
+      '#.......###################....#',
+      '#.......###################....#',
+      '#.......###################....#',
+      '#.......###################....#',
+      '#.V.....###################....#',
+      '#.......###################....#',
+      '#.K.....###################....#',
+      '####......77...77...77.....D...#',
+      '#.................V........D..V#',
+      '#....SS.................1..D.E.#',
+      '################################',
+    ],
+  },
+  {
+    id: 'vardiya',
+    name: 'Vardiya',
+    hint: 'Zamanlı düğme kapağı ' + PHYS.timerHold + ' saniye açık tutar: bas ve koş! Cebin kapağını biri tutsun; karşıdaki şalter onu açık bırakır.',
+    map: [
+      '################################',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#####............#.............#',
+      '#.V.b........V...a.............#',
+      '#...b........#...a........V....#',
+      '#.t.b.SS2....#...a.5........E..#',
+      '#########<<<####################',
+    ],
+  },
+  {
+    id: 'ters-akinti',
+    name: 'Ters akıntı',
+    hint: 'Bant seni geri iter, presler acımaz ama yolunu keser. Düğme presleri yalnızca başta tutar; son geçen zamanlamayı bilmeli.',
+    map: [
+      '################################',
+      '#........################......#',
+      '#........################......#',
+      '#........################......#',
+      '#........################......#',
+      '#........################..V...#',
+      '#........################......#',
+      '#........################..5...#',
+      '#...V........7...7.......D.#...#',
+      '#..............V.........D.#...#',
+      '#.SS.K.1.................D.b.E.#',
+      '###########<<<<<<<<#############',
+    ],
+  },
+  {
+    id: 'montaj-sinavi',
+    name: 'Montaj sınavı',
+    hint: 'Hepsi bir arada: zamanlı düğme, bantla uzun atlama, inişte pres, ikiyle itilen kutu ve raftaki anahtar.',
+    map: [
+      '########################################',
+      '#.....#...........................#.#..#',
+      '#.....#...........................#.#..#',
+      '#.....#...........................#.#..#',
+      '#.....#...........88..............#.#..#',
+      '#.....#...........................#.#..#',
+      '#.....#....................V......#.#..#',
+      '#.....#........................K..#.#.V#',
+      '#.....a........V..............###.c.D..#',
+      '#.....a.................H.........c.D..#',
+      '#.SSt.a....................3.#....c.D.E#',
+      '#######>>>>>>.....######################',
+    ],
+  },
 ];
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
 
-// Alan 1 · Hurdalık haritasının kısımları (sırası LEVELS ile aynı)
-const PARTS = [
-  { name: 'Uyanış', ids: ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu'] },
-  { name: 'Hurda yığınları', ids: ['salter', 'merdiven', 'asansor', 'zipzip', 'hepsi-birden'] },
-  { name: 'Paslı raylar', ids: ['gezgin', 'yuk-treni', 'ters-asansor', 'yay-ve-kule', 'hurda-dagi'] },
-  { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'metal-sandik', 'miknatis-ustasi'] },
-  { name: 'Manyetik çekirdek', ids: ['yapiskan-tavan', 'miknatis-bacasi', 'kutup-kapisi', 'ikiye-bolun', 'cekirdek'] },
-  { name: 'Pusula parçası', ids: ['uzun-yol', 'anahtar-zinciri', 'asma-bahce', 'firtinanin-gozu', 'pusula-parcasi'] },
+// Alanlar: her biri kendi haritası, kısımları ve zorluğuyla. Alanlar istenen sırayla oynanır;
+// bir alanın içindeki bölümler sırayla açılır. LEVELS, alanların kısımlarıyla aynı sıradadır.
+const AREAS = [
+  {
+    id: 'hurdalik', name: 'Hurdalık', difficulty: 'Kolay', color: '#ffa94d',
+    story: 'Fırtınanın ilk savurduğu yer: paslı hurda, eski makineler. Pusula iğnesinin ilk parçası burada.',
+    parts: [
+      { name: 'Uyanış', ids: ['merhaba', 'anahtar', 'kule', 'nobetci', 'agir-kutu'] },
+      { name: 'Hurda yığınları', ids: ['salter', 'merdiven', 'asansor', 'zipzip', 'hepsi-birden'] },
+      { name: 'Paslı raylar', ids: ['gezgin', 'yuk-treni', 'ters-asansor', 'yay-ve-kule', 'hurda-dagi'] },
+      { name: 'Mıknatıs mezarlığı', ids: ['firlatma', 'ucurum', 'metal-anahtar', 'metal-sandik', 'miknatis-ustasi'] },
+      { name: 'Manyetik çekirdek', ids: ['yapiskan-tavan', 'miknatis-bacasi', 'kutup-kapisi', 'ikiye-bolun', 'cekirdek'] },
+      { name: 'Pusula parçası', ids: ['uzun-yol', 'anahtar-zinciri', 'asma-bahce', 'firtinanin-gozu', 'pusula-parcasi'] },
+    ],
+  },
+  {
+    id: 'fabrika', name: 'Fabrika', difficulty: 'Zor', color: '#66d9e8',
+    story: 'Pusulanın yapıldığı yer: bantlar, presler, zamanlı kapılar. İğnenin ikinci parçası burada.',
+    parts: [
+      { name: 'Montaj hattı', ids: ['uzun-atlama', 'pres-hatti', 'vardiya', 'ters-akinti', 'montaj-sinavi'] },
+    ],
+  },
 ];
-const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
+// Henüz yapılmamış alanlar: Alanlar ekranında "yakında" olarak görünür
+const SOON_AREAS = [
+  { name: 'Buzul', difficulty: 'Uzman', color: '#a5d8ff' },
+  { name: 'Kuzey Işıkları', difficulty: 'Uzman', color: '#b197fc' },
+];
 
-// Kilit: ilk bölüm, önceki bölümü geçilmiş ya da kendisi daha önce geçilmiş bölüm açıktır.
+// Kısımlar düz liste olarak da durur (her biri alanını bilir)
+const PARTS = AREAS.flatMap(a => a.parts.map(p => Object.assign({ area: a }, p)));
+const partOf = i => PARTS.findIndex(p => p.ids.includes(LEVELS[i].id));
+const areaOf = i => AREAS.findIndex(a => a.parts.some(p => p.ids.includes(LEVELS[i].id)));
+// Bir alanın bölümleri (LEVELS sırası)
+const areaLevels = a => AREAS[a].parts.flatMap(p => p.ids).map(levelIndexById);
+// Alan içinde sıradaki bölüm; alanın sonuysa -1
+function nextInArea(i) {
+  const list = areaLevels(areaOf(i)), k = list.indexOf(i);
+  return k >= 0 && k < list.length - 1 ? list[k + 1] : -1;
+}
+// Bölümün alanındaki sırası (1'den başlar)
+const levelNo = i => areaLevels(areaOf(i)).indexOf(i) + 1;
+
+// Kilit: her alanın ilk bölümü, önceki bölümü geçilmiş ya da kendisi daha önce geçilmiş bölüm açıktır.
 // done: geçilen bölüm kimlikleri (Set). Online odada odadakilerin hepsinin birleşimi kullanılır.
 function levelUnlocked(i, done) {
-  return i === 0 || done.has(LEVELS[i].id) || (i > 0 && done.has(LEVELS[i - 1].id));
+  if (!LEVELS[i]) return false;
+  const list = areaLevels(areaOf(i)), k = list.indexOf(i);
+  return k === 0 || done.has(LEVELS[i].id) || (k > 0 && done.has(LEVELS[list[k - 1]].id));
 }
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV<>789tuw';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

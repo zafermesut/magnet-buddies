@@ -86,6 +86,14 @@ console.log('Harita ve kilitler');
   ok(levelUnlocked(2, some) && !levelUnlocked(3, some), 'geçilen bölümün ardındaki açılır, ötesi kilitli');
   ok(levelUnlocked(L('firlatma'), new Set(['firlatma'])), 'daha önce geçilen bölüm sıra atlanmış olsa da açık kalır');
 }
+{
+  // Alanlar istenen sırayla oynanır: her alanın ilk bölümü baştan açık, içindekiler sırayla
+  const none = new Set();
+  ok(AREAS.every((a, k) => levelUnlocked(areaLevels(k)[0], none)), 'her alanın ilk bölümü baştan açık');
+  ok(AREAS.every((a, k) => { const idx = areaLevels(k); return idx.length < 2 || !levelUnlocked(idx[1], none); }), 'alanın ikinci bölümü ilki geçilmeden kilitli');
+  ok(AREAS.every((a, k) => { const idx = areaLevels(k); return nextInArea(idx[idx.length - 1]) === -1 && levelNo(idx[0]) === 1; }), 'alanın sonunda sıradaki bölüm yok, numaralar alanda 1 ile başlar');
+  ok(PARTS.every(p => AREAS.includes(p.area)), 'her kısım bir alana bağlı');
+}
 
 console.log('Vidalar');
 {
@@ -95,7 +103,7 @@ console.log('Vidalar');
   const bad = [];
   LEVELS.forEach((l, i) => {
     const g = new Game(i, 2), m = l.map, reach = g.magnet ? 7 : 4;
-    const solid = (r, c) => r >= m.length || '#PN-xyz='.includes(m[r][c]) || ('H'.includes(m[r][c]));
+    const solid = (r, c) => r >= m.length || '#PN-xyz=<>'.includes(m[r][c]) || ('H'.includes(m[r][c]));
     const stand = (r, c) => r >= 0 && r < m.length && c >= 0 && c < m[0].length && !'#PN'.includes(m[r][c]) && solid(r + 1, c);
     const near = (r0, c0, k) => {
       for (let r = r0; r <= Math.min(m.length - 1, r0 + k); r++) for (let c = c0 - 3; c <= c0 + 3; c++) if (stand(r, c)) return true;
@@ -1131,6 +1139,177 @@ function gardenClimb(g, sp, stripEnd, wallX, topY, stripBottom) {
   // Ağ: şalter, asansör ve yayın durumu yeni bir Game'e aktarılabilir olmalı (sunucu bunları yollar)
   const g = new Game(L('asansor'), 2);
   ok(Array.isArray(g.lifts) && Array.isArray(g.levers) && Array.isArray(g.springs) && g.switches, 'yeni öğelerin durumu Game üzerinde');
+}
+
+console.log('Fabrika öğeleri');
+{
+  const mk = (map, n) => new Game({ name: 'Deneme', map }, n || 1);
+  // Taşıyıcı bant üstündekini taşır
+  const g = mk(['##########', '#........#', '#........#', '#S......E#', '##>>>>>###']), p = g.players[0];
+  p.x = 2 * T + 3; p.y = 4 * T - p.h;
+  const x0 = p.x;
+  run(g, [idle], 1);
+  ok(p.x - x0 > 90 && p.x - x0 < 130, 'bant duran oyuncuyu sağa taşır (' + Math.round(p.x - x0) + ' px)');
+}
+{
+  // Pres iner; altında kalan ezilmez, yana fırlar; pres zeminde bekleyip geri çıkar
+  const g = new Game({ name: 'Deneme', map: ['##########', '#...7....#', '#........#', '#E......S#', '##########'] }, 1);
+  const p = g.players[0], P = g.presses[0];
+  p.x = 4 * T + 3; p.y = 4 * T - p.h;
+  let bonk = false, low = P.y;
+  run(g, [idle], 4, g => { bonk = bonk || g.effects.some(e => e.type === 'bonk'); low = Math.max(low, P.y); return false; });
+  ok(bonk && (p.x + p.w <= P.x || p.x >= P.x + P.w), 'presin altında kalan yana fırlar');
+  ok(Math.abs(low - 3 * T) < 1, 'pres zemine kadar iner (' + low + ')');
+  let back = false;
+  run(g, [idle], 3, () => { back = back || P.y <= P.topY + 0.5; return false; });
+  ok(back, 'pres geri çıkar');
+}
+{
+  // Pres kanalı açıkken yukarıda bekler
+  const g = new Game({ name: 'Deneme', map: ['##########', '#...7....#', '#........#', '#S.1....E#', '##########'] }, 1);
+  const p = g.players[0], P = g.presses[0], btn = g.buttons[0];
+  p.x = btn.x; p.y = btn.y + btn.h - p.h;
+  let moved = false;
+  run(g, [idle], 4, () => { moved = moved || P.y > P.topY + 1; return false; });
+  ok(!moved, 'düğmeye basılıyken pres yukarıda bekler');
+}
+{
+  // Zamanlı düğme bırakıldıktan sonra kanalı birkaç saniye daha açık tutar
+  const g = new Game({ name: 'Deneme', map: ['##########', '#........#', '#....a...#', '#S.t.a..E#', '##########'] }, 1);
+  const p = g.players[0], btn = g.buttons[0], gate = g.gates[0];
+  p.x = btn.x; p.y = btn.y + btn.h - p.h;
+  run(g, [idle], 0.3);
+  p.x = 1 * T + 3;
+  run(g, [idle], PHYS.timerHold - 1);
+  const stillOpen = gate.open;
+  run(g, [idle], 1.5);
+  ok(stillOpen && !gate.open, 'zamanlı düğme kanalı ' + PHYS.timerHold + ' sn açık tutar, sonra kapanır');
+}
+
+console.log('Fabrika bölümleri');
+// Bantta koşup çukurun kenarında zıpla (bant hız verir); karşıya inince biter
+const longJump = (edgeX, landX) => (g, p, t) => {
+  if (p.supported && p.x > landX) return null;
+  if (p.supported && p.x + p.w < edgeX + 10) return I({ right: true });
+  return I({ right: true, jump: p.vy < 0 || p.supported });
+};
+// Arkadaşının başına çık, oradan yandaki yüksek yere zıpla (dir: 1 sağa, -1 sola)
+const towerUp = (A, topSurf, dir) => (g, p, t) => {
+  if (p.supported && p.y + p.h <= topSurf + 1) return null;
+  if (p.ground === A) return I({ jump: (t * 5 | 0) % 2 === 0 });   // tuş kenar ister: aralıklı bas
+  if (!p.supported && p.vy < 0 && p.y + p.h < topSurf + 6) return I({ jump: true, right: dir > 0, left: dir < 0 });
+  return climbOn(A)(g, p, t);
+};
+const flip = (lv, ch) => (g, p, t) => (g.switches[ch] ? null : Math.abs(p.x + p.w / 2 - (lv.x + T / 2)) > 10 ? goTo(lv.x + T / 2)(g, p, t) : I({ action: tap(t) }));
+{
+  // F1. Uzun atlama: A düğmede, B bantla çukuru aşar ve şalteri çevirir; A da aşar; kule ile duvara, şalter ile kapak
+  const g = new Game(L('uzun-atlama'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const btn = g.buttons[0], [lv1, lv2] = g.levers.slice().sort((p, q) => p.x - q.x);
+  const hold = (g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t));
+  const ctl = phases([
+    [hold, (g, p, t) => (g.gates[0].open || g.switches[1] ? longJump(14 * T, 19 * T)(g, p, t) || flip(lv1, 1)(g, p, t) : goTo(7 * T)(g, p, t))],
+    [longJump(14 * T, 19 * T), (g, p, t) => (A.x > 19 * T ? null : idle())],
+    [(g, p, t) => (p.supported && p.y + p.h <= 8 * T + 1 ? null : Math.abs(B.x + B.w / 2 - (25 * T + 17)) < 8 && B.supported ? towerUp(B, 8 * T, 1)(g, p, t) : goTo(23 * T)(g, p, t)),
+     (g, p, t) => (A.supported && A.y + A.h <= 8 * T + 1 ? null : Math.abs(p.x + p.w / 2 - (25 * T + 17)) > 6 ? goTo(25 * T + 17)(g, p, t) : idle())],
+    [flip(lv2, 2), (g, p, t) => (g.switches[2] ? null : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F1. Uzun atlama geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+// Preslerin altından geç: sıradaki presin sütununa yalnızca pres yukarıda ve beklemesi yetecekken gir
+const passPresses = (presses, toX, speed = PHYS.runSpeed) => (g, p, t) => {
+  if (p.x + p.w / 2 >= toX - 6) return null;
+  const next = presses.filter(P => P.x + P.w > p.x).sort((a, b) => a.x - b.x)[0];
+  if (next && p.x + p.w > next.x - 14 && p.x < next.x + next.w) {
+    const inside = p.x + p.w > next.x;
+    const safe = (next.y <= next.topY + 1 && next.dir > 0 && next.pause > (next.w + p.w + 20) / speed) || g.channelOn(next.channel);
+    if (!inside && !safe) return I();   // sütunun önünde bekle
+  }
+  return goTo(toX)(g, p, t);
+};
+{
+  // F2. Pres hattı: kule ile raftan anahtar; B anahtarla preslerden zamanlayarak geçer, düğmede presleri tutar; A geçer
+  const g = new Game(L('pres-hatti'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0], btn = g.buttons[0];
+  const base = 4 * T + 20;
+  const ctl = phases([
+    [(g, p, t) => (key.holder ? null : Math.abs(p.x + p.w / 2 - base) > 6 ? goTo(base)(g, p, t) : idle()),
+     (g, p, t) => (key.holder ? null : Math.abs(A.x + A.w / 2 - base) < 8 && A.supported ? towerUp(A, 8 * T, -1)(g, p, t) : goTo(6 * T)(g, p, t))],
+    [(g, p, t) => (btn.pressed ? null : idle()), (g, p, t) => (Math.abs(p.x + p.w / 2 - (btn.x + btn.w / 2)) < 6 ? null : passPresses(g.presses, btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (p.x > 23 * T ? null : goTo(23 * T + 20)(g, p, t)), (g, p, t) => (A.x > 23 * T ? null : idle())],
+    [(g, p, t) => (door.open ? goTo(ex)(g, p, t) : idle()), (g, p, t) => (door.open ? goTo(ex)(g, p, t) : goTo(door.cells[0].c * T)(g, p, t))],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F2. Pres hattı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F3. Vardiya: A düğmede cebi açar; B zamanlı düğmeye basıp kapak kapanmadan geçer, şalterle cebi açık bırakır; A da koşar
+  const g = new Game(L('vardiya'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const tb = g.buttons.find(b => b.timed), b2 = g.buttons.find(b => !b.timed), lv = g.levers[0], gx = g.gates.find(x => x.channel === 1).cells[0].c * T;
+  const on = (b, p) => Math.abs(p.x + p.w / 2 - (b.x + b.w / 2)) < 6;
+  const pressed = new Set();   // zamanlı düğmeye basmış olan koşar
+  const sprint = (g, p, t) => {
+    if (p.x > gx + T) return null;
+    if (on(tb, p)) pressed.add(p);
+    return pressed.has(p) ? goTo(gx + 2 * T)(g, p, t) : goTo(tb.x + tb.w / 2)(g, p, t);
+  };
+  const ctl = phases([
+    [(g, p, t) => (g.switches[2] ? null : p.x > gx + T ? flip(lv, 2)(g, p, t) : sprint(g, p, t)), (g, p, t) => (g.switches[2] ? null : goTo(b2.x + b2.w / 2)(g, p, t))],
+    [(g, p, t) => (B.x > gx + T ? null : goTo(gx + 6 * T)(g, p, t)), (g, p, t) => (p.x > gx + T ? null : sprint(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F3. Vardiya geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F4. Ters akıntı: B anahtarı alıp düğmede presleri tutar, A karşı bantta geçer; B anahtarla tek başına zamanlayarak geçer;
+  // kapı açılır, kule ile duvarın üstüne, şalterle duvardaki kapak
+  const g = new Game(L('ters-akinti'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0], btn = g.buttons[0], lv = g.levers[0];
+  const waitX = 23 * T + 20, base = 26 * T + 20, slow = PHYS.runSpeed - PHYS.beltSpeed;
+  const ctl = phases([
+    [(g, p, t) => (p.x > 22 * T ? null : btn.pressed ? passPresses(g.presses, waitX, slow)(g, p, t) : idle()),
+     (g, p, t) => (A.x > 22 * T ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (door.open ? null : goTo(waitX)(g, p, t)), (g, p, t) => (door.open ? null : key.holder !== p ? goTo(key.x + key.w / 2)(g, p, t) : passPresses(g.presses, door.cells[0].c * T, slow)(g, p, t))],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - base) < 6 && p.supported ? null : goTo(base)(g, p, t)), (g, p, t) => (p.x > 24 * T ? null : goTo(24 * T + 10)(g, p, t))],
+    [(g, p, t) => (B.supported && B.y + B.h <= 8 * T + 1 ? null : idle()), towerUp(A, 8 * T, 1)],
+    [(g, p, t) => (g.switches[2] ? null : idle()), flip(lv, 2)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F4. Ters akıntı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F5. Montaj sınavı: zamanlı düğme → bantla uzun atlama (inişteki pres kalkarken) → ikisi kutuyu düğmeye iter →
+  // kutudan rafa, anahtar → kapı → çıkış
+  const g = new Game(L('montaj-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
+  const tb = g.buttons.find(b => b.timed), P = g.presses[0], box = g.boxes[0];
+  const landed = p => p.supported && p.x > 20 * T;
+  // Zamanlı düğmeye bas; pres kalkmaya başlayınca koş ve atla, inince presin altından çık
+  const cross = (g, p, t) => {
+    if (landed(p)) return null;
+    if (p.x > 13 * T) return p.supported && p.x > 17 * T ? goTo(21 * T)(g, p, t) : longJump(13 * T, 17 * T)(g, p, t) || goTo(21 * T)(g, p, t);
+    const onT = Math.abs(p.x + p.w / 2 - (tb.x + tb.w / 2)) < 6;
+    if (onT && P.dir < 0 && P.y > P.topY + 150) going.add(p);   // pres kalkarken yola çık, sonra durma
+    if (!going.has(p)) return goTo(tb.x + tb.w / 2)(g, p, t);
+    return longJump(13 * T, 17 * T)(g, p, t);
+  };
+  const going = new Set();
+  const boxDone = () => box.x + box.w >= 29 * T - 1;
+  const ctl = phases([
+    [cross, (g, p, t) => (landed(A) ? null : idle())],
+    [(g, p, t) => (landed(B) ? null : goTo(21 * T + 10)(g, p, t)), cross],
+    [(g, p, t) => (boxDone() ? null : I({ right: true })), (g, p, t) => (boxDone() ? null : I({ right: true }))],
+    [(g, p, t) => {
+      if (door.open) return null;
+      if (key.holder === p) return goTo(door.cells[0].c * T)(g, p, t);
+      if (p.supported && p.y + p.h <= 8 * T + 1 && p.x > 29 * T) return goTo(key.x + key.w / 2)(g, p, t);   // rafta
+      if (p.ground === box || (!p.supported && p.y + p.h < 9 * T)) return I({ right: true, jump: p.supported || p.vy < 0 });   // kutudan rafa
+      return goTo(box.x + box.w / 2)(g, p, t);   // önce kutunun üstüne
+    },
+     (g, p, t) => (door.open ? null : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F5. Montaj sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

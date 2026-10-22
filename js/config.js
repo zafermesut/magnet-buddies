@@ -31,6 +31,14 @@ const PHYS = {
   springV: 860,        // yayın fırlatma hızı: ~4 karo; zıplama tuşu basılıysa springBoost katı (~5 karo)
   springBoost: 1.12,
 
+  // Fabrika öğeleri
+  beltSpeed: 110,      // taşıyıcı bant üstündekini bu hızla taşır (px/sn)
+  pressDown: 520,      // pres iniş hızı (px/sn)
+  pressUp: 150,        // pres çıkış hızı (px/sn)
+  pressWait: 1.2,      // pres yukarıda bekler (sn)
+  pressRest: 0.5,      // pres aşağıda bekler (sn)
+  timerHold: 4,        // zamanlı düğme bırakıldıktan sonra kanalı bu kadar açık tutar (sn)
+
   // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
   // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.
   magnetRange: 280,

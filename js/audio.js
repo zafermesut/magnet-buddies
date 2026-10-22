@@ -170,6 +170,14 @@ const Sound = {
         this.tone(d, { type: 'triangle', f: 180, f2: 900, dur: 0.28, vol: 0.2 });
         this.tone(d, { type: 'sine', f: 360, f2: 1300, t: 0.02, dur: 0.22, vol: 0.08 });
         break;
+      case 'press':
+        // Ağır metal "güm"
+        this.tone(d, { f: 110, f2: 45, dur: 0.22, vol: 0.32 });
+        this.noise(d, { dur: 0.14, vol: 0.12, type: 'lowpass', freq: 900 });
+        break;
+      case 'bonk':
+        this.tone(d, { type: 'square', f: 520, f2: 180, dur: 0.16, vol: 0.12, filter: 1600 });
+        break;
       case 'swap':
         this.tone(d, { f: 420, f2: 840, dur: 0.16, vol: 0.18 });
         this.tone(d, { f: 630, f2: 1260, t: 0.03, dur: 0.14, vol: 0.08 });

@@ -27,6 +27,10 @@ const EDITOR_TOOLS = [
   { id: 'magN', ch: 'N', label: '− mıknatıs', cls: 'tMagN', tip: 'Sabit mıknatıs bloğu: + kutuptakini çeker (tavana yapışılır, duvara tırmanılır), − kutuptakini iter.' },
   { id: 'poleP', ch: 'p', label: '+ kapı', cls: 'tPoleP', tip: 'Kutup kapısı: yalnızca + kutuptaki oyuncu geçer.' },
   { id: 'poleN', ch: 'n', label: '− kapı', cls: 'tPoleN', tip: 'Kutup kapısı: yalnızca − kutuptaki oyuncu geçer.' },
+  { id: 'beltL', ch: '<', label: 'Bant ←', cls: 'tBeltL', tip: 'Taşıyıcı bant: zemindir; üstündekini sola taşır.' },
+  { id: 'beltR', ch: '>', label: 'Bant →', cls: 'tBeltR', tip: 'Taşıyıcı bant: zemindir; üstündekini sağa taşır.' },
+  { id: 'press', chs: '789', label: 'Pres', cls: 'tPress', tip: 'Yan yana çiz: tek blok olur. Bulunduğu yerden aşağı iner, geri çıkar. Aynı renk açıkken yukarıda bekler. Altında kalan yana fırlar.' },
+  { id: 'timer', chs: 'tuw', label: 'Zamanlı düğme', cls: 'tTimer', tip: 'Bırakıldıktan sonra aynı renkteki kapakları ' + PHYS.timerHold + ' saniye daha açık tutar.' },
 ];
 
 const EDITOR_KEY = 'editor-level-v1';

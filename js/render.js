@@ -177,11 +177,38 @@ class Renderer {
       }
       ctx.fillStyle = col;
       ctx.fillRect(b.x + 3, b.y + b.h - 3 - h, b.w - 6, h);
+      // Zamanlı düğme: kalan süre üstünde azalan bir yay
+      if (b.timed && b.left > 0) {
+        ctx.strokeStyle = col; ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(b.x + b.w / 2, b.y - 6, 8, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * b.left / PHYS.timerHold); ctx.stroke();
+      }
     }
   }
 
-  // Hurdalık öğeleri: tek yönlü platform, şalter, asansör, yay
+  // Hurdalık ve Fabrika öğeleri: tek yönlü platform, şalter, asansör, yay, bant, pres
   drawScrap(ctx, g, t) {
+    for (const [id, dir] of g.belts) {
+      const x = (id % g.cols) * T, y = Math.floor(id / g.cols) * T;
+      ctx.fillStyle = '#23243f';
+      ctx.fillRect(x, y, T, 8);
+      ctx.strokeStyle = '#ffd43b'; ctx.lineWidth = 2;
+      const off = ((t * PHYS.beltSpeed * dir) % 20 + 20) % 20;
+      for (let k = -1; k < 2; k++) {
+        const cx = x + off + k * 20;
+        if (cx < x + 2 || cx > x + T - 2) continue;
+        ctx.beginPath(); ctx.moveTo(cx - dir * 3, y + 1); ctx.lineTo(cx + dir * 3, y + 4); ctx.lineTo(cx - dir * 3, y + 7); ctx.stroke();
+      }
+    }
+    for (const P of g.presses) {
+      ctx.fillStyle = '#8c90c8';
+      ctx.fillRect(P.x + P.w / 2 - 3, 0, 6, P.y);
+      ctx.fillStyle = '#5d6189';
+      ctx.fillRect(P.x, P.y, P.w, P.h);
+      ctx.fillStyle = '#ffd43b';
+      ctx.fillRect(P.x + 3, P.y + P.h - 10, P.w - 6, 6);
+      ctx.fillStyle = rgbaHex(CHANNEL_COLORS[P.channel], g.channelOn(P.channel) ? 1 : 0.5);
+      ctx.fillRect(P.x + P.w / 2 - 6, P.y + 6, 12, 5);
+    }
     ctx.fillStyle = '#c27a4a';
     for (let r = 0; r < g.rows; r++) for (let c = 0; c < g.cols; c++) {
       if (g.oneway[r][c]) ctx.fillRect(c * T, r * T, T, 7);

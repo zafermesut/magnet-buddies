@@ -354,6 +354,11 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tStop { background: linear-gradient(#ffa94d, #ffa94d) center top / 4px 60% no-repeat; }
 .tool i.tLift { background: #55588f; box-shadow: inset 0 3px 0 var(--ch); }
 .tool i.tOne { background: linear-gradient(#c27a4a, #c27a4a) top / 100% 5px no-repeat; }
+.tool i.tBeltL, .tool i.tBeltR { background: #23243f; box-shadow: inset 0 -3px 0 #3a3f72; position: relative; }
+.tool i.tBeltL::after, .tool i.tBeltR::after { position: absolute; inset: 0; display: grid; place-items: center; color: #ffd43b; font-style: normal; font-weight: 800; font-size: 11px; line-height: 1; }
+.tool i.tBeltL::after { content: '‹'; } .tool i.tBeltR::after { content: '›'; }
+.tool i.tPress { background: linear-gradient(#8c90c8, #8c90c8) center top / 3px 40% no-repeat, linear-gradient(#5d6189, #5d6189) bottom / 100% 60% no-repeat; box-shadow: inset 0 -3px 0 var(--ch); }
+.tool i.tTimer { background: transparent; border: 2px solid var(--ch); border-radius: 50%; border-right-color: transparent; }
 .tool i.tSpring { background: linear-gradient(#ffa94d, #ffa94d) top / 100% 4px no-repeat, repeating-linear-gradient(0deg, #8c90c8 0 2px, transparent 2px 4px); }
 #edColors { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8e92c0; transition: opacity .15s ease; }
 #edColors span { margin-right: auto; }
@@ -544,6 +549,42 @@ button.stop:hover .dot { transform: translateY(-3px) scale(1.05); }
   .stop .lbl { max-width: 72px; font-size: 10.5px; }
   .stop .dot { width: 44px; height: 44px; font-size: 17px; }
   .stop .time { display: none; }
+}
+
+/* ---------- Alanlar ---------- */
+.diff { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: none; vertical-align: 1px; }
+.diff.easy { background: rgba(105, 219, 124, .16); color: #8ce99a; }
+.diff.hard { background: rgba(255, 146, 43, .18); color: #ffc078; }
+.diff.expert { background: rgba(255, 107, 107, .18); color: #ffa8a8; }
+.areaList { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 14px; }
+.areaCard {
+  position: relative; display: flex; flex-direction: column; align-items: stretch; gap: 8px; padding: 16px; text-align: left; overflow: hidden;
+  border-radius: 18px; border: 1px solid rgba(255, 255, 255, .12);
+  background: linear-gradient(160deg, color-mix(in srgb, var(--ac) 22%, transparent), rgba(255, 255, 255, .03) 60%);
+}
+.areaCard::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--ac); }
+button.areaCard:hover:not(:disabled) { background: linear-gradient(160deg, color-mix(in srgb, var(--ac) 32%, transparent), rgba(255, 255, 255, .05) 60%); }
+.areaTop { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.areaNo { color: var(--ac); font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; }
+.areaCard > b { font-size: 24px; color: #fff; }
+.areaStory { font-size: 13px; color: #b9bce0; line-height: 1.45; display: flex; align-items: center; gap: 6px; }
+.areaBar { height: 7px; border-radius: 999px; background: rgba(255, 255, 255, .1); overflow: hidden; margin-top: auto; }
+.areaBar i { display: block; height: 100%; border-radius: inherit; background: var(--ac); }
+.areaStats { font-size: 12px; color: #b9bce0; }
+.areaStats b { color: #fff; }
+.areaCard.soon { opacity: .5; border-style: dashed; background: rgba(255, 255, 255, .02); }
+.areaCard.soon::before { opacity: .4; }
+.areaCard.soon .areaStory .ic { width: 14px; height: 14px; }
+#mapArea .diff { margin-left: 6px; letter-spacing: .04em; }
+/* Odada alan sekmeleri */
+.areaTabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+.areaTabs button { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: 999px; font-size: 13px; }
+.areaTabs button.on { border-color: var(--ac); background: color-mix(in srgb, var(--ac) 18%, transparent); color: #fff; }
+@media (max-height: 520px) {
+  .areaList { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+  .areaCard { padding: 12px; gap: 6px; }
+  .areaCard > b { font-size: 19px; }
+  .areaStory { font-size: 12px; }
 }
 
 /* ---------- Alan 1 finali: pusula ---------- */

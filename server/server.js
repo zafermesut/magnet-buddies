@@ -33,7 +33,7 @@ const sim = vm.createContext({ console, Math, Map, Set });
 for (const f of ['config.js', 'levels.js', 'game.js']) {
   vm.runInContext(fs.readFileSync(path.join(ROOT, 'js', f), 'utf8'), sim, { filename: f });
 }
-const { Game, LEVELS, validateLevel, levelUnlocked } = vm.runInContext('({ Game, LEVELS, validateLevel, levelUnlocked })', sim);
+const { Game, LEVELS, validateLevel, levelUnlocked, nextInArea } = vm.runInContext('({ Game, LEVELS, validateLevel, levelUnlocked, nextInArea })', sim);
 const LEVEL_IDS = new Set(LEVELS.map(l => l.id));
 
 // Atölye: oyuncuların bölümleri ve paketleri (veriler DATA_DIR altında, varsayılan: data/)
@@ -220,6 +220,8 @@ class Room {
       sw: [1, 2, 3].map(c => (g.switches[c] ? 1 : 0)),
       lv: g.levers.map(l => r3(l.flipT)),
       l: g.lifts.map(l => r1(l.y)),
+      pr: g.presses.map(P => r1(P.y)),
+      tm: g.buttons.map(b => (b.timed ? r3(b.left) : 0)),
       m: g.movers.map(m => r1(m.x)),
       v: g.screws.map(sc => (sc.got ? 1 : 0)),
       sp: g.springs.map(s => r3(s.t)),
@@ -281,7 +283,7 @@ class Room {
         break;
       case 'next':
         if (this.state === 'complete') {
-          if (this.level >= 0 && this.level < LEVELS.length - 1) this.start(this.level + 1);
+          if (this.level >= 0 && nextInArea(this.level) >= 0) this.start(nextInArea(this.level));   // alanın sonunda odaya dönülür
           else if (this.level === -1 && this.queue && this.queueIndex < this.queue.length - 1) {
             // Pakette sıradaki bölüm
             this.custom = this.queue[++this.queueIndex];

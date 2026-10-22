@@ -112,6 +112,8 @@ function applySnapshot(g, s) {
   (s.sw || []).forEach((o, i) => { g.switches[i + 1] = !!o; });
   (s.lv || []).forEach((t, i) => { if (g.levers[i]) g.levers[i].flipT = t; });
   (s.l || []).forEach((y, i) => { if (g.lifts[i]) setTarget(g.lifts[i], g.lifts[i].x, y); });
+  (s.pr || []).forEach((y, i) => { if (g.presses[i]) setTarget(g.presses[i], g.presses[i].x, y); });
+  (s.tm || []).forEach((t, i) => { if (g.buttons[i]) g.buttons[i].left = t; });
   (s.v || []).forEach((o, i) => { if (g.screws[i]) g.screws[i].got = !!o; });
   (s.m || []).forEach((x, i) => { if (g.movers[i]) setTarget(g.movers[i], x, g.movers[i].y); });
   (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
@@ -122,7 +124,7 @@ function applySnapshot(g, s) {
 // Kendi top yumuşatılmaz, sunucunun son konumunda çizilir: tuşa tepki gecikmesi azalır
 function smoothNet(g, dt) {
   const k = Math.min(1, dt * 20);
-  for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts, ...g.movers]) {
+  for (const o of [...g.players, ...g.keys, ...g.boxes, ...g.lifts, ...g.movers, ...g.presses]) {
     if (o.tx === undefined) continue;
     const kk = o.isMe ? 1 : k;
     o.x += (o.tx - o.x) * kk;
@@ -146,7 +148,7 @@ const Echo = {
     if (g.rectBlocked(foot.x, foot.y, foot.w, foot.h, p)) return true;
     const r = Math.floor((p.y + p.h + 1) / T);
     for (let c = Math.floor(foot.x / T); c <= Math.floor((foot.x + foot.w) / T); c++) if (g.oneway[r] && g.oneway[r][c]) return true;
-    return [...g.players, ...g.boxes, ...g.lifts, ...g.movers].some(o => o !== p && !o.inExit &&
+    return [...g.players, ...g.boxes, ...g.lifts, ...g.movers, ...g.presses].some(o => o !== p && !o.inExit &&
       foot.x < o.x + o.w && foot.x + foot.w > o.x && foot.y < o.y + o.h && foot.y + foot.h > o.y);
   },
 

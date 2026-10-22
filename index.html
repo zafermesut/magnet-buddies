@@ -181,6 +181,7 @@
       <p class="small">Linki arkadaşlarına gönder. En fazla 4 kişi.</p>
       <div id="roomMembers"></div>
       <p id="roomNote" class="note"></p>
+      <div id="roomAreas" class="areaTabs"></div>
       <div id="roomMap" class="map compact"></div>
       <div id="roomLevels"></div>
       <p class="small keysOnly">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
@@ -199,12 +200,24 @@
     </div>
   </div>
 
-  <!-- Hurdalık haritası (bölüm seçimi) -->
+  <!-- Alanlar: hangi alanın haritası açılacak -->
+  <div id="areas" class="overlay hidden">
+    <div class="card mapCard">
+      <button id="areasBack" class="link back"><i data-ic="back"></i>Oyuncular</button>
+      <div class="mapHead">
+        <div><small>Büyük Pusula</small><h2>Alanlar</h2></div>
+        <div class="mapProg"><span id="areasCount"></span></div>
+      </div>
+      <div id="areaList" class="areaList"></div>
+    </div>
+  </div>
+
+  <!-- Bir alanın haritası (bölüm seçimi) -->
   <div id="select" class="overlay hidden">
     <div class="card mapCard">
-      <button id="backBtn" class="link back"><i data-ic="back"></i>Oyuncular</button>
+      <button id="backBtn" class="link back"><i data-ic="back"></i>Alanlar</button>
       <div class="mapHead">
-        <div><small>Alan 1</small><h2>Hurdalık</h2></div>
+        <div><small id="mapArea">Alan 1</small><h2 id="mapTitle">Hurdalık</h2></div>
         <div class="mapProg"><span id="mapCount"></span><div class="bar"><i id="mapBar"></i></div></div>
       </div>
       <div id="levelGrid" class="map"></div>

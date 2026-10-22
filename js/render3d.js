@@ -167,6 +167,9 @@ class Renderer3D {
       rivet: new THREE.SphereGeometry(0.045, 8, 6),
       signBar: new THREE.BoxGeometry(0.42, 0.11, 0.06),
       poleField: new THREE.BoxGeometry(0.9, 1, 0.5),
+      beltTop: new THREE.BoxGeometry(1, 0.14, 1.02),
+      pressRod: new THREE.CylinderGeometry(0.09, 0.09, 1, 12),
+      timerDot: new THREE.SphereGeometry(0.06, 10, 8),
     };
     this.mat = {
       block: std(PALETTE.block, { roughness: 0.82 }),
@@ -190,10 +193,48 @@ class Renderer3D {
       metalCrate: std('#9ea3c7', { roughness: 0.3, metalness: 0.8 }),
       nut: std('#eef0ff', { roughness: 0.25, metalness: 0.7, emissive: '#b9bdf5', emissiveIntensity: 0.8 }),
       sign: new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }),
+      // Fabrika: kayan oklu bant, çelik pres, uyarı şeritleri, zamanlı düğmenin sayaç ışıkları
+      beltR: std('#ffffff', { roughness: 0.7, map: this.beltTexture(1) }),
+      beltL: std('#ffffff', { roughness: 0.7, map: this.beltTexture(-1) }),
+      press: std('#5d6189', { roughness: 0.35, metalness: 0.75 }),
+      hazard: std('#ffffff', { roughness: 0.5, map: this.hazardTexture() }),
+      timerOn: std('#ffffff', { emissive: '#ffffff', emissiveIntensity: 1.4 }),
+      timerOff: std('#2b2d55', { roughness: 0.6 }),
     };
     this.ballMats = PLAYER_COLORS.map(c => new THREE.MeshPhysicalMaterial({
       map: ballTexture(c), roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.15,
     }));
+  }
+
+  // Taşıyıcı bant: koyu kauçuk üstünde sarı oklar (dir: 1 sağa, -1 sola); doku kaydırılarak akar
+  beltTexture(dir) {
+    const tex = canvasTexture(64, 32, (g, w, h) => {
+      g.fillStyle = '#23243f';
+      g.fillRect(0, 0, w, h);
+      g.strokeStyle = '#ffd43b';
+      g.lineWidth = 5;
+      g.lineCap = 'round';
+      g.lineJoin = 'round';
+      for (const x0 of [12, 44]) {
+        g.beginPath();
+        g.moveTo(x0 - dir * 6, 7); g.lineTo(x0 + dir * 6, h / 2); g.lineTo(x0 - dir * 6, h - 7);
+        g.stroke();
+      }
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
+  }
+
+  // Presin önündeki sarı-siyah uyarı şeridi
+  hazardTexture() {
+    const tex = canvasTexture(64, 16, (g, w, h) => {
+      g.fillStyle = '#ffd43b';
+      g.fillRect(0, 0, w, h);
+      g.fillStyle = '#1d1b3a';
+      for (let x = -16; x < w + 16; x += 16) { g.beginPath(); g.moveTo(x, h); g.lineTo(x + 8, h); g.lineTo(x + 16, 0); g.lineTo(x + 8, 0); g.fill(); }
+    });
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    return tex;
   }
 
   gridTexture() {
@@ -420,7 +461,7 @@ class Renderer3D {
         if (!game.grid[r][c]) continue;
         if ('PN'.includes(game.def.map[r][c])) continue;   // sabit mıknatıslar ayrıca çizilir
         cells.push([c, r]);
-        if (r > 0 && !game.grid[r - 1][c]) caps.push([c, r]);
+        if (r > 0 && !game.grid[r - 1][c] && !game.belts.has(r * W + c)) caps.push([c, r]);
       }
     }
     const inst = (geo, mat, list, place) => {
@@ -442,7 +483,33 @@ class Renderer3D {
     if (blocks.instanceColor) blocks.instanceColor.needsUpdate = true;
     // Kenar şeridi bloğun üst yüzeyinden biraz yukarıda: aynı düzlemde iki yüzey titreşir (z-fighting)
     inst(this.geo.cap, this.mat.cap, caps, (o, c, r) => o.position.set(c + 0.5, -r - 0.05, 0));
+    // Taşıyıcı bantlar: bloğun üstünde oklu kauçuk
+    for (const dir of [1, -1]) {
+      const list = [...game.belts].filter(([, d]) => d === dir).map(([id]) => [id % W, Math.floor(id / W)]);
+      if (list.length) inst(this.geo.beltTop, dir > 0 ? this.mat.beltR : this.mat.beltL, list, (o, c, r) => o.position.set(c + 0.5, -r - 0.05, 0));
+    }
 
+    // Presler: çelik kafa, önünde uyarı şeridi ve kanal ışığı; tavana uzanan mil
+    this.pressObjs = game.presses.map(P => {
+      const w = wx(P.w), col = CHANNEL_COLORS[P.channel];
+      const g = new THREE.Group();
+      const head = new THREE.Mesh(new RoundedBoxGeometry(w, 1, 0.92, 2, 0.06), this.mat.press);
+      head.castShadow = head.receiveShadow = true;
+      const stripe = new THREE.Mesh(new THREE.BoxGeometry(w - 0.1, 0.22, 0.02), this.mat.hazard);
+      stripe.position.set(0, -0.32, 0.47);
+      const lightMat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.6, roughness: 0.3 });
+      const light = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.12, 0.04), lightMat);
+      light.position.set(0, 0.2, 0.47);
+      g.add(head, stripe, light);
+      const rod = new THREE.Mesh(this.geo.pressRod, this.mat.metal);
+      rod.castShadow = true;
+      this.levelGroup.add(g, rod);
+      // Mil: başlangıç yerinin üstündeki ilk duvara kadar
+      const c = Math.floor((P.x + P.w / 2) / T);
+      let r = Math.floor(P.topY / T) - 1;
+      while (r > 0 && !game.grid[r][c]) r--;
+      return { P, g, rod, lightMat, ceil: wy((r + 1) * T) };
+    });
     // Kilitli kapılar
     this.doorObjs = game.doors.map(d => {
       const g = new THREE.Group();
@@ -499,8 +566,17 @@ class Renderer3D {
       const cap = new THREE.Mesh(this.geo.buttonCap, capMat);
       cap.castShadow = true;
       g.add(base, cap);
+      // Zamanlı düğme: çevresinde kalan süreyi gösteren 8 ışık
+      const dots = [];
+      if (b.timed) for (let k = 0; k < 8; k++) {
+        const a = Math.PI / 2 - k / 8 * Math.PI * 2;
+        const d = new THREE.Mesh(this.geo.timerDot, this.mat.timerOff);
+        d.position.set(Math.cos(a) * 0.56, 0.06, Math.sin(a) * 0.3 + 0.1);
+        g.add(d);
+        dots.push(d);
+      }
       this.levelGroup.add(g);
-      return { b, cap, capMat, press: b.pressed ? 1 : 0 };
+      return { b, cap, capMat, dots, press: b.pressed ? 1 : 0 };
     });
 
     // Tek yönlü platformlar: karonun üst kenarında ince paslı tahta
@@ -913,6 +989,8 @@ class Renderer3D {
         case 'lever': this.burst(x, y, 14, e.color || '#fff', { speed: 2.4, gravity: 1, life: 0.45, up: true }); break;
         case 'screw': this.burst(x, y, 16, '#e3e6fb', { speed: 3, gravity: 0, life: 0.5 }); break;
         case 'spring': this.burst(x, y, 12, '#ffc078', { speed: 2.6, gravity: 2, life: 0.4, up: true }); break;
+        case 'press': this.burst(x, y, 14, '#c9c7e8', { speed: 2.4, gravity: 2, life: 0.4, size: 0.06 }); break;
+        case 'bonk': this.burst(x, y, 12, '#ffd43b', { speed: 3, gravity: 1, life: 0.45 }); break;
         case 'click': this.burst(x, y, 12, e.color || '#fff', { speed: 2.5, gravity: 1, life: 0.45, up: true }); break;
         case 'swap': this.burst(x, y, 18, e.color || '#fff', { speed: 3, gravity: 0, life: 0.4 }); break;
         case 'enter': this.burst(x, y, 20, PALETTE.exit, { speed: 2.5, gravity: -2, life: 0.8, up: true }); break;
@@ -1035,6 +1113,21 @@ class Renderer3D {
       o.g.position.y = wy(o.sc.y + o.sc.h / 2) + Math.sin(t * 2.5 + i) * 0.05;
     });
     for (const o of this.moverObjs) o.g.position.set(wx(o.M.x + o.M.w / 2), wy(o.M.y + o.M.h / 2), 0);
+    // Bantlar akar (bir karo bir doku boyu); presler iner kalkar, mil boyu uzar kısalır
+    this.mat.beltR.map.offset.x -= dt * PHYS.beltSpeed / T;
+    this.mat.beltL.map.offset.x += dt * PHYS.beltSpeed / T;
+    for (const o of this.pressObjs) {
+      const top = wy(o.P.y), len = Math.max(0.01, o.ceil - top);
+      o.g.position.set(wx(o.P.x + o.P.w / 2), wy(o.P.y + o.P.h / 2), 0);
+      o.rod.scale.y = len;
+      o.rod.position.set(wx(o.P.x + o.P.w / 2), top + len / 2, -0.15);
+      o.lightMat.emissiveIntensity = game.channelOn(o.P.channel) ? 2 : 0.5;
+    }
+    for (const o of this.buttonObjs) {
+      if (!o.dots.length) continue;
+      const lit = Math.ceil((o.b.left || 0) / PHYS.timerHold * 8);
+      o.dots.forEach((d, k) => { d.material = k < lit ? this.mat.timerOn : this.mat.timerOff; });
+    }
     for (const o of this.springObjs) {
       // Fırlatınca önce basılır, sonra sönen bir sekmeyle açılır
       const since = game.t - o.sp.t;

@@ -1,7 +1,7 @@
 'use strict';
 
 // Ekranlar ve oyun döngüsü.
-//   Aynı klavye: home → lobby (katılım) → select → playing → complete
+//   Aynı klavye: home → lobby (katılım) → areas (alanlar) → select (alan haritası) → playing → complete
 //   Online:      home → onlineForm → room (oda + bölüm seçimi) → playing → complete
 //   Editör:      home → editor → (dene) playing → complete → editor
 // Aynı klavyede simülasyon burada çalışır; online'da sunucuda çalışır, burada yalnızca çizilir.
@@ -12,13 +12,14 @@ Input.init();
 Touch.init();
 
 const STEP = 1 / 60;
-const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor', 'atolye'];
+const SCREENS = ['home', 'lobby', 'areas', 'select', 'onlineForm', 'room', 'complete', 'editor', 'atolye'];
 
 let mode = 'local';         // local | online
 let state = 'home';
 let joined = [];            // aynı klavye: katılan giriş kaynakları (katılım sırasıyla)
 let game = null;            // menülerde canlı demo sahnesi (menuGame), oyunda oynanan bölüm
 let levelIndex = 0;
+let currentArea = 0;        // açık olan alan haritası (aynı klavye) / odada seçili alan sekmesi
 let acc = 0, last = performance.now(), completeAt = 0;
 let room = null;            // online: sunucudan gelen son oda bilgisi
 let currentDef = LEVELS[0]; // oynanan bölümün tanımı (hazır ya da kendi bölümün)
@@ -83,18 +84,20 @@ async function syncProgress() {
   saveProgress();
   saveScrews();
   if (state === 'select') renderLevelGrid();
+  if (state === 'areas') renderAreas();
 }
 
 const fmt = s => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-// ---------- Hurdalık haritası ----------
-// Bölümler kıvrılan bir patika üzerinde duraklar: her kısım bir satır, satır sonunda yol aşağı kıvrılıp
-// ters yöne devam eder. Geçilen duraklar turuncu, sıradaki yeşil ve nabız gibi atar, kilitliler sönük.
+// ---------- Alan haritası ----------
+// Bir alanın bölümleri kıvrılan bir patika üzerinde duraklar: her kısım bir satır, satır sonunda yol aşağı
+// kıvrılıp ters yöne devam eder. Geçilen duraklar turuncu, sıradaki yeşil ve nabız gibi atar, kilitliler sönük.
 const MAP_COLS = 5;
-function renderMap(el, { done, pick, canPick = true, compact = false, note = null }) {
+function renderMap(el, { area = 0, done, pick, canPick = true, compact = false, note = null }) {
+  const idx = areaLevels(area), L = idx.map(i => LEVELS[i]);
   const short = innerHeight < 520;   // yatay telefon: satırlar sık, az kaydırılsın
-  const rowH = compact ? (short ? 98 : 108) : short ? 116 : 142, head = short ? 22 : 26, n = LEVELS.length + 1;   // sonda "devamı yakında"
+  const rowH = compact ? (short ? 98 : 108) : short ? 116 : 160, head = short ? 22 : 26, n = idx.length + 1;   // sonda "devamı yakında"
   const rows = Math.ceil(n / MAP_COLS);
   const pts = [];
   for (let k = 0; k < n; k++) {
@@ -108,22 +111,22 @@ function renderMap(el, { done, pick, canPick = true, compact = false, note = nul
     return `C ${a.x + out} ${a.y} ${b.x + out} ${b.y} ${b.x} ${b.y}`;
   };
   const pathTo = k => pts.slice(0, k + 1).map((p, j) => (j ? seg(pts[j - 1], p) : `M ${p.x} ${p.y}`)).join(' ');
-  const open = LEVELS.map((l, i) => levelUnlocked(i, done));
+  const open = idx.map(i => levelUnlocked(i, done));
   // Aydınlık yol: yalnızca iki ucu da açık duraklar arasında
-  const lit = pts.slice(1, LEVELS.length).map((p, j) => (open[j] && open[j + 1] ? `M ${pts[j].x} ${pts[j].y} ${seg(pts[j], p)}` : '')).join(' ');
-  const current = LEVELS.findIndex((l, i) => open[i] && !done.has(l.id));
+  const lit = pts.slice(1, idx.length).map((p, j) => (open[j] && open[j + 1] ? `M ${pts[j].x} ${pts[j].y} ${seg(pts[j], p)}` : '')).join(' ');
+  const current = L.findIndex((l, k) => open[k] && !done.has(l.id));
 
-  const parts = PARTS.map((p, r) => {
-    const first = levelIndexById(p.ids[0]), cleared = p.ids.filter(id => done.has(id)).length;
+  const parts = AREAS[area].parts.map((p, r) => {
+    const first = idx.indexOf(levelIndexById(p.ids[0])), cleared = p.ids.filter(id => done.has(id)).length;
     return `<div class="partHead" style="top:${Math.floor(first / MAP_COLS) * rowH}px"><b>${r + 1}. Kısım</b>${esc(p.name)}<span>${cleared}/${p.ids.length}</span></div>`;
   }).join('');
-  const stops = LEVELS.map((l, i) => {
-    const p = pts[i], best = bestOf(i);
-    const cls = !open[i] ? 'locked' : done.has(l.id) ? 'done' : i === current ? 'current' : 'open';
-    return `<button class="stop ${cls}" data-i="${i}" style="left:${p.x / 10}%;top:${p.y}px" title="${i + 1}. ${esc(l.name)}">
-      <span class="dot">${open[i] ? i + 1 : icon('lock')}${l.magnet ? `<span class="badge">${icon('magnet')}</span>` : ''}</span>
+  const stops = idx.map((i, k) => {
+    const l = LEVELS[i], p = pts[k], best = bestOf(i);
+    const cls = !open[k] ? 'locked' : done.has(l.id) ? 'done' : k === current ? 'current' : 'open';
+    return `<button class="stop ${cls}" data-i="${i}" data-k="${k}" style="left:${p.x / 10}%;top:${p.y}px" title="${k + 1}. ${esc(l.name)}">
+      <span class="dot">${open[k] ? k + 1 : icon('lock')}${l.magnet ? `<span class="badge">${icon('magnet')}</span>` : ''}</span>
       <span class="lbl">${esc(l.name)}</span>${best && !compact ? `<span class="time">${icon('check')}${fmt(best)}</span>` : ''}
-      ${open[i] && !compact ? `<span class="nuts">${[0, 1, 2].map(k => `<i class="${screwsOf(i) >> k & 1 ? 'got' : ''}"></i>`).join('')}</span>` : ''}
+      ${open[k] && !compact ? `<span class="nuts">${[0, 1, 2].map(j => `<i class="${screwsOf(i) >> j & 1 ? 'got' : ''}"></i>`).join('')}</span>` : ''}
     </button>`;
   }).join('');
   const last = pts[n - 1];
@@ -136,15 +139,37 @@ function renderMap(el, { done, pick, canPick = true, compact = false, note = nul
     </svg>${parts}${stops}${soon}`;
   for (const b of el.querySelectorAll('button.stop')) {
     b.addEventListener('click', () => {
-      const i = +b.dataset.i;
-      if (!open[i]) {
+      const i = +b.dataset.i, k = +b.dataset.k;
+      if (!open[k]) {
         b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake');
-        if (note) note.textContent = `Önce ${i}. bölüm "${LEVELS[i - 1].name}" geçilmeli.`;
+        if (note) note.textContent = `Önce ${k}. bölüm "${L[k - 1].name}" geçilmeli.`;
         return;
       }
       if (canPick) pick(i);
     });
   }
+}
+
+// Alan kartları: alanlar istenen sırayla açılır; her kartta zorluk ve ilerleme
+const DIFF_CLASS = { Kolay: 'easy', Zor: 'hard', Uzman: 'expert' };
+function areaStats(a, done) {
+  const idx = areaLevels(a);
+  return { total: idx.length, cleared: idx.filter(i => done.has(LEVELS[i].id)).length, screws: idx.reduce((n, i) => n + bitCount(screwsOf(i)), 0) };
+}
+function renderAreaCards(el, done, pick) {
+  el.innerHTML = AREAS.map((a, k) => {
+    const st = areaStats(k, done);
+    return `<button class="areaCard" data-a="${k}" style="--ac:${a.color}">
+      <span class="areaTop"><span class="areaNo">Alan ${k + 1}</span><span class="diff ${DIFF_CLASS[a.difficulty]}">${a.difficulty}</span></span>
+      <b>${esc(a.name)}</b>
+      <span class="areaStory">${esc(a.story)}</span>
+      <span class="areaBar"><i style="width:${st.total ? st.cleared / st.total * 100 : 0}%"></i></span>
+      <span class="areaStats"><b>${st.cleared}</b> / ${st.total} bölüm · <b>${st.screws}</b> / ${st.total * 3} vida</span>
+    </button>`;
+  }).join('') + SOON_AREAS.map((a, k) => `<div class="areaCard soon" style="--ac:${a.color}">
+      <span class="areaTop"><span class="areaNo">Alan ${AREAS.length + k + 1}</span><span class="diff ${DIFF_CLASS[a.difficulty]}">${a.difficulty}</span></span>
+      <b>${esc(a.name)}</b><span class="areaStory">${icon('lock')}Yakında</span></div>`).join('');
+  for (const b of el.querySelectorAll('button.areaCard')) b.addEventListener('click', () => pick(+b.dataset.a));
 }
 
 // Ekran açılınca sıradaki bölüm görünmüyorsa ona kaydır (görünüyorsa hiç kaydırma)
@@ -189,7 +214,7 @@ const MENU_LEVEL = {
     '############################',
   ],
 };
-const MENU_STATES = new Set(['home', 'lobby', 'select', 'onlineForm', 'room', 'atolye']);
+const MENU_STATES = new Set(['home', 'lobby', 'areas', 'select', 'onlineForm', 'room', 'atolye']);
 let demo = null;
 
 function menuGame() {
@@ -259,8 +284,24 @@ function toLobby() {
   renderSlots();
 }
 
-function toSelect() {
+// Alanlar: istenen alan açılır (alanın içindeki bölümler sırayla)
+function toAreas() {
   if (joined.length < 2) return;
+  state = 'areas';
+  game = menuGame();
+  show('areas');
+  renderAreas();
+}
+
+function renderAreas() {
+  const done = new Set(Object.keys(progress));
+  $('areasCount').innerHTML = `<b>${LEVELS.filter(l => done.has(l.id)).length}</b> / ${LEVELS.length} bölüm · <b>${totalScrews()}</b> / ${LEVELS.length * 3} vida`;
+  renderAreaCards($('areaList'), done, toAreaMap);
+}
+
+function toAreaMap(a) {
+  if (joined.length < 2) return;
+  currentArea = a;
   state = 'select';
   game = menuGame();
   show('select');
@@ -269,18 +310,23 @@ function toSelect() {
 }
 
 function renderLevelGrid() {
-  const done = new Set(Object.keys(progress));
-  const cleared = LEVELS.filter(l => done.has(l.id)).length;
-  $('mapCount').innerHTML = `<b>${cleared}</b> / ${LEVELS.length} bölüm · <b>${totalScrews()}</b> / ${LEVELS.length * 3} vida`;
-  $('mapBar').style.width = `${(cleared / LEVELS.length) * 100}%`;
+  const done = new Set(Object.keys(progress)), area = AREAS[currentArea], st = areaStats(currentArea, done);
+  $('mapArea').innerHTML = `Alan ${currentArea + 1} · <span class="diff ${DIFF_CLASS[area.difficulty]}">${area.difficulty}</span>`;
+  $('mapTitle').textContent = area.name;
+  $('mapCount').innerHTML = `<b>${st.cleared}</b> / ${st.total} bölüm · <b>${st.screws}</b> / ${st.total * 3} vida`;
+  $('mapBar').style.width = `${st.total ? st.cleared / st.total * 100 : 0}%`;
   $('mapNote').textContent = '';
-  renderMap($('levelGrid'), { done, pick: startLevel, note: $('mapNote') });
+  renderMap($('levelGrid'), { area: currentArea, done, pick: startLevel, note: $('mapNote') });
 }
+
+// Bölümün oyun içindeki adı: alandaki sırası ve adı
+const levelTitle = i => `${levelNo(i)}. ${LEVELS[i].name}`;
 
 function startLevel(i) {
   editorTest = false;
   levelIndex = i;
-  playLocal(LEVELS[i], `${i + 1}. ${LEVELS[i].name}`);
+  currentArea = areaOf(i);
+  playLocal(LEVELS[i], levelTitle(i));
 }
 
 // Editörden "Dene" ya da Atölye'den oyna: tek başına deneyen biri iki topu WASD ve ok tuşlarıyla yönetebilir
@@ -299,7 +345,7 @@ function playLocal(def, title) {
   state = 'playing';
   show(null);
   const ap = !editorTest && Atolye.play;
-  levelIntro(levelIndex >= 0 ? `Bölüm ${levelIndex + 1}`
+  levelIntro(levelIndex >= 0 ? `${AREAS[areaOf(levelIndex)].name} · Bölüm ${levelNo(levelIndex)}`
     : ap && ap.pack ? `${ap.pack.name} · ${ap.index + 1}/${ap.pack.levels.length}`
     : ap ? `Atölye · ${ap.level.author.name}` : 'Kendi bölümün', def.name);
   const sources = Input.sources();
@@ -375,8 +421,8 @@ function showComplete(i, secs) {
   const prevBest = custom ? 0 : bestOf(i);
   const mask = game && game.screwMask || 0;
   if (!custom) recordProgress(i, secs, mask);
-  const lastLevel = custom || i === LEVELS.length - 1;
-  $('completeTitle').textContent = lastLevel ? 'Tüm bölümler bitti!' : 'Bölüm tamam!';
+  const lastLevel = custom || nextInArea(i) < 0;   // alanın son bölümü
+  $('completeTitle').textContent = lastLevel && !custom ? `${AREAS[areaOf(i)].name} bitti!` : 'Bölüm tamam!';
   $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b>` +
     (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '') +
     (game && game.screws && game.screws.length ? ` · vida <b>${bitCount(mask)}/${game.screws.length}</b>` : '');
@@ -394,8 +440,9 @@ function showComplete(i, secs) {
   // Kısmın son bölümü ilk kez geçildi: küçük kutlama ve haritada sıradaki kısım açılır
   const part = custom ? -1 : partOf(i);
   if (part >= 0 && !final && !prevBest && PARTS[part].ids[PARTS[part].ids.length - 1] === LEVELS[i].id) {
+    const parts = PARTS[part].area.parts, k = parts.findIndex(p => p.name === PARTS[part].name);
     $('completeTitle').textContent = `${PARTS[part].name} tamam!`;
-    $('completeInfo').innerHTML += `<br><span class="partDone">${icon('star')}${part + 1}. Kısım bitti${PARTS[part + 1] ? ` · sırada <b>${esc(PARTS[part + 1].name)}</b>` : ''}</span>`;
+    $('completeInfo').innerHTML += `<br><span class="partDone">${icon('star')}${k + 1}. Kısım bitti${parts[k + 1] ? ` · sırada <b>${esc(parts[k + 1].name)}</b>` : ''}</span>`;
   }
   $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'HARİTA') : 'SONRAKİ BÖLÜM';
   $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Harita';
@@ -419,15 +466,15 @@ function next() {
   if (mode === 'online') { Net.send({ t: 'next' }); return; }
   if (editorTest) toEditor();
   else if (Atolye.play) Atolye.next();
-  else if (levelIndex < LEVELS.length - 1) startLevel(levelIndex + 1);
-  else toSelect();
+  else if (nextInArea(levelIndex) >= 0) startLevel(nextInArea(levelIndex));
+  else toAreaMap(currentArea);
 }
 
 function backToChooser() {
   if (mode === 'online') Net.send({ t: 'lobby' });
   else if (editorTest) toEditor();
   else if (Atolye.play) Atolye.back();
-  else toSelect();
+  else toAreaMap(currentArea);
 }
 
 function restart() {
@@ -519,7 +566,13 @@ function renderRoom() {
   grid.innerHTML = '';
   const locked = !isHost || !enough || room.state !== 'lobby';
   // Odadakilerden biri bir bölümü açtıysa herkes için açık
-  renderMap($('roomMap'), { done: new Set(room.done || []), pick: i => Net.send({ t: 'start', level: i }), canPick: !locked, compact: true, note: $('roomNote') });
+  // Alan sekmeleri: herkes istediği alanın haritasına bakar, bölümü kurucu seçer
+  const tabs = $('roomAreas');
+  tabs.classList.toggle('hidden', AREAS.length < 2);
+  tabs.innerHTML = AREAS.map((a, k) => `<button data-a="${k}" class="${k === currentArea ? 'on' : ''}" style="--ac:${a.color}">
+    <b>${k + 1}. ${esc(a.name)}</b><span class="diff ${DIFF_CLASS[a.difficulty]}">${a.difficulty}</span></button>`).join('');
+  for (const b of tabs.querySelectorAll('button')) b.addEventListener('click', () => { currentArea = +b.dataset.a; renderRoom(); });
+  renderMap($('roomMap'), { area: currentArea, done: new Set(room.done || []), pick: i => Net.send({ t: 'start', level: i }), canPick: !locked, compact: true, note: $('roomNote') });
   if (room.custom) {
     const b = document.createElement('button');
     b.className = 'lvl custom';
@@ -542,7 +595,13 @@ Net.on('room', m => {
   }
   history.replaceState(null, '', `${location.pathname}?oda=${m.code}`);
   if (m.state === 'lobby' || (state !== 'playing' && state !== 'complete')) {
-    if (state !== 'room') { state = 'room'; game = menuGame(); show('room'); renderRoom(); if (m.members.length >= 2) scrollToCurrent($('roomMap')); return; }
+    if (state !== 'room') {
+      state = 'room'; game = menuGame(); show('room');
+      if (m.level >= 0 && LEVELS[m.level]) currentArea = areaOf(m.level);   // bölümden dönünce onun alanı açık
+      renderRoom();
+      if (m.members.length >= 2) scrollToCurrent($('roomMap'));
+      return;
+    }
   }
   renderRoom();
 });
@@ -556,8 +615,9 @@ Net.on('start', m => {
   Echo.reset();
   state = 'playing';
   show(null);
-  levelIntro(m.def ? 'Kendi bölümün' : `Bölüm ${m.level + 1}`, currentDef.name);
-  setHud(m.def ? m.def.name : `${m.level + 1}. ${currentDef.name}`, currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
+  if (!m.def) currentArea = areaOf(m.level);
+  levelIntro(m.def ? 'Kendi bölümün' : `${AREAS[currentArea].name} · Bölüm ${levelNo(m.level)}`, currentDef.name);
+  setHud(m.def ? m.def.name : levelTitle(m.level), currentDef, [{ color: PLAYER_COLORS[m.you], label: m.players[m.you].name,
     hint: 'A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem' + (game.magnet ? ' (basılı: mıknatıs) · E / sağ Shift kutup' : '') }]);
 });
 
@@ -594,8 +654,9 @@ $('edOnline').addEventListener('click', () => {
   $('onlineError').textContent = 'Oda kur: bölümün odada yıldızla işaretli çıkacak.';
 });
 $('lobbyBack').addEventListener('click', toHome);
-$('startBtn').addEventListener('click', toSelect);
-$('backBtn').addEventListener('click', toLobby);
+$('startBtn').addEventListener('click', toAreas);
+$('backBtn').addEventListener('click', toAreas);
+$('areasBack').addEventListener('click', toLobby);
 $('nextBtn').addEventListener('click', next);
 $('replayBtn').addEventListener('click', restart);   // vidaları tamamlamak ya da rekor için aynı bölüm baştan
 $('toSelectBtn').addEventListener('click', () => (editorTest || (mode === 'local' && Atolye.play) ? restart() : backToChooser()));
@@ -645,11 +706,15 @@ $('a2hsClose').addEventListener('click', () => {
 
 addEventListener('keydown', e => {
   if (e.target.tagName === 'INPUT') return;
-  if (state === 'lobby' && e.code === 'Enter') toSelect();
-  else if (state === 'select') {
+  if (state === 'lobby' && e.code === 'Enter') toAreas();
+  else if (state === 'areas') {
     if (e.code === 'Escape') toLobby();
     const n = parseInt(e.key, 10);
-    if (n >= 1 && n <= LEVELS.length) startLevel(n - 1);
+    if (n >= 1 && n <= AREAS.length) toAreaMap(n - 1);
+  } else if (state === 'select') {
+    if (e.code === 'Escape') toAreas();
+    const n = parseInt(e.key, 10), idx = areaLevels(currentArea);
+    if (n >= 1 && n <= idx.length && levelUnlocked(idx[n - 1], new Set(Object.keys(progress)))) startLevel(idx[n - 1]);
   } else if (state === 'playing') {
     if (e.code === 'KeyR') restart();
     if (e.code === 'Escape') backToChooser();
