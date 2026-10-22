@@ -6,6 +6,21 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.3.0 · 22 Ekim 2026
+
+**Alan 2 · Fabrika** (Zor)
+
+- **Alanlar ekranı:** haritaya geçince önce alanlar gelir. Her alanda zorluk (Kolay, Zor, Uzman), ilerleme ve vidalar yazar. Alanları istediğin sırayla oynayabilirsin; bir alanın içindeki bölümler sırayla açılır.
+- **Fabrika:** pusulanın yapıldığı yer. Hurdalık'tan zor: daha çok adım, zamanlama ve ikinizin birlikte yapması gereken işler. Şimdilik 2 kısım, 10 bölüm.
+- **Yeni öğeler:**
+  - **Taşıyıcı bant:** üstündekini taşır; üstünde koşup zıplarsan bandın hızı havada sürer, normalde aşılamayan çukurlar aşılır.
+  - **Pres:** tavandan inip kalkar. Altında kalan ezilmez, yana fırlar. Düğmesi ya da şalteri açıkken yukarıda bekler; üstüne binip asansör gibi kullanılabilir.
+  - **Zamanlı düğme:** bırakınca kapağı 4 saniye daha açık tutar; çevresindeki ışıklar kalan süreyi gösterir. Bas ve koş!
+- **Bölümler:** Montaj hattı (Uzun atlama, Pres hattı, Vardiya, Ters akıntı, Montaj sınavı) ve Pres atölyesi (Pres asansörü, Kapan koridoru, Vardiya değişimi, Ritim, Atölye sınavı).
+- Yeni öğeler bölüm editöründe de var.
+- Online odada haritanın üstünde alan sekmeleri; bir bölüm bitince sıradaki, aynı alandan gelir.
+- Haritada kısım başlıkları artık üstteki satırın vidalarına binmiyor.
+
 ## 0.2.1 · 22 Ekim 2026
 
 - iPhone'da tuşa basılı tutunca açılan büyüteç ve seçim balonu artık çıkmıyor.
