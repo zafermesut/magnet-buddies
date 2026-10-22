@@ -3,3 +3,6 @@ node_modules/
 .claude/
 data/
 .env
+
+# Yerel notlar: tasarım, durum, yol haritası (GitHub'a gönderilmez)
+notlar/
