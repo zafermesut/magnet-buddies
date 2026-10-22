@@ -2,7 +2,14 @@
 <html lang="tr">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#1c1b3a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Magnet Buddies">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icons/icon-180.png">
   <meta name="build" content="__BUILD__" data-version="__VERSION__">
   <title>Magnet Buddies</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,6 +25,9 @@
   <canvas id="overlay"></canvas>
   <div id="fade"></div>
   <div id="levelIntro"><span id="introNum"></span><b id="introName"></b></div>
+
+  <!-- Telefon dikey tutulunca -->
+  <div id="rotate"><span class="rotPhone"><i data-ic="phone"></i></span><b>Telefonu yan çevir</b><span>Magnet Buddies yatay oynanır.</span></div>
 
   <!-- Hesap: menülerde sol üstte Google ile giriş ya da ad + resim -->
   <div id="account" class="hidden"></div>
@@ -59,6 +69,11 @@
     <div id="ping" class="panel hidden" title="Sunucuya gidiş-dönüş süresi"></div>
     <div id="controls"></div>
     <div id="keysHelp">R yeniden başlat · Esc harita</div>
+    <button id="hudMenu" title="Menü"><i data-ic="menu"></i></button>
+    <div id="hudMenuList" class="panel hidden">
+      <button id="hudRestart"><i data-ic="refresh"></i>Yeniden başlat<kbd class="keysOnly">R</kbd></button>
+      <button id="hudBack"><i data-ic="back"></i><span id="hudBackLabel">Haritaya dön</span><kbd class="keysOnly">Esc</kbd></button>
+    </div>
   </div>
 
   <!-- Ana menü: solda oyun, sağda profil kartı -->
@@ -80,6 +95,7 @@
           <button id="homeAtolye" class="tile"><span class="tileIc"><i data-ic="wrench"></i></span><b>Atölye</b><small>Oyuncuların bölümleri</small></button>
           <button id="homeEditor" class="tile"><span class="tileIc"><i data-ic="pencil"></i></span><b>Bölüm editörü</b><small>Kendi bölümünü yap</small></button>
         </div>
+        <p id="a2hs" class="small hidden">Tam ekran için Safari'de <b>Paylaş</b> → <b>Ana Ekrana Ekle</b>. <button id="a2hsClose" class="link">Tamam</button></p>
       </div>
       <aside id="profile" class="card profile hidden"></aside>
     </div>
@@ -141,7 +157,7 @@
   <!-- Online: oda kur / katıl -->
   <div id="onlineForm" class="overlay hidden">
     <div class="card">
-      <h2>Online</h2>
+      <div class="cardBar"><button id="onlineBack" class="link back"><i data-ic="back"></i>Ana menü</button><h2>Online</h2><span></span></div>
       <input id="onlineName" maxlength="16" placeholder="Takma adın" autocomplete="off">
       <button id="createBtn" class="primary">ODA KUR</button>
       <div class="or"><span>ya da</span></div>
@@ -150,50 +166,49 @@
         <button id="joinBtn">Katıl</button>
       </div>
       <p id="onlineError" class="error"></p>
-      <button id="onlineBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
   </div>
 
   <!-- Online oda -->
   <div id="room" class="overlay hidden">
     <div class="card wide">
-      <h2>Oda <span id="roomCode"></span></h2>
+      <div class="cardBar"><button id="roomLeave" class="link back"><i data-ic="back"></i>Odadan çık</button><h2>Oda <span id="roomCode"></span></h2><span></span></div>
       <div class="share">
         <input id="roomLink" readonly>
         <button id="copyBtn">Kopyala</button>
+        <button id="shareBtn" class="hidden"><i data-ic="share"></i>Paylaş</button>
       </div>
       <p class="small">Linki arkadaşlarına gönder. En fazla 4 kişi.</p>
       <div id="roomMembers"></div>
       <p id="roomNote" class="note"></p>
       <div id="roomMap" class="map compact"></div>
       <div id="roomLevels"></div>
-      <p class="small">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
-      <button id="roomLeave" class="link"><i data-ic="back"></i>Odadan çık</button>
+      <p class="small keysOnly">Kontroller: A D / ← → yürü · W / ↑ zıpla · S / ↓ eylem (dokun: anahtarı at, basılı tut: mıknatıs) · E / sağ Shift kutup</p>
+      <p class="small touchOnly">Ekrandaki tuşlar: solda yürü, sağda zıpla ve eylem (dokun: anahtarı at, basılı tut: mıknatıs). Mıknatıslı bölümlerde kutup tuşu da çıkar.</p>
     </div>
   </div>
 
   <!-- Aynı klavye: katılım -->
   <div id="lobby" class="overlay hidden">
     <div class="card wide">
-      <h2>Aynı klavyede</h2>
+      <div class="cardBar"><button id="lobbyBack" class="link back"><i data-ic="back"></i>Ana menü</button><h2>Aynı klavyede</h2><span></span></div>
       <div id="slots"></div>
       <p id="lobbyNote" class="note"></p>
       <button id="startBtn" class="primary" disabled>HARİTAYA GEÇ</button>
       <p class="small">Katılmak için kendi zıplama tuşuna bas. Ayrılmak için eylem tuşuna bas.<br>Gamepad takılıysa A tuşuyla katılabilirsin.</p>
-      <button id="lobbyBack" class="link"><i data-ic="back"></i>Ana menü</button>
     </div>
   </div>
 
   <!-- Hurdalık haritası (bölüm seçimi) -->
   <div id="select" class="overlay hidden">
     <div class="card mapCard">
+      <button id="backBtn" class="link back"><i data-ic="back"></i>Oyuncular</button>
       <div class="mapHead">
         <div><small>Alan 1</small><h2>Hurdalık</h2></div>
         <div class="mapProg"><span id="mapCount"></span><div class="bar"><i id="mapBar"></i></div></div>
       </div>
       <div id="levelGrid" class="map"></div>
       <p id="mapNote" class="note"></p>
-      <button id="backBtn" class="link back"><i data-ic="back"></i>Oyuncular</button>
     </div>
   </div>
 
@@ -215,7 +230,10 @@
       <p id="completeInfo"></p>
       <button id="likeBtn" class="hidden"><i data-ic="heart"></i>Bu bölümü beğen</button>
       <button id="nextBtn" class="primary">SONRAKİ BÖLÜM</button>
-      <button id="toSelectBtn">Harita</button>
+      <div class="row">
+        <button id="replayBtn"><i data-ic="refresh"></i>Tekrar oyna</button>
+        <button id="toSelectBtn">Harita</button>
+      </div>
       <p id="completeHint" class="small">Herhangi bir oyuncunun zıplama tuşu da devam ettirir.</p>
     </div>
   </div>
@@ -224,6 +242,7 @@
   <script src="js/config.js"></script>
   <script src="js/levels.js"></script>
   <script src="js/input.js"></script>
+  <script src="js/touch.js"></script>
   <script src="js/game.js"></script>
   <script src="js/net.js"></script>
   <script src="js/audio.js"></script>

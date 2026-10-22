@@ -96,9 +96,11 @@ bulduğunuzda pusula ilk kez kıpırdar.
 | 3. oyuncu | J L | I | K | U |
 | 4. oyuncu | Numpad 4 6 | Numpad 8 | Numpad 5 | Numpad 7 |
 | Gamepad | Çubuk | A | B | X / Y |
+| Telefon | Sol alttaki ‹ › | Sağdaki ↑ | Sağdaki el / mıknatıs | Sağdaki kutup tuşu |
 
 Online oyunda herkes kendi bilgisayarında 1. ya da 2. oyuncunun tuşlarını kullanır.
-**R** bölümü baştan başlatır, **Esc** haritaya döner.
+**R** bölümü baştan başlatır, **Esc** haritaya döner (ikisi de sol üstteki menüde).
+Telefonda yatay oynanır; online oyunda telefon ve bilgisayar aynı odada olabilir. iPhone'da tam ekran için Safari'den **Ana Ekrana Ekle**.
 
 ## Atölye ve bölüm editörü
 

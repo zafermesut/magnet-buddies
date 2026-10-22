@@ -70,6 +70,8 @@ class Renderer3D {
 
     this.padLeft = 0;
     this.padTop = 70;
+    this.padBottom = 30;   // telefonda alttaki tuş şeridi kadar
+    this.tilt = 11;        // kameranın yukarıdan bakış açısı (derece); telefonda tam karşıdan
     this.game = null;
     this.lastTime = 0;
     this.fxT = -1;
@@ -104,7 +106,9 @@ class Renderer3D {
 
     let saved = null;
     try { saved = localStorage.getItem('quality'); } catch (e) { /* yoksay */ }
-    this.setQuality(['low', 'medium', 'high'].includes(saved) ? saved : 'high', false);
+    // Telefonda varsayılan Orta (ısınma ve pil); oyuncu seçtiyse onun seçimi
+    const phone = typeof Touch !== 'undefined' && Touch.enabled;
+    this.setQuality(['low', 'medium', 'high'].includes(saved) ? saved : phone ? 'medium' : 'high', false);
 
     this.raycaster = new THREE.Raycaster();
     this.plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -960,19 +964,19 @@ class Renderer3D {
 
   // ---------- Kamera ----------
 
-  // Bütün bölümü HUD/editör paylarının dışında kalan alana sığdırır; hafif yukarıdan bakar
+  // Bütün bölümü HUD/editör/tuş paylarının dışında kalan alana sığdırır; hafif yukarıdan bakar
   updateCamera(game, t, dt) {
     const W = game.cols, H = game.rows;
-    const padTop = this.padTop ?? 70, padLeft = this.padLeft || 0, pad = 30;
-    const aw = Math.max(100, this.w - padLeft - pad * 2), ah = Math.max(100, this.h - padTop - pad);
+    const padTop = this.padTop ?? 70, padLeft = this.padLeft || 0, pad = 30, padBottom = this.padBottom ?? pad;
+    const aw = Math.max(100, this.w - padLeft - pad * 2), ah = Math.max(100, this.h - padTop - padBottom);
     // Görünür alanın merkezini tuvalin merkezine göre kaydır
     const offX = -(padLeft + (this.w - padLeft) / 2 - this.w / 2);
-    const offY = -(padTop + (this.h - padTop - pad) / 2 - this.h / 2);
+    const offY = -(padTop + (this.h - padTop - padBottom) / 2 - this.h / 2);
     this.camera.setViewOffset(this.w, this.h, offX, offY, this.w, this.h);
-    const ppu = Math.min(aw / W, ah / (H * 1.08), 1.6 * T);   // birim başına piksel (eğiklik için biraz pay)
+    const ppu = Math.min(aw / W, ah / (H * (this.tilt === 0 ? 1.02 : 1.08)), 1.6 * T);   // birim başına piksel (eğiklik için biraz pay)
     const fov = THREE.MathUtils.degToRad(this.camera.fov);
     const dist = this.h / (2 * Math.tan(fov / 2) * ppu);
-    const tilt = THREE.MathUtils.degToRad(11);
+    const tilt = THREE.MathUtils.degToRad(this.tilt ?? 11);
     const cx = W / 2 + Math.sin(t * 0.21) * 0.12, cy = -H / 2 + Math.sin(t * 0.17) * 0.08;
     const target = new THREE.Vector3(cx, cy + dist * Math.sin(tilt), dist * Math.cos(tilt));
     if (!this.camPos || this.camPos.distanceTo(target) > 40) this.camPos = target.clone();

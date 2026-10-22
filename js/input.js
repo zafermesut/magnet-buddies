@@ -1,6 +1,6 @@
 'use strict';
 
-// Yerel çok oyunculu giriş: aynı klavyede 4 şema + gamepad'ler.
+// Yerel çok oyunculu giriş: aynı klavyede 4 şema + gamepad'ler + telefonda ekrandaki tuşlar (touch.js).
 // Her şema { left, right, jump, action } üretir; oyun bunun nereden geldiğini bilmez.
 
 const SCHEMES = [
@@ -36,6 +36,7 @@ const Input = {
   // Şu an bağlı olan bütün giriş kaynakları (klavye şemaları + gamepad'ler)
   sources() {
     const list = SCHEMES.map(s => ({ id: s.id, label: s.label, hint: s.hint, magnetHint: s.magnetHint, join: s.join }));
+    if (Touch.enabled) list.push({ id: 'touch', label: 'Dokunmatik', hint: 'Ekrandaki tuşlar', magnetHint: 'mıknatıs tuşunu basılı tut', join: 'zıpla' });
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
     for (const p of pads) {
       if (p && p.connected) list.push({ id: 'pad' + p.index, label: 'Gamepad ' + (p.index + 1), hint: 'Çubuk yürü · A zıpla · B eylem', magnetHint: 'B basılı mıknatıs · X/Y kutup', join: 'A' });
@@ -44,6 +45,7 @@ const Input = {
   },
 
   read(id) {
+    if (id === 'touch') return Touch.read();
     const s = SCHEMES.find(x => x.id === id);
     if (s) {
       const any = codes => codes.some(c => this.down.has(c) || this.tapped.has(c));
@@ -62,6 +64,7 @@ const Input = {
     this.cur = {};
     for (const s of this.sources()) this.cur[s.id] = this.read(s.id);
     this.tapped.clear();
+    Touch.endFrame();
   },
 
   state(id) { return this.cur[id] || { left: false, right: false, jump: false, action: false, swap: false }; },

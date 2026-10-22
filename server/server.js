@@ -55,8 +55,9 @@ const TYPES = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
 };
-const PUBLIC = new Set(['index.html', 'css', 'js']);
+const PUBLIC = new Set(['index.html', 'css', 'js', 'icons', 'manifest.webmanifest']);
 
 // Önbellek kırıcı: index.html'deki js/css adreslerine dosyaların içeriğinden bir sürüm eklenir (?v=...).
 // Böylece Cloudflare ya da tarayıcı eski dosyayı saklasa bile yeni yayından sonra hep yenisi yüklenir.

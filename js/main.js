@@ -9,6 +9,7 @@
 const $ = id => document.getElementById(id);
 let renderer = null;        // sayfa hazır olunca kurulur: 3D (Three.js) ya da 2D yedek
 Input.init();
+Touch.init();
 
 const STEP = 1 / 60;
 const SCREENS = ['home', 'lobby', 'select', 'onlineForm', 'room', 'complete', 'editor', 'atolye'];
@@ -92,12 +93,13 @@ const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;'
 // ters yöne devam eder. Geçilen duraklar turuncu, sıradaki yeşil ve nabız gibi atar, kilitliler sönük.
 const MAP_COLS = 5;
 function renderMap(el, { done, pick, canPick = true, compact = false, note = null }) {
-  const rowH = compact ? 108 : 142, head = 26, n = LEVELS.length + 1;   // sonda "devamı yakında"
+  const short = innerHeight < 520;   // yatay telefon: satırlar sık, az kaydırılsın
+  const rowH = compact ? (short ? 98 : 108) : short ? 116 : 142, head = short ? 22 : 26, n = LEVELS.length + 1;   // sonda "devamı yakında"
   const rows = Math.ceil(n / MAP_COLS);
   const pts = [];
   for (let k = 0; k < n; k++) {
     const row = Math.floor(k / MAP_COLS), col = k % MAP_COLS, x = row % 2 ? MAP_COLS - 1 - col : col;
-    pts.push({ x: (x + 0.5) / MAP_COLS * 1000, y: row * rowH + head + (compact ? 28 : 36) + (x % 2 ? -6 : 6), row });
+    pts.push({ x: (x + 0.5) / MAP_COLS * 1000, y: row * rowH + head + (compact ? (short ? 24 : 28) : short ? 30 : 36) + (x % 2 ? -6 : 6), row });
   }
   // Aynı satırda yumuşak dalga, satır değişince dışarı doğru U dönüşü
   const seg = (a, b) => {
@@ -145,6 +147,16 @@ function renderMap(el, { done, pick, canPick = true, compact = false, note = nul
   }
 }
 
+// Ekran açılınca sıradaki bölüm görünmüyorsa ona kaydır (görünüyorsa hiç kaydırma)
+function scrollToCurrent(el) {
+  requestAnimationFrame(() => {
+    const cur = el.querySelector('.stop.current');
+    if (!cur) return;
+    const r = cur.getBoundingClientRect();
+    if (r.top < 0 || r.bottom > innerHeight) cur.scrollIntoView({ block: 'center' });
+  });
+}
+
 // ---------- Ekran geçişleri ----------
 
 function show(id) {
@@ -152,7 +164,9 @@ function show(id) {
   $('hud').classList.toggle('hidden', id !== null);
   // Editörde bölüm sol paneli açıkta bırakacak şekilde çizilir
   renderer.padLeft = id === 'editor' ? 260 : 0;
-  renderer.padTop = id === 'editor' ? 24 : 70;
+  renderer.padTop = id === 'editor' ? 24 : Touch.enabled ? 46 : 70;   // telefonda üst çubuk tek satır
+  renderer.tilt = Touch.enabled ? 0 : 11;                                   // telefonda bölüme tam karşıdan bakılır
+  $('hudMenuList').classList.add('hidden');
   if (typeof Atolye !== 'undefined') Atolye.renderAccount();
 }
 
@@ -251,6 +265,7 @@ function toSelect() {
   game = menuGame();
   show('select');
   renderLevelGrid();
+  scrollToCurrent($('levelGrid'));
 }
 
 function renderLevelGrid() {
@@ -273,7 +288,7 @@ function startCustom(def, fromAtolye = false) {
   editorTest = !fromAtolye;
   levelIndex = -1;
   mode = 'local';
-  if (joined.length < 2) joined = ['wasd', 'arrows'];
+  if (joined.length < 2) joined = Touch.enabled ? ['touch', 'arrows'] : ['wasd', 'arrows'];
   playLocal(def, def.name);
 }
 
@@ -340,10 +355,17 @@ function updateScrewHud() {
   el.innerHTML = `<span class="nut"></span>${got}/${n}`;
 }
 
+let hintTimer = 0;
 function setHud(title, def, rows) {
   $('levelName').textContent = title;
   $('levelHint').textContent = def.hint || 'Arkadaşının yaptığı bölüm. Kolay gelsin!';
   $('controls').innerHTML = rows.map(r => `<span><b style="color:${r.color}">${esc(r.label)}</b>${esc(r.hint)}</span>`).join('');
+  $('hudBackLabel').textContent = mode === 'online' ? 'Odaya dön' : editorTest ? 'Editöre dön' : Atolye.play ? 'Atölye\'ye dön' : 'Haritaya dön';
+  Touch.setMagnet(game && game.magnet);
+  // Telefonda ipucu birkaç saniye görünür, sonra küçülür; bölüm adına dokununca yeniden açılır
+  $('levelInfo').classList.remove('collapsed');
+  clearTimeout(hintTimer);
+  if (Touch.enabled) hintTimer = setTimeout(() => $('levelInfo').classList.add('collapsed'), 5000);
 }
 
 function showComplete(i, secs) {
@@ -377,6 +399,7 @@ function showComplete(i, secs) {
   }
   $('nextBtn').textContent = editorTest ? 'EDİTÖRE DÖN' : lastLevel ? (mode === 'online' ? 'ODAYA DÖN' : 'HARİTA') : 'SONRAKİ BÖLÜM';
   $('toSelectBtn').textContent = editorTest ? 'Tekrar dene' : mode === 'online' ? 'Odaya dön' : 'Harita';
+  $('replayBtn').classList.toggle('hidden', !!editorTest);   // editörde "Tekrar dene" zaten aynı işi yapar
   // Atölye'den oynanan bölüm: oynanma kaydı, beğen düğmesi, pakette sıradaki bölüm
   $('likeBtn').classList.add('hidden');
   if (mode === 'local' && !editorTest && Atolye.play) {
@@ -384,6 +407,7 @@ function showComplete(i, secs) {
     $('completeTitle').textContent = Atolye.hasNext() ? 'Bölüm tamam!' : Atolye.play.pack ? 'Paket bitti!' : 'Bölüm tamam!';
     $('nextBtn').textContent = Atolye.hasNext() ? 'SONRAKİ BÖLÜM' : 'ATÖLYE\'YE DÖN';
     $('toSelectBtn').textContent = 'Tekrar oyna';
+    $('replayBtn').classList.add('hidden');
   }
   $('completeHint').textContent = mode === 'online'
     ? 'Herhangi biriniz devam ettirebilir (zıplama tuşu da olur).'
@@ -518,7 +542,7 @@ Net.on('room', m => {
   }
   history.replaceState(null, '', `${location.pathname}?oda=${m.code}`);
   if (m.state === 'lobby' || (state !== 'playing' && state !== 'complete')) {
-    if (state !== 'room') { state = 'room'; game = menuGame(); show('room'); }
+    if (state !== 'room') { state = 'room'; game = menuGame(); show('room'); renderRoom(); if (m.members.length >= 2) scrollToCurrent($('roomMap')); return; }
   }
   renderRoom();
 });
@@ -573,10 +597,11 @@ $('lobbyBack').addEventListener('click', toHome);
 $('startBtn').addEventListener('click', toSelect);
 $('backBtn').addEventListener('click', toLobby);
 $('nextBtn').addEventListener('click', next);
+$('replayBtn').addEventListener('click', restart);   // vidaları tamamlamak ya da rekor için aynı bölüm baştan
 $('toSelectBtn').addEventListener('click', () => (editorTest || (mode === 'local' && Atolye.play) ? restart() : backToChooser()));
 $('onlineBack').addEventListener('click', toHome);
-$('createBtn').addEventListener('click', () => goOnline({ t: 'create' }));
-$('joinBtn').addEventListener('click', () => goOnline({ t: 'join', code: $('joinCode').value }));
+$('createBtn').addEventListener('click', () => { Touch.fullscreen(); goOnline({ t: 'create' }); });
+$('joinBtn').addEventListener('click', () => { Touch.fullscreen(); goOnline({ t: 'join', code: $('joinCode').value }); });
 $('roomLeave').addEventListener('click', () => { history.replaceState(null, '', location.pathname); toHome(); });
 $('copyBtn').addEventListener('click', async () => {
   const input = $('roomLink');
@@ -584,9 +609,38 @@ $('copyBtn').addEventListener('click', async () => {
   $('copyBtn').textContent = 'Kopyalandı!';
   setTimeout(() => { $('copyBtn').textContent = 'Kopyala'; }, 1500);
 });
+// Telefonda paylaşma penceresi (WhatsApp vb.) linki tek dokunuşla gönderir
+if (navigator.share) $('shareBtn').classList.remove('hidden');
+$('shareBtn').addEventListener('click', () => {
+  navigator.share({ title: GAME_TITLE, text: `${GAME_TITLE}: odama gel, birlikte oynayalım!`, url: $('roomLink').value }).catch(() => { /* vazgeçildi */ });
+});
 $('joinCode').addEventListener('keydown', e => { if (e.key === 'Enter') $('joinBtn').click(); });
 $('onlineName').addEventListener('keydown', e => {
   if (e.key === 'Enter') ($('joinCode').value.length === 4 ? $('joinBtn') : $('createBtn')).click();
+});
+
+// Telefonda R / Esc yerine oyun içi menü
+$('hudMenu').addEventListener('click', () => $('hudMenuList').classList.toggle('hidden'));
+addEventListener('pointerdown', e => { if (!(e.target instanceof Element && e.target.closest('#hudMenu, #hudMenuList'))) $('hudMenuList').classList.add('hidden'); });
+// Odak menü düğmesinde kalmasın: yoksa zıplama tuşu (Boşluk) menüyü yeniden açar
+for (const id of ['hudMenu', 'hudRestart', 'hudBack']) $(id).addEventListener('mousedown', e => e.preventDefault());
+$('hudRestart').addEventListener('click', () => { $('hudMenuList').classList.add('hidden'); if (state === 'playing') restart(); });
+$('hudBack').addEventListener('click', () => { $('hudMenuList').classList.add('hidden'); if (state === 'playing') backToChooser(); });
+$('levelInfo').addEventListener('click', () => { if (Touch.enabled) $('levelInfo').classList.toggle('collapsed'); });
+
+// Dokunmatik cihazda: aynı klavye ve editör yok (editör fareyle çalışır); iPhone'da ana ekrana ekleme ipucu
+Touch.onEnable(() => {
+  $('homeEditor').disabled = true;
+  $('homeEditor').querySelector('small').textContent = 'Bilgisayarda açılır';
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  let seen = false;
+  try { seen = !!localStorage.getItem('a2hsSeen'); } catch (e) { /* yoksay */ }
+  if (ios && !navigator.standalone && !seen) $('a2hs').classList.remove('hidden');
+  if (renderer) show(SCREENS.find(s => !$(s).classList.contains('hidden')) || null);   // üst pay yenilensin
+});
+$('a2hsClose').addEventListener('click', () => {
+  $('a2hs').classList.add('hidden');
+  try { localStorage.setItem('a2hsSeen', '1'); } catch (e) { /* yoksay */ }
 });
 
 addEventListener('keydown', e => {
@@ -601,6 +655,7 @@ addEventListener('keydown', e => {
     if (e.code === 'Escape') backToChooser();
   } else if (state === 'complete') {
     if (e.code === 'Enter') next();
+    if (e.code === 'KeyR') restart();
     if (e.code === 'Escape') backToChooser();
   }
 });
@@ -653,6 +708,7 @@ function frame(now) {
   }
 
   updatePingHud();
+  renderer.padBottom = Touch.enabled && (state === 'playing' || state === 'complete') ? Touch.band() : 30;   // tuşlar bölümün altında kalsın
   if (state === 'editor' && Editor.game) game = Editor.game;
   updateScrewHud();
   if (renderer.quality !== shownQuality) { shownQuality = renderer.quality; renderSettings(); }   // otomatik düşürülmüş olabilir

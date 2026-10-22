@@ -1,0 +1,16 @@
+{
+  "name": "Magnet Buddies",
+  "short_name": "Magnet Buddies",
+  "description": "Arkadaşlarınla birlikte çözülen mıknatıslı top bulmacaları.",
+  "lang": "tr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#1c1b3a",
+  "theme_color": "#1c1b3a",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

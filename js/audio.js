@@ -23,9 +23,10 @@ const Sound = {
         if (saved.muted && typeof saved.muted[k] === 'boolean') this.muted[k] = saved.muted[k];
       }
     } catch (e) { /* yoksay */ }
-    const start = () => { this.start(); removeEventListener('pointerdown', start); removeEventListener('keydown', start); };
-    addEventListener('pointerdown', start);
-    addEventListener('keydown', start);
+    // iOS sesi yalnızca parmak kalkınca (pointerup / touchend) açar; dokunmatikte bunlar da dinlenir
+    const evs = ['pointerdown', 'pointerup', 'touchend', 'keydown'];
+    const start = () => { this.start(); if (this.ctx && this.ctx.state === 'running') for (const ev of evs) removeEventListener(ev, start); };
+    for (const ev of evs) addEventListener(ev, start);
   },
 
   save() { try { localStorage.setItem('sound', JSON.stringify(Object.assign({ muted: this.muted }, this.settings))); } catch (e) { /* yoksay */ } },
@@ -33,7 +34,7 @@ const Sound = {
   level(kind) { return this.muted[kind] ? 0 : this.settings[kind]; },
 
   start() {
-    if (this.ctx) return;
+    if (this.ctx) { if (this.ctx.state === 'suspended') this.ctx.resume(); return; }
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return;
     const ctx = this.ctx = new AC();
