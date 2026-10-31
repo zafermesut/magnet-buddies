@@ -2250,7 +2250,7 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
   // topun üstünden geçerler. A düğmede (1) kapağı açar, B ikinci topu buzda iter: kapağın içine kayar, basamak tutar
   const g = new Game(L('kartopu-takozu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, P = g.presses[0];
   const [s1, s2] = g.boxes.slice().sort((p, q) => p.x - q.x), b1 = g.buttons[0], gx = 32 * T, out = 21 * T + 10;
-  const settled = () => s1.x + s1.w > 14 * T + 4 && Math.abs(s1.dx) < 0.01 && s1.supported;
+  const settled = () => s1.x + s1.w > 13 * T + 4 && Math.abs(s1.dx) < 0.01 && s1.supported;
   const wedged = () => s2.x >= gx - 1 && s2.supported;
   const going = new Set();
   const cross = (g, p, t) => {
@@ -2327,6 +2327,113 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
     [goTo(ex), goTo(ex)],
   ]);
   ok(run(g, ctl, 90, g => g.done), 'B10. Kar fırtınası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B11. Donmuş bant: A düğmede (2) sandığı bırakır, B düğmede (3) alçak kapağı açar. Sandık banttan buza geçip kayar, kapaktan
+  // geçer, duvardaki düğmeye (1) çarpar: a kapağı açılır. İkisi alçak kapağın ve basamağın üstünden çıkışa
+  const g = new Game(L('donmus-bant'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2), b3 = g.buttons.find(b => b.channel === 3);
+  const ctl = phases([
+    [(g, p, t) => (b1.pressed ? null : goTo(b2.x + b2.w / 2)(g, p, t)), (g, p, t) => (b1.pressed ? null : goTo(b3.x + b3.w / 2)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B11. Donmuş bant geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B12. Eriyen merdiven: A düğmede (1) kapağı tutar; B eriyen buz basamaklardan durmadan zıplayarak rafa çıkar, şalterle (4)
+  // kapağı açık bırakır. Basamaklar donunca A da çıkar
+  const g = new Game(L('eriyen-merdiven'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
+  const top = p => p.supported && p.y + p.h <= 6 * T + 1 && p.x > 20 * T;
+  const intact = () => g.thaws.every(th => !th.open && th.crackT < 0);
+  const started = new Set();
+  const climb = (g, p, t) => {
+    if (top(p)) return null;
+    if (!started.has(p)) { if (!intact()) return goTo(12 * T)(g, p, t); if (Math.abs(p.x + p.w / 2 - 15 * T) < 8) started.add(p); else return goTo(15 * T)(g, p, t); }
+    if (p.y > 9 * T && p.supported && p.x < 16 * T && !intact()) { started.delete(p); return idle(); }   // düştüyse yeniden dene
+    return I({ right: true, jump: p.supported ? true : p.vy < 0 });
+  };
+  const ctl = phases([
+    [(g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t)), (g, p, t) => (g.switches[1] ? null : top(p) ? flip(lv, 1)(g, p, t) : g.gates[0].open ? climb(g, p, t) || idle() : idle())],
+    [climb, (g, p, t) => (top(A) ? null : goTo(26 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B12. Eriyen merdiven geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B13. Buz sapanı: A düğmede (1) kapağı tutar; B buzda koşup yaya basar, 4 karoluk duvarın üstüne uçar, şalterle (4) kapağı
+  // açık bırakır; A da aynı yoldan
+  const g = new Game(L('buz-sapani'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
+  const top = p => p.supported && p.y + p.h <= 7 * T + 1 && p.x > 22 * T;
+  const sling = (g, p, t) => (top(p) ? null : I({ right: true }));
+  const ctl = phases([
+    [(g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t)), (g, p, t) => (g.switches[1] ? null : top(p) ? flip(lv, 1)(g, p, t) : g.gates[0].open ? sling(g, p, t) : idle())],
+    [sling, (g, p, t) => (top(A) ? null : goTo(31 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B13. Buz sapanı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B14. Kar asansörü: A topu karda büyütür; ikisi topu asansörün sağına iter, yanına binerler; B kenardaki şalteri (4)
+  // çevirir, asansör çıkar. Yukarıda topu duvarın dibine iterler, üstünden 4 karoluk rafa zıplarlar
+  const g = new Game(L('kar-asansoru'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0], lift = g.lifts[0];
+  const behind = p => p.x + p.w <= sb.x + 3 && p.supported && p.ground !== sb;
+  const push = done => [
+    (g, p, t) => (done() ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)),
+    (g, p, t) => (done() ? null : behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t)),
+  ];
+  const onLift = () => sb.x + sb.w >= 18 * T - 1 && sb.ground === lift;
+  const up = () => lift.y <= lift.topY + 0.5;
+  const ledge = 27 * T, top = p => p.supported && p.y + p.h <= 3 * T + 1;
+  const climb = (g, p, t) => {
+    if (top(p)) return null;
+    if (p.ground === sb) return I({ right: true, jump: true });
+    if (!p.supported) return I({ right: true, jump: p.vy < 0 });
+    return Math.abs(p.x + p.w / 2 - (sb.x - 30)) > 8 ? goTo(sb.x - 30)(g, p, t) : I({ right: true, jump: true });
+  };
+  const at = (p, x) => Math.abs(p.x + p.w / 2 - x) < 4;
+  const ctl = phases([
+    [(g, p, t) => (sb.big ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)), (g, p, t) => (sb.big ? null : goTo(1 * T)(g, p, t))],
+    push(onLift),
+    // Asansöre bin; B sol kenarda şalteri çevirir
+    [(g, p, t) => (g.switches[1] ? null : at(p, lift.x + 62) ? idle() : goTo(lift.x + 62)(g, p, t)),
+     (g, p, t) => (g.switches[1] ? null : at(p, lift.x + 12) && at(A, lift.x + 62) ? I({ action: tap(t) }) : at(p, lift.x + 12) ? idle() : goTo(lift.x + 12)(g, p, t))],   // asansörün sol kenarında: şalter yanında
+    [(g, p, t) => (up() ? null : idle()), (g, p, t) => (up() ? null : idle())],
+    push(() => sb.x + sb.w >= ledge - 1),
+    [climb, (g, p, t) => (top(A) ? null : goTo(sb.x - 100)(g, p, t))],
+    [(g, p, t) => (top(B) ? null : goTo(30 * T)(g, p, t)), climb],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B14. Kar asansörü geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B15. Buzul ustası (sınav): A düğmede (2) sandığı bırakır, B düğmede (3) alçak kapağı açar; sandık banttan buza geçip
+  // düğmeye (1) kayar, a kapağı açılır. Sırayla eriyen basamaklardan rafa çıkarlar, buzda koşup çukuru aşarlar
+  const g = new Game(L('buzul-ustasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2), b3 = g.buttons.find(b => b.channel === 3);
+  const ledge = p => p.supported && p.y + p.h <= 7 * T + 1 && p.x > 25 * T, over = p => p.supported && p.x > 42 * T;
+  const intact = () => g.thaws.every(th => !th.open && th.crackT < 0);
+  const started = new Set();
+  const climb = (g, p, t) => {
+    if (ledge(p)) return null;
+    if (!started.has(p)) { if (!intact()) return goTo(21 * T)(g, p, t); if (Math.abs(p.x + p.w / 2 - (21 * T + 20)) < 8) started.add(p); else return goTo(21 * T + 20)(g, p, t); }
+    if (p.supported && p.y + p.h > 10 * T && p.x < 23 * T && !intact()) { started.delete(p); return idle(); }
+    return I({ right: true, jump: p.supported ? true : p.vy < 0 });
+  };
+  const edge = 37 * T;
+  const skate = (g, p, t) => (over(p) ? null : I({ right: true, jump: (p.supported && p.x + p.w > edge - 4) || (!p.supported && p.vy < 0) }));
+  const ctl = phases([
+    [(g, p, t) => (b1.pressed ? null : goTo(b2.x + b2.w / 2)(g, p, t)), (g, p, t) => (b1.pressed ? null : goTo(b3.x + b3.w / 2)(g, p, t))],
+    // Önce B tırmanıp kayar; A basamaklar donunca
+    [(g, p, t) => (ledge(B) || over(B) ? (over(p) ? null : ledge(p) ? skate(g, p, t) : climb(g, p, t) || idle()) : goTo(20 * T)(g, p, t)),
+     (g, p, t) => (over(p) ? (over(A) ? null : goTo(45 * T)(g, p, t)) : ledge(p) ? skate(g, p, t) : climb(g, p, t) || idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B15. Buzul ustası geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

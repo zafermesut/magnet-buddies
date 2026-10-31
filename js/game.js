@@ -383,7 +383,11 @@ class Game {
       const g = b.ground;
       // Üstündekini taşır; ama oyuncunun kafasına düşen sandık taşınmaz, oyuncu yürüyünce kayıp düşer
       // Taşıyıcı bant: yerdeyken bandın hızını alır, zıplayınca bu hız havada da sürer (bantla uzun atlama)
-      if (b.onGround) b.beltV = g ? 0 : this.beltUnder(b) * ph.beltSpeed;
+      if (b.onGround) {
+        const bv = g ? 0 : this.beltUnder(b) * ph.beltSpeed;
+        if (!bv && b.beltV && b.onIce && b.kind === 'box') b.vx = b.beltV;   // banttan buza geçen sandık bandın hızıyla kaymayı sürdürür
+        b.beltV = bv;
+      }
       const carry = (g && this.solids.includes(g) && !(b.kind === 'box' && g.kind === 'player') ? g.dx : 0) + (b.beltV || 0) * dt;
       const x0 = b.x;
       b.onGround = false;
