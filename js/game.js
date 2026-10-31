@@ -678,6 +678,8 @@ class Game {
   rollSnow(b) {
     b.roll += b.dx / (b.w / 2);
     if (b.big || !b.onGround || b.ground || b.onIce || !b.dx || this.beltUnder(b)) return;   // buzda ve bantta büyümez
+    const ur = Math.floor((b.y + b.h + 1) / T), under = this.blockers[ur] && this.blockers[ur][Math.floor((b.x + b.w / 2) / T)];
+    if (under && under.kind === 'thaw') return;   // eriyen buz da buzdur
     b.rolled += Math.abs(b.dx);
     if (b.rolled < PHYS.snowGrow) return;
     const k = PHYS.snowBig, nx = b.dx > 0 ? b.x : b.x + b.w - k, ny = b.y + b.h - k;   // itildiği yöne doğru büyür (iteni ezmez)
