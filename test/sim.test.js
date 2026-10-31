@@ -1707,5 +1707,145 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
   ok(run(g, ctl, 120, g => g.done), 'F20. Sevkiyat sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // F21. Asma hat: A düğmede (1) a kapağını açar. B tavana asılır, bantta akan anahtarı mıknatısla çeker, karşıda kutup
+  // değiştirip iner, şalterle (4) kapağı açık bırakır. A da asılarak geçer; B anahtarla kapıyı açar
+  const g = new Game(L('asma-hat'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
+  const btn = g.buttons[0], lv = g.levers[0], startX = 8 * T, endX = 24 * T + 20;
+  const hanging = p => !p.supported && p.vy <= 1 && p.gripT > 0;
+  // Asılıyken anahtarın üstüne kadar git, anahtar elde olana kadar mıknatıs
+  const fish = (g, p, t) => {
+    if (key.holder === p) return null;
+    if (hanging(p) && p.x + p.w / 2 > 14 * T) return I({ action: true });
+    return hangAcross(startX, endX, 1)(g, p, t) || idle();
+  };
+  const land = p => p.supported && p.x > 23 * T + 30;
+  const ctl = phases([
+    [(g, p, t) => (key.holder ? null : goTo(btn.x + btn.w / 2)(g, p, t)), fish],
+    [(g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t)), (g, p, t) => (g.switches[1] ? null : land(p) ? flip(lv, 1)(g, p, t) : hangAcross(startX, endX, 1)(g, p, t) || idle())],
+    [(g, p, t) => (land(p) ? null : hangAcross(startX, endX, 1)(g, p, t) || idle()), (g, p, t) => (land(A) ? null : goTo(29 * T)(g, p, t))],
+    [(g, p, t) => (door.open ? null : idle()), (g, p, t) => (door.open ? null : goTo(door.cells[0].c * T + T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F21. Asma hat geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F22. Zamanlı çekiş: A yakındaki zamanlı düğmeye basıp B'nin arkasına koşar, B kenardan zıplarken iter; B karşıda.
+  // B karşıdaki zamanlı düğmeye basıp çekme yerine koşar; kapak açıkken A zıplar, B kutup değiştirip çeker
+  const g = new Game(L('zamanli-cekis'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, gate = g.gates[0];
+  const [tNear, tFar] = g.buttons.slice().sort((p, q) => p.x - q.x), on = (b, p) => Math.abs(p.x + p.w / 2 - (b.x + b.w / 2)) < 6;
+  const farX = 18 * T, bAcross = () => B.x > farX - 10 && B.supported, both = () => bAcross() && A.x > farX - 10 && A.supported;
+  let pressed = false, pressedFar = false;
+  const [pa, pb] = crossPit(g, A, B, 12 * T, farX, bAcross);
+  const [qa, qb] = crossPit(g, A, B, 12 * T, farX, both);
+  const ctl = phases([
+    [(g, p, t) => (pressed ? null : on(tNear, p) ? ((pressed = true), idle()) : goTo(tNear.x + tNear.w / 2)(g, p, t)), (g, p, t) => (pressed ? null : goTo(10 * T)(g, p, t))],
+    [(g, p, t) => (gate.open ? pa(g, p, t) : idle()), (g, p, t) => (gate.open ? pb(g, p, t) : idle())],
+    [(g, p, t) => (pressedFar ? null : goTo(10 * T)(g, p, t)), (g, p, t) => (pressedFar ? null : on(tFar, p) ? ((pressedFar = true), idle()) : goTo(tFar.x + tFar.w / 2)(g, p, t))],
+    // A, B çekme yerine varana kadar kenarda bekler
+    [(g, p, t) => (both() ? null : gate.open && Math.abs(B.x + B.w / 2 - (farX + 20)) < 12 ? qa(g, p, t) : goTo(10 * T + 10)(g, p, t)), (g, p, t) => (both() ? null : qb(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F22. Zamanlı çekiş geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F23. Gezgin fırlatma: A, B'nin başına çıkar; B onu taşıyarak gezgin platforma biner. Platform duvarın dibinde beklerken
+  // B mıknatısla A'yı fırlatır, A duvarın üstüne iner, kutup değiştirip B'yi çeker (platform bir sonraki gelişinde de olur)
+  const g = new Game(L('gezgin-firlatma'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, M = g.movers[0];
+  const wallX = 28 * T, topY = 6 * T, onTop = p => p.supported && p.y + p.h <= topY + 1 && p.x + p.w > wallX;
+  const ride = slot => (g, p, t) => { const d = M.x + slot - (p.x + p.w / 2); return I({ right: d > 3, left: d < -3 }); };
+  const atLeft = () => M.x <= M.minX + 1 && M.pause > 0.15, atRight = () => M.x >= M.maxX - 1 && M.pause > 0;
+  const center = (g, p, t) => { const d = B.x - p.x; return I({ right: d > 2, left: d < -2 }); };
+  let launching = false;
+  const ctl = phases([
+    // A karada B'nin başına çıkar; B onu taşıyıp platform sol uçta beklerken biner
+    [(g, p, t) => (p.ground === B && B.ground === M ? null : p.ground === B ? center(g, p, t) :
+       Math.abs(B.x + B.w / 2 - (M.minX - 24)) < 6 && B.supported ? climbOn(B)(g, p, t) : goTo(M.minX - 90)(g, p, t)),
+     (g, p, t) => (A.ground === p && p.ground === M ? null : p.ground === M ? ride(M.w - 24)(g, p, t) : A.ground === p && atLeft() ? I({ right: true }) :
+       Math.abs(p.x + p.w / 2 - (M.minX - 24)) > 4 ? goTo(M.minX - 24)(g, p, t) : idle())],
+    // Sağ uçta B fırlatır, A duvarın üstüne kayar
+    [(g, p, t) => (onTop(p) ? null : p.ground === B ? center(g, p, t) : !p.supported && p.y + p.h < topY + 20 ? I({ right: true }) : idle()),
+     (g, p, t) => {
+       if (onTop(A)) return null;
+       if (A.ground === p && atRight()) launching = true;
+       else if (A.supported || A.y + A.h < topY - 20) launching = false;
+       return I({ action: launching, right: M.x + M.w - 24 - (p.x + p.w / 2) > 3, left: M.x + M.w - 24 - (p.x + p.w / 2) < -3 });
+     }],
+    // A kutup değiştirip duvarın kenarında çeker; B platform sağ uçtayken duvara doğru zıplar
+    [(g, p, t) => {
+       if (onTop(B)) return null;
+       if (p.pol === B.pol) return I({ swap: (t * 10 | 0) % 2 === 0 });
+       const cx = p.x + p.w / 2, at = wallX + 20;
+       if (Math.abs(cx - at) > 8) return I({ right: cx < at, left: cx > at });
+       return I({ action: B.x + B.w > wallX - 80 && !onTop(B), right: B.y + B.h < topY });
+     },
+     (g, p, t) => {
+       if (onTop(p)) return null;
+       if (p.y + p.h < topY + 4) return I({ right: true, jump: true });
+       if (p.ground === M) return M.x >= M.maxX - 1 && A.pol !== p.pol ? I({ right: true, jump: (t * 5 | 0) % 2 === 0 || p.vy < 0 }) : ride(M.w - 24)(g, p, t);
+       return I({ right: true, jump: p.vy < 0 });
+     }],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F23. Gezgin fırlatma geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F24. Kanca: B düğmede (2) cebin kapağını açar. A şeride asılıp B'nin tam üstünde durur, mıknatısla sandığı cebinden çeker;
+  // sandık altında asılı kalır, A asılı yürüyüp karşıdaki düğmenin (1) üstünde bırakır. A iner; B de asılarak geçer
+  const g = new Game(L('kanca'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b2 = g.buttons.find(b => b.channel === 2), b1 = g.buttons.find(b => b.channel === 1);
+  const hanging = p => !p.supported && p.vy <= 1 && p.gripT > 0;
+  const holdX = b2.x + b2.w / 2, dropX = b1.x + b1.w / 2;
+  const land = p => p.supported && p.x > 23 * T;
+  const ctl = phases([
+    [(g, p, t) => {
+       if (b1.pressed) return null;
+       if (!hanging(p)) return p.supported ? (Math.abs(p.x + p.w / 2 - 6 * T) > 8 ? goTo(6 * T)(g, p, t) : B.supported && Math.abs(B.x + B.w / 2 - holdX) < 6 ? I({ jump: (t * 4 | 0) % 2 === 0 }) : idle()) : I();
+       const held = crate.y + crate.h < 10 * T && Math.abs(crate.x + crate.w / 2 - (p.x + p.w / 2)) < 60;
+       if (!held) { const d = holdX - (p.x + p.w / 2); return Math.abs(d) > 4 ? I({ right: d > 0, left: d < 0 }) : I({ action: true }); }   // düğmedekinin tam üstünde: sandığı çek
+       const cx = crate.x + crate.w / 2;
+       return Math.abs(cx - dropX) > 8 ? I({ action: true, right: cx < dropX, left: cx > dropX }) : I();   // düğmenin üstünde bırak
+     },
+     (g, p, t) => (b1.pressed ? null : goTo(holdX)(g, p, t))],
+    [(g, p, t) => (land(B) ? null : land(p) ? goTo(26 * T)(g, p, t) : hangAcross(holdX + 40, 25 * T, 1)(g, p, t) || idle()),
+     (g, p, t) => (land(p) ? null : A.supported ? hangAcross(holdX + 40, 25 * T, 1)(g, p, t) || idle() : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F24. Kanca geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F25. Atölye ustası: Kanca gibi: B düğmede (2), A asılıp sandığı cebinden çeker, birinci çukurun üstünden taşıyıp düğmeye (1)
+  // bırakır: a kapağı açık kalır. İkisi asılarak geçer. İkinci çukuru Uçurum gibi: A, B'yi iter; B kutup değiştirip A'yı çeker
+  const g = new Game(L('atolye-ustasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b2 = g.buttons.find(b => b.channel === 2), b1 = g.buttons.find(b => b.channel === 1);
+  const hanging = p => !p.supported && p.vy <= 1 && p.gripT > 0;
+  const holdX = b2.x + b2.w / 2, dropX = b1.x + b1.w / 2, endX = 20 * T;
+  const land = p => p.supported && p.x > 18 * T && p.x < 26 * T;
+  const across = () => A.x > 32 * T - 10 && B.x > 32 * T - 10 && A.supported && B.supported;
+  const ctl = phases([
+    [(g, p, t) => {
+       if (b1.pressed) return null;
+       if (!hanging(p)) return p.supported ? (Math.abs(p.x + p.w / 2 - 6 * T) > 8 ? goTo(6 * T)(g, p, t) : B.supported && Math.abs(B.x + B.w / 2 - holdX) < 6 ? I({ jump: (t * 4 | 0) % 2 === 0 }) : idle()) : I();
+       const held = crate.y + crate.h < 10 * T && Math.abs(crate.x + crate.w / 2 - (p.x + p.w / 2)) < 60;
+       if (!held) { const d = holdX - (p.x + p.w / 2); return Math.abs(d) > 4 ? I({ right: d > 0, left: d < 0 }) : I({ action: true }); }
+       const cx = crate.x + crate.w / 2;
+       return Math.abs(cx - dropX) > 8 ? I({ action: true, right: cx < dropX, left: cx > dropX }) : I();
+     },
+     (g, p, t) => (b1.pressed ? null : goTo(holdX)(g, p, t))],
+    [(g, p, t) => (land(B) && land(p) ? null : land(p) ? goTo(22 * T)(g, p, t) : hangAcross(holdX + 40, endX, 1)(g, p, t) || idle()),
+     (g, p, t) => (land(p) && land(A) ? null : land(p) ? goTo(24 * T)(g, p, t) : A.supported && land(A) ? hangAcross(holdX + 40, endX, 1)(g, p, t) || idle() : idle())],
+    // Kutuplar: ikisi de + olmalı (asılırken + kaldılar; inince değişmiş olabilir)
+    [(g, p, t) => (!land(p) || !land(B) ? (land(p) ? idle() : hangAcross(holdX + 40, endX, 1)(g, p, t) || idle()) : p.pol === 1 && B.pol === 1 ? (Math.abs(p.x + p.w / 2 - 22 * T) > 6 ? goTo(22 * T)(g, p, t) : null) : p.pol !== 1 ? I({ swap: (t * 10 | 0) % 2 === 0 }) : idle()),
+     (g, p, t) => (!land(p) || !land(A) ? (land(p) ? idle() : hangAcross(holdX + 40, endX, 1)(g, p, t) || idle()) : p.pol === 1 && A.pol === 1 ? (Math.abs(p.x + p.w / 2 - 24 * T) > 6 ? goTo(24 * T)(g, p, t) : null) : p.pol !== 1 ? I({ swap: (t * 10 | 0) % 2 === 0 }) : idle())],
+    crossPit(g, A, B, 26 * T, 32 * T, across),
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F25. Atölye ustası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
