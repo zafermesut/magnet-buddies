@@ -1288,6 +1288,20 @@ const flat = (floor, row10 = '#.SS' + '.'.repeat(27) + '#') => ['#'.repeat(32)].
   ok(Math.abs(sb.x - x0) < 1, 'kar topu mıknatısla çekilmez');
 }
 
+{
+  // Yay hafif nesneleri de fırlatır (küçük kar topu, metal sandık); büyük top ve ağır kutu fırlamaz
+  const lift = ch => {
+    const g = tmpGame(flat('#'.repeat(32), '#.SS..' + ch + '^' + '.'.repeat(23) + '#')), [A, B] = g.players, b = g.boxes[0];
+    if (ch === 'O' && lift.big) { b.w = b.h = PHYS.snowBig; b.big = true; b.y = 11 * T - b.w; }
+    B.x = 1 * T; A.x = b.x - A.w - 1;
+    let minY = b.y;
+    run(g, [(g, p) => I({ right: p.x + p.w < 7 * T - 2 }), idle], 3, () => { minY = Math.min(minY, b.y); return false; });
+    return b.y + b.h - (minY + b.h);
+  };
+  const small = lift('O'), crate = lift('M');
+  ok(small > 3 * T && crate > 3 * T, 'yay küçük kar topunu ve metal sandığı fırlatır (' + (small | 0) + ' / ' + (crate | 0) + ' px)');
+}
+
 console.log('Fabrika bölümleri');
 // Bantta koşup çukurun kenarında zıpla (bant hız verir); karşıya inince biter
 const longJump = (edgeX, landX) => (g, p, t) => {
@@ -2604,6 +2618,128 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
     [goTo(ex), goTo(ex)],
   ]);
   ok(run(g, ctl, 90, g => g.done), 'B20. Kuzey rüzgârı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B21. Kar yayı: A düğmede (2) alçak kapağı açar; B küçük topu buzda iter: top kapaktan kayıp yaya çarpar, rafa fırlar, düğmeye
+  // (1) düşer, a kapağı açılır. İkisi rafın altından çıkışa
+  const g = new Game(L('kar-yayi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0];
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2);
+  let shoved = false;
+  const ctl = phases([
+    [(g, p, t) => (b1.pressed ? null : goTo(b2.x + b2.w / 2)(g, p, t)),
+     (g, p, t) => { if (b1.pressed) return null; if (!b2.pressed) return idle(); if (sb.dx > 1) shoved = true; return shoved ? I({ left: true }) : p.x + p.w <= sb.x + 3 ? I({ right: true }) : goTo(sb.x - 25)(g, p, t); }],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B21. Kar yayı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+
+{
+  // B22. Çift yay: A düğmede (3) alçak kapakları açar; B önce birinci topu, sonra ikinciyi buzda iter: her top yaya çarpıp kendi
+  // rafındaki düğmeye (1, 2) düşer; a ve b kapakları açılır
+  const g = new Game(L('cift-yay'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const [s1, s2] = g.boxes.slice().sort((p, q) => p.x - q.x);
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2), b3 = g.buttons.find(b => b.channel === 3);
+  const shove = (ball, done) => { let shoved = false; return (g, p, t) => { if (done()) return null; if (!b3.pressed) return idle(); if (ball.dx > 1) shoved = true; return shoved ? idle() : p.x + p.w <= ball.x + 3 ? I({ right: true }) : goTo(ball.x - 25)(g, p, t); }; };
+  const ctl = phases([
+    [(g, p, t) => (b1.pressed ? null : goTo(b3.x + b3.w / 2)(g, p, t)), shove(s1, () => b1.pressed)],
+    [(g, p, t) => (b2.pressed ? null : goTo(b3.x + b3.w / 2)(g, p, t)), (g, p, t) => (b2.pressed ? null : p.x + p.w < s2.x - 30 ? I({ right: true, jump: p.x > 8 * T && p.x < 9 * T && p.supported }) : shove(s2, () => b2.pressed)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B22. Çift yay geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B23. İki top: A küçük topu buzda iter, top yaya çarpıp rafın düğmesine (1) düşer: a kapağı açılır. İkinci topu A karda
+  // yuvarlayıp büyütür; ikisi büyük topu kapaktan geçirip yüksek rafın dibine iter, üstünden zıplarlar
+  const g = new Game(L('iki-top'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const [s1, s2] = g.boxes.slice().sort((p, q) => p.x - q.x), b1 = g.buttons[0];
+  const behind = (p, b) => p.x + p.w <= b.x + 3 && p.supported && p.ground !== b;
+  let shoved = false;
+  const wall = 30 * T, top = p => p.supported && p.y + p.h <= 7 * T + 1 && p.x > wall - 10;
+  const atWall = () => s2.x + s2.w >= wall - 1;
+  const climb = (g, p, t) => {
+    if (top(p)) return null;
+    if (p.ground === s2) return I({ right: true, jump: true });
+    if (!p.supported) return I({ right: true, jump: p.vy < 0 });
+    return Math.abs(p.x + p.w / 2 - (s2.x - 30)) > 8 ? goTo(s2.x - 30)(g, p, t) : I({ right: true, jump: true });
+  };
+  const ctl = phases([
+    [(g, p, t) => { if (b1.pressed) return null; if (s1.dx > 1) shoved = true; return shoved ? I({ left: true }) : behind(p, s1) ? I({ right: true }) : goTo(s1.x - 25)(g, p, t); },
+     (g, p, t) => (b1.pressed ? null : goTo(1 * T)(g, p, t))],
+    // A ikinci topa gider (yayın üstünden atlar), büyütür
+    [(g, p, t) => (s2.big ? null : p.x + p.w < s2.x - 30 ? I({ right: true, jump: p.x > 8 * T && p.x < 9 * T && p.supported }) : behind(p, s2) ? I({ right: true }) : goTo(s2.x - 40)(g, p, t)),
+     (g, p, t) => (s2.big ? null : goTo(1 * T)(g, p, t))],
+    [(g, p, t) => (atWall() ? null : behind(p, s2) ? I({ right: true }) : goTo(s2.x - 40)(g, p, t)),
+     (g, p, t) => (atWall() ? null : p.x < 10 * T ? I({ right: true, jump: p.x > 8 * T && p.supported }) : behind(p, s2) && (p.x + p.w > A.x - 4 || behind(A, s2)) ? I({ right: true }) : goTo(s2.x - 80)(g, p, t))],
+    [climb, (g, p, t) => (top(A) ? null : goTo(s2.x - 100)(g, p, t))],
+    [(g, p, t) => (top(B) ? null : goTo(34 * T)(g, p, t)), climb],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B23. İki top geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B24. Kar kapısı: A topu karda büyütür; ikisi büyük topu kapağın önüne iter. A zamanlı düğmeye (t) basıp koşar; kapak 4 sn
+  // açıkken ikisi topu kapağın içine iter: kapak kapanmaz. Topun üstünden geçerler
+  const g = new Game(L('kar-kapisi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0], tb = g.buttons[0];
+  const gx = 16 * T, gate = g.gates[0];
+  const behind = p => p.x + p.w <= sb.x + 3 && p.supported && p.ground !== sb;
+  const ready = () => sb.x + sb.w >= gx - 2;
+  const wedged = () => sb.x + sb.w > gx + 10 && sb.supported;
+  let pressed = false;
+  const push2 = done => [
+    (g, p, t) => (done() ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)),
+    (g, p, t) => (done() ? null : behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t)),
+  ];
+  const ctl = phases([
+    [(g, p, t) => (sb.big ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)), (g, p, t) => (sb.big ? null : goTo(1 * T + 20)(g, p, t))],
+    push2(ready),
+    // A zamanlı düğmeye basıp döner; B topun arkasında bekler; kapak açıkken ikisi iter
+    [(g, p, t) => {
+       if (wedged()) return null;
+       if (!pressed) { if (Math.abs(p.x + p.w / 2 - (tb.x + tb.w / 2)) < 6) pressed = true; return goTo(tb.x + tb.w / 2)(g, p, t); }
+       return behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t);
+     },
+     (g, p, t) => (wedged() ? null : gate.open && behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B24. Kar kapısı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B25. Kar ustası (sınav): A küçük topu buzda iter, top yayla rafın düğmesine (1) düşer: a kapağı açılır. A ikinci topu karda
+  // büyütür; ikisi büyük topu hendeğe iter, üstünden geçerler. Sırayla eriyen basamaklardan rafa çıkarlar
+  const g = new Game(L('kar-ustasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const [s1, s2] = g.boxes.slice().sort((p, q) => p.x - q.x), b1 = g.buttons[0];
+  const behind = (p, b) => p.x + p.w <= b.x + 3 && p.supported && p.ground !== b;
+  let shoved = false;
+  const inTrench = () => s2.big && s2.supported && s2.y > 12 * T;
+  const pastTrench = p => p.supported && p.x > 26 * T && p.y + p.h <= 12 * T + 1;
+  const crossT = (g, p, t) => (pastTrench(p) ? null : I({ right: true, jump: p.ground === s2 || (!p.supported && p.vy < 0) }));
+  const top = p => p.supported && p.y + p.h <= 8 * T + 1 && p.x > 32 * T;
+  const intact = () => g.thaws.every(th => !th.open && th.crackT < 0);
+  const started = new Set();
+  const climb = (g, p, t) => {
+    if (top(p)) return null;
+    if (!started.has(p)) { if (!intact()) return goTo(27 * T)(g, p, t); if (Math.abs(p.x + p.w / 2 - (28 * T + 20)) < 8) started.add(p); else return goTo(28 * T + 20)(g, p, t); }
+    if (p.supported && p.y + p.h > 11 * T && p.x < 30 * T && !intact()) { started.delete(p); return idle(); }
+    return I({ right: true, jump: p.supported ? true : p.vy < 0 });
+  };
+  const ctl = phases([
+    [(g, p, t) => { if (b1.pressed) return null; if (s1.dx > 1) shoved = true; return shoved ? I({ left: true }) : behind(p, s1) ? I({ right: true }) : goTo(s1.x - 25)(g, p, t); },
+     (g, p, t) => (b1.pressed ? null : goTo(1 * T)(g, p, t))],
+    [(g, p, t) => (s2.big ? null : p.x + p.w < s2.x - 30 ? I({ right: true, jump: p.x > 7 * T && p.x < 8 * T && p.supported }) : behind(p, s2) ? I({ right: true }) : goTo(s2.x - 40)(g, p, t)),
+     (g, p, t) => (s2.big ? null : goTo(1 * T)(g, p, t))],
+    [(g, p, t) => (inTrench() ? null : behind(p, s2) ? I({ right: true }) : goTo(s2.x - 40)(g, p, t)),
+     (g, p, t) => (inTrench() ? null : p.x < 9 * T ? I({ right: true, jump: p.x > 7 * T && p.supported }) : behind(p, s2) && (p.x + p.w > A.x - 4 || behind(A, s2)) ? I({ right: true }) : goTo(s2.x - 80)(g, p, t))],
+    [(g, p, t) => (pastTrench(p) && pastTrench(B) ? null : pastTrench(B) ? crossT(g, p, t) || goTo(27 * T)(g, p, t) : goTo(19 * T)(g, p, t)),
+     (g, p, t) => (pastTrench(p) && pastTrench(A) ? null : pastTrench(p) ? goTo(28 * T)(g, p, t) : crossT(g, p, t))],
+    [(g, p, t) => (top(p) && top(B) ? null : top(B) ? climb(g, p, t) || idle() : goTo(26 * T + 20)(g, p, t)), (g, p, t) => (top(p) ? (top(A) ? null : goTo(40 * T)(g, p, t)) : climb(g, p, t) || idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B25. Kar ustası geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

@@ -723,6 +723,14 @@ class Game {
         s.t = this.t;
         this.fx('spring', s.x + s.w / 2, s.y);
       }
+      // Hafif nesneler de fırlar: metal sandık ve küçük kar topu (ağır kutu ve büyük top değil)
+      for (const b of this.boxes) {
+        if (!(b.metal || (b.snow && !b.big)) || !b.onGround || b.vy < 0 || !overlap(b, pad)) continue;
+        b.vy = -PHYS.springV;
+        b.onGround = false; b.supported = false; b.ground = null;
+        s.t = this.t;
+        this.fx('spring', s.x + s.w / 2, s.y);
+      }
     }
   }
 
