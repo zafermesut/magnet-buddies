@@ -192,7 +192,10 @@ class Game {
   beltUnder(b) {
     if (!this.belts.size) return 0;
     const r = Math.floor((b.y + b.h + 1) / T), c = Math.floor((b.x + b.w / 2) / T);
-    return this.belts.get(r * this.cols + c) || 0;
+    if (this.belts.has(r * this.cols + c) || this.blocked(c, r)) return this.belts.get(r * this.cols + c) || 0;
+    // Ortası boşluğun üstündeyse kenarıyla bantta duruyor: bant onu boşluğa doğru taşır (bandın ucundan düşer)
+    const e = this.belts.get(r * this.cols + Math.floor(b.x / T)) || this.belts.get(r * this.cols + Math.floor((b.x + b.w - 0.001) / T));
+    return e || 0;
   }
 
   fx(type, x, y, extra) {
@@ -354,6 +357,7 @@ class Game {
       b.onGround = false;
       b.ground = null;
       this.moveX(b, b.vx * dt + carry);
+      if (b.beltV && !g && Math.abs(b.x - x0 - (b.vx * dt + carry)) > 0.01) b.beltV = 0;   // havada duvara çarptı: bandın hızı biter
       this.moveY(b, b.vy * dt);
       b.dx = b.x - x0;
     }
@@ -367,8 +371,13 @@ class Game {
       }
     }
     for (const b of movers) b.supported = b.onGround && (!b.ground || b.ground.supported);
-    // Düşen oyuncu en son sağlam zeminde (karo üstünde) durduğu yerde doğar
-    for (const p of this.players) if (p.supported && !p.ground && !p.inExit) p.safe = { x: p.x, y: p.y };
+    // Düşen oyuncu en son sağlam zeminde (karo üstünde) durduğu yerde doğar. Ortası boşluğun üstündeyse
+    // (kenarda) kaydedilmez: orada doğan hemen yine düşerdi
+    for (const p of this.players) {
+      if (!p.supported || p.ground || p.inExit) continue;
+      const c = Math.floor((p.x + p.w / 2) / T), r = Math.floor((p.y + p.h + 1) / T);
+      if (this.blocked(c, r) || (this.oneway[r] && this.oneway[r][c])) p.safe = { x: p.x, y: p.y };
+    }
 
     // 4) İtme zinciri: kutuya yaslanan oyuncuyu aynı yöne iten herkes iten sayılır
     for (const p of this.players) {
@@ -605,7 +614,8 @@ class Game {
 
   // Presin altında kalanı yana, geldiği tarafa doğru fırlat (ezilmez, yalnızca yolunu keser)
   knockOut(o, P) {
-    const left = o.x + o.w / 2 < P.x + P.w / 2;
+    // Yürüyorsa geldiği yana (geniş presin ortasını geçen öbür uçtan çıkmasın), duruyorsa yakın yana
+    const left = Math.abs(o.vx) > 20 ? o.vx > 0 : o.x + o.w / 2 < P.x + P.w / 2;
     for (const side of left ? [-1, 1] : [1, -1]) {
       const x = side < 0 ? P.x - o.w - 1 : P.x + P.w + 1;
       if (this.rectBlocked(x, o.y, o.w, o.h, o)) continue;

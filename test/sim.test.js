@@ -1473,5 +1473,116 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
   ok(run(g, ctl, 90, g => g.done), 'F10. Atölye sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // F11. Paket: A düğmede (1) kapağı açar; B geçip karşıdaki düğmeye (2) basar: sandık banttan bacaya, oradan kapağın içine düşer;
+  // içinde sandık olan kapak kapanmaz, ikisi de sandığın üstünden geçer
+  const g = new Game(L('paket'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2), ga = g.gates.find(x => x.channel === 1), gx = ga.cells[0].c * T;
+  const wedged = () => crate.y + crate.h >= 11 * T - 1 && crate.x >= gx - 1 && crate.x + crate.w <= gx + T + 1;
+  const ctl = phases([
+    [(g, p, t) => (wedged() ? null : goTo(b1.x + b1.w / 2)(g, p, t)), (g, p, t) => (wedged() ? null : ga.open || p.x > gx ? goTo(b2.x + b2.w / 2)(g, p, t) : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F11. Paket geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F12. Pres takozu: A düğmede (1) sandığı bırakır; sandık banttan düşüp presin altına girer, pres sandığın üstünde durur.
+  // Pres yukarıdayken ikisi sandığın üstünden atlar, presin altından geçer; kule ile rafa, şalterle (5) kapak
+  const g = new Game(L('pres-takozu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0], P = g.presses[0];
+  const b1 = g.buttons[0], lv = g.levers[0], out = 16 * T;
+  const settled = () => crate.y + crate.h >= 11 * T - 1 && Math.abs(crate.dx) < 0.01 && crate.x > 9 * T - 20;
+  const going = new Set();
+  const cross = (g, p, t) => {
+    if (p.x > out) return null;
+    if (P.y <= P.topY + 1 && P.dir > 0 && P.pause > 0.9 && p.x + p.w < crate.x && p.x > crate.x - 80) going.add(p);
+    if (!going.has(p)) return goTo(crate.x - 50)(g, p, t);
+    if (p.x > crate.x + crate.w) return I({ right: true });   // presin altında zıplama: yürü
+    return I({ right: true, jump: p.supported || p.vy < 0 });   // sandığın üstünden
+  };
+  const past = p => (A.x > out && B.x > out ? null : p.x > out ? goTo(p === A ? 17 * T + 20 : 19 * T + 20)(g, p, g.t) : null);
+  const base = 22 * T + 20;
+  const ctl = phases([
+    [(g, p, t) => (settled() ? null : goTo(b1.x + b1.w / 2)(g, p, t)), (g, p, t) => (settled() ? null : goTo(5 * T)(g, p, t))],
+    [(g, p, t) => (A.x > out && B.x > out ? null : past(p) || (B.x > out ? cross(g, p, t) || idle() : idle())),
+     (g, p, t) => (A.x > out && B.x > out ? null : past(p) || cross(g, p, t) || idle())],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - base) < 6 && p.supported ? null : goTo(base)(g, p, t)), (g, p, t) => (A.x > 21 * T ? null : goTo(18 * T)(g, p, t))],
+    [(g, p, t) => (B.supported && B.y + B.h <= 8 * T + 1 ? null : idle()), towerUp(A, 8 * T, -1)],
+    [(g, p, t) => (g.switches[2] ? null : idle()), flip(lv, 2)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F12. Pres takozu geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F13. Vinç: bant anahtarı çukura döker; A çukurun kenarında, anahtar düşerken mıknatısla çeker (B menzil dışında).
+  // Sonra Uçurum'daki gibi: B, A'yı karşıya iter; A kutup değiştirip B'yi çeker; kapı, çıkış
+  const g = new Game(L('vinc'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
+  const edge = 11 * T + 20;
+  const across = () => A.x > 18 * T - 10 && B.x > 18 * T - 10 && A.supported && B.supported;
+  const ctl = phases([
+    [(g, p, t) => (key.holder === p ? null : Math.abs(p.x + p.w / 2 - edge) > 6 ? goTo(edge)(g, p, t) : I({ action: key.vy > 0 && key.y > 4 * T })),
+     (g, p, t) => (key.holder ? null : idle())],
+    crossPit(g, B, A, 12 * T, 18 * T, across).reverse(),   // anahtarlı A öndedir: B onu iter, A karşıda B'yi çeker
+    [(g, p, t) => (door.open ? goTo(ex)(g, p, t) : goTo(door.cells[0].c * T)(g, p, t)), (g, p, t) => (door.open ? goTo(ex)(g, p, t) : idle())],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F13. Vinç geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F14. Kepçe: bant sandığı çukura döker; A kenarda mıknatısla yakalar (B raftaki düğmede, kapak açık).
+  // A sandığı kapağın içine iter (basamak onu orada tutar): içinde sandık olan kapak kapanmaz. İkisi de geçer;
+  // A, B'yi duvarın üstüne fırlatır, B kutup değiştirip A'yı çeker
+  const g = new Game(L('kepce'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const catchX = 7 * T + 20, gx = 14 * T, btn = g.buttons[0];
+  const caught = () => crate.supported && crate.x > 6 * T - 4 && crate.y + crate.h >= 11 * T - 1;
+  const wedged = () => caught() && crate.x >= gx - 1;
+  // B rafın sağından sola zıplayıp düğmenin üstünde durur
+  const onBtn = (g, p, t) => {
+    if (p.supported && p.y + p.h <= 9 * T + 1) return Math.abs(p.x + p.w / 2 - (btn.x + btn.w / 2)) > 4 ? goTo(btn.x + btn.w / 2)(g, p, t) : idle();
+    if (p.x > 12 * T - 6) return I({ left: !p.supported && p.y + p.h < 9 * T, jump: p.supported ? tap(t) : true });   // zıpla, rafın üstüne çıkınca sola
+    return goTo(13 * T)(g, p, t);
+  };
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= 6 * T + 1);
+  const ctl = phases([
+    [(g, p, t) => (caught() ? null : crate.ground === p ? I({ right: true }) : Math.abs(p.x + p.w / 2 - catchX) > 6 ? goTo(catchX)(g, p, t) : I({ action: !crate.supported && crate.vy > 0 && crate.y > 4 * T })),
+     (g, p, t) => (caught() ? null : onBtn(g, p, t))],
+    [(g, p, t) => (wedged() ? null : p.x + p.w <= crate.x + 3 && p.supported && p.ground !== crate ? I({ right: true }) : goTo(crate.x - p.w / 2 - 2)(g, p, t)),
+     (g, p, t) => (wedged() ? null : onBtn(g, p, t))],
+    [(g, p, t) => (A.x > 17 * T && B.x > 17 * T ? null : goTo(26 * T)(g, p, t)), (g, p, t) => (A.x > 17 * T && B.x > 17 * T ? null : A.x > 17 * T ? goTo(28 * T)(g, p, t) : idle())],
+    climbWall(g, A, B, 30 * T, 32 * T, 6 * T, both),
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F14. Kepçe geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F15. Paketleme sınavı: A düğmede (2) sandığı bırakır, sandık presin altına girer; ikisi pres yukarıdayken sandığın
+  // üstünden atlayıp geçer. Bantla çukuru aşarlar; kule ile rafa, şalterle (4) kapak; çıkış
+  const g = new Game(L('paketleme-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0], P = g.presses[0];
+  const b2 = g.buttons[0], lv = g.levers[0], out = 16 * T, land = 28 * T, base = 32 * T + 20;
+  const settled = () => crate.y + crate.h >= 11 * T - 1 && Math.abs(crate.dx) < 0.01 && crate.x > 9 * T - 20;
+  const going = new Set();
+  const cross = (g, p, t) => {
+    if (p.x > out) return null;
+    if (P.y <= P.topY + 1 && P.dir > 0 && P.pause > 0.9 && p.x + p.w < crate.x && p.x > crate.x - 80) going.add(p);
+    if (!going.has(p)) return goTo(crate.x - 50)(g, p, t);
+    if (p.x > crate.x + crate.w) return I({ right: true });
+    return I({ right: true, jump: p.supported || p.vy < 0 });
+  };
+  const over = p => p.supported && p.x > land;
+  const ctl = phases([
+    [(g, p, t) => (settled() ? null : goTo(b2.x + b2.w / 2)(g, p, t)), (g, p, t) => (settled() ? null : goTo(5 * T)(g, p, t))],
+    // Önce B geçer; presten çıkan hemen bantla çukuru aşar
+    [(g, p, t) => (over(A) && over(B) ? null : over(p) ? goTo(base)(g, p, t) : p.x > out ? longJump(23 * T, land)(g, p, t) || idle() : B.x > out ? cross(g, p, t) || idle() : idle()),
+     (g, p, t) => (over(A) && over(B) ? null : over(p) ? goTo(29 * T)(g, p, t) : p.x > out ? longJump(23 * T, land)(g, p, t) || idle() : cross(g, p, t) || idle())],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - base) < 6 && p.supported ? null : goTo(base)(g, p, t)), (g, p, t) => (A.x > 31 * T ? null : goTo(29 * T)(g, p, t))],
+    [(g, p, t) => (B.supported && B.y + B.h <= 8 * T + 1 ? null : idle()), towerUp(A, 8 * T, -1)],
+    [(g, p, t) => (g.switches[1] ? null : idle()), flip(lv, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F15. Paketleme sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
