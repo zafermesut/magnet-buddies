@@ -6,6 +6,26 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.5.0 · 31 Ekim 2026
+
+**Yeni alan: Buzul** (Uzman, 30 bölüm)
+
+- **Altı kısım, 30 bölüm:**
+  - **Buz kapısı:** Kayak, Çatlak köprü, Buz hokeyi, Kartopu, Buz kapısı.
+  - **Kar fırtınası:** Kar köprüsü, Eriyen kule, Kartopu takozu, Buz pisti, Kar fırtınası.
+  - **Donmuş fabrika:** Donmuş bant, Eriyen merdiven, Buz sapanı, Kar asansörü, Buzul ustası.
+  - **Kuzey rüzgârı:** Buz kancası, Eriyen fırlatma, Donmuş göl, Buzlu baca, Kuzey rüzgârı.
+  - **Kar ustaları:** Kar yayı, Çift yay, İki top, Kar kapısı, Kar ustası.
+  - **Pusula buzulu:** Donmuş köprü, Buzlu pist, Fırtına kulesi, Fırtına koşusu ve final Pusula iğnesi III.
+- **Yeni öğeler:**
+  - **Kaygan buz:** buzda hızlanırsın ama zor durursun. Buzdan zıplayınca hızın havada da sürer, 5 karoluk çukuru bile aşarsın.
+  - **Eriyen buz:** üstüne basınca çatlar, bir saniye sonra kırılır, üç saniye sonra yeniden donar.
+  - **Kar topu:** karda yuvarladıkça büyür. Küçüğünü biri iter, büyüğü için ikiniz gerekir ve büyük top basamak ya da köprü olur. Çukura düşen top küçülüp başa döner.
+- **Yeni hileler:**
+  - Yay metal sandığı ve küçük kar topunu da fırlatır (ağır kutu ve büyük top fırlamaz).
+  - Banttan buza geçen sandık bandın hızıyla kaymayı sürdürür.
+- **Final:** iğnenin üçüncü parçası bulununca pusula Kuzey Işıkları'nı gösterir.
+
 ## 0.4.0 · 31 Ekim 2026
 
 **Fabrika tamamlandı** (30 bölüm)
