@@ -6,6 +6,28 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.4.0 · 31 Ekim 2026
+
+**Fabrika tamamlandı** (30 bölüm)
+
+- **Dört yeni kısım, 20 yeni bölüm:**
+  - **Paketleme:** Paket, Pres takozu, Vinç, Kepçe, Paketleme sınavı.
+  - **Sevkiyat:** Yük asansörü, Sapan, Aktarma, Fıskiye, Sevkiyat sınavı.
+  - **Mıknatıs atölyesi:** Asma hat, Zamanlı çekiş, Gezgin fırlatma, Kanca, Atölye ustası.
+  - **Pusula atölyesi:** Çift takoz, Asılı takoz, Yük yolu, Büyük sapan ve final Pusula iğnesi.
+- **Yeni hileler:**
+  - **Takoz:** içinde sandık olan kapak kapanmaz; pres sandığın üstünde durur ve altından geçecek kadar yer kalır.
+  - **Bant dağıtıcısı:** yüksek banttaki anahtar ya da sandık çukura düşerse başa döner. Mıknatısla, gezgin platformla ya da doğru anda düğmeye basarak yakalayın.
+  - **Sapan:** bantta koşup yaya basarsan yay seni çok daha uzağa atar.
+  - **Asılı taşıma:** tavana asılıyken mıknatıs metal sandığı tutar; sandığı çukurun üstünden taşıyabilirsin.
+  - **Ortak taşıma:** asansör ve gezgin platform sandığı da taşır.
+- **Final:** iğnenin ikinci parçası bulununca pusula Buzul'u gösterir.
+- **Fizik düzeltmeleri:**
+  - Bandın ucundan taşan şey artık bantta takılı kalmaz, ucundan düşer.
+  - Banttan fırlayan bir şey havada duvara çarpınca bandın hızı biter.
+  - Pres, altına yürüyerek giren oyuncuyu geldiği yana atar. Geniş presin ortasını geçen artık öbür uçtan çıkamaz.
+  - Çukura düşen artık tam kenarda doğmaz; orada doğup hemen yine düşmez.
+
 ## 0.3.2 · 22 Ekim 2026
 
 - Kapak artık içinde biri durunca açık kalmıyor: kapanırken içindekini yana iter. Böylece kapağın içinde bekleyip arkadaşınla birlikte geçmek yerine şalter ve düğmelerle çözmek gerekiyor. Ağır kutu ya da metal sandık içindeyse kapak yine açık kalır.
