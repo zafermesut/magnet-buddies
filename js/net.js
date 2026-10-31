@@ -108,7 +108,12 @@ function applySnapshot(g, s) {
   s.d.forEach((a, i) => { g.doors[i].open = !!a[0]; g.doors[i].openT = a[1]; });
   s.g.forEach((o, i) => { g.gates[i].open = !!o; });
   s.b.forEach((o, i) => { g.buttons[i].pressed = !!o; });
-  s.x.forEach((a, i) => { const b = g.boxes[i]; setTarget(b, a[0], a[1]); b.pushers = a[2]; });
+  s.x.forEach((a, i) => {
+    const b = g.boxes[i];
+    if (b.snow && a[3] && a[3] !== b.w) { b.w = b.h = a[3]; b.big = a[3] > PHYS.snowSmall; b.x = a[0]; b.y = a[1]; b.tx = undefined; }   // kar topu büyüdü/küçüldü
+    setTarget(b, a[0], a[1]); b.pushers = a[2];
+    if (b.snow) b.roll = a[4] || 0;
+  });
   (s.sw || []).forEach((o, i) => { g.switches[i + 1] = !!o; });
   (s.lv || []).forEach((t, i) => { if (g.levers[i]) g.levers[i].flipT = t; });
   (s.l || []).forEach((y, i) => { if (g.lifts[i]) setTarget(g.lifts[i], g.lifts[i].x, y); });
@@ -117,6 +122,7 @@ function applySnapshot(g, s) {
   (s.v || []).forEach((o, i) => { if (g.screws[i]) g.screws[i].got = !!o; });
   (s.m || []).forEach((x, i) => { if (g.movers[i]) setTarget(g.movers[i], x, g.movers[i].y); });
   (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
+  (s.th || []).forEach((a, i) => { const th = g.thaws[i]; if (th) { th.open = !!a[0]; th.crackT = a[1]; } });
   for (const e of s.fx) g.effects.push(e);
   if (g.effects.length > 60) g.effects = g.effects.filter(e => g.t - e.t < 1.2);
 }

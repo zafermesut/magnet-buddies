@@ -39,6 +39,16 @@ const PHYS = {
   pressRest: 0.5,      // pres aşağıda bekler (sn)
   timerHold: 4,        // zamanlı düğme bırakıldıktan sonra kanalı bu kadar açık tutar (sn)
 
+  // Buzul öğeleri
+  iceAccel: 300,       // kaygan buzda hızlanma (normal 2400)
+  iceSpeed: 330,       // buzda uzun koşunca ulaşılan hız (normal 230): uzun koşuyla geniş çukur aşılır
+  iceFriction: 150,    // kaygan buzda yavaşlama (normal 2800): bırakınca uzun kayarsın
+  thawTime: 1,         // eriyen buz: değdikten bu kadar sonra kırılır (sn)
+  thawRegrow: 3,       // kırılan eriyen buz bu kadar sonra yeniden donar (boşsa)
+  snowGrow: 120,       // kar topu karlı zeminde bu kadar yuvarlanınca büyür (px)
+  snowSmall: 38,       // küçük kar topu (tek kişi iter)
+  snowBig: 76,         // büyük kar topu (iki kişi iter)
+
   // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
   // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.
   magnetRange: 280,

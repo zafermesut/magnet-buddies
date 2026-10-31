@@ -85,6 +85,7 @@ class Renderer {
     this.drawGates(ctx, game, t);
     this.drawButtons(ctx, game);
     this.drawScrap(ctx, game, t);
+    this.drawThaws(ctx, game);
     this.drawExit(ctx, game, t);
     for (const b of game.boxes) this.drawBox(ctx, b, game);
     if (game.magnet) for (const p of game.players) if (p.magnetOn && !p.inExit) this.drawField(ctx, p, t);
@@ -108,6 +109,38 @@ class Renderer {
           ctx.fillStyle = PAL.tileEdge;
           ctx.fillRect(x, y, T, 5);
         }
+        // Kaygan buz: açık mavi, parlak çizgili
+        if (g.ice.has(r * g.cols + c)) {
+          ctx.fillStyle = '#a5d8ff';
+          ctx.fillRect(x, y, T, r > 0 && !g.grid[r - 1][c] ? 10 : T);
+          ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.moveTo(x + 8, y + 7); ctx.lineTo(x + 18, y + 3); ctx.moveTo(x + 24, y + 8); ctx.lineTo(x + 30, y + 5); ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // Eriyen buz: yarı saydam blok; çatlarken çatlak çizgileri artar, kırılınca kesik çizgili hayalet
+  drawThaws(ctx, g) {
+    for (const th of g.thaws) {
+      const x = th.c * T, y = th.r * T;
+      if (th.open) {
+        ctx.strokeStyle = 'rgba(165,216,255,0.35)'; ctx.setLineDash([4, 6]); ctx.lineWidth = 2;
+        ctx.strokeRect(x + 3, y + 3, T - 6, T - 6); ctx.setLineDash([]);
+        continue;
+      }
+      const shake = th.crackT >= 0 ? Math.sin(g.t * 60) * 1.5 * (th.crackT / PHYS.thawTime) : 0;
+      ctx.fillStyle = 'rgba(165,216,255,0.75)';
+      ctx.fillRect(x + shake, y, T, T);
+      ctx.fillStyle = 'rgba(255,255,255,0.8)';
+      ctx.fillRect(x + shake, y, T, 4);
+      if (th.crackT >= 0) {
+        const k = Math.min(1, th.crackT / PHYS.thawTime);
+        ctx.strokeStyle = '#3d5a80'; ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 20, y); ctx.lineTo(x + 16, y + 14 * k + 4); ctx.lineTo(x + 24, y + 26 * k + 4);
+        if (k > 0.4) { ctx.moveTo(x + 16, y + 10); ctx.lineTo(x + 6, y + 20 * k); ctx.moveTo(x + 24, y + 16); ctx.lineTo(x + 34, y + 30 * k); }
+        ctx.stroke();
       }
     }
   }
@@ -320,6 +353,23 @@ class Renderer {
 
   drawBox(ctx, b, g) {
     const { x, y, w, h } = b;
+    if (b.snow) {
+      // Kar topu: beyaz yuvarlak, yuvarlandıkça dönen gölge çizgisi; büyükse kaç kişi gerektiği
+      const cx = x + w / 2, cy = y + h / 2, rr = w / 2;
+      ctx.fillStyle = '#f1f6ff';
+      ctx.beginPath(); ctx.arc(cx, cy, rr, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = '#a5c3e8'; ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(cx, cy, rr * 0.6, b.roll, b.roll + 1.6); ctx.stroke();
+      ctx.beginPath(); ctx.arc(cx, cy, rr * 0.3, b.roll + 3, b.roll + 4.2); ctx.stroke();
+      if (!b.big) return;
+      const n = g.boxNeed, gap = 16, sx = cx - (n - 1) * gap / 2;
+      for (let i = 0; i < n; i++) {
+        ctx.beginPath(); ctx.arc(sx + i * gap, y - 12, 6, 0, Math.PI * 2);
+        ctx.fillStyle = i < b.pushers ? '#fff' : 'rgba(255,255,255,0.15)'; ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 1.5; ctx.stroke();
+      }
+      return;
+    }
     if (b.metal) {
       ctx.fillStyle = '#9ea3c7';
       ctx.fillRect(x, y, w, h);

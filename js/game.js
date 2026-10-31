@@ -57,6 +57,8 @@ class Game {
     this.levers = []; this.lifts = []; this.springs = []; this.movers = [];
     this.presses = [];             // pres: tavandan inip kalkan blok (kanalı açıkken yukarıda bekler)
     this.belts = new Map();        // taşıyıcı bant hücreleri: r * cols + c → yön (-1 / 1)
+    this.ice = new Set();          // kaygan buz hücreleri: r * cols + c
+    this.thaws = [];               // eriyen buz hücreleri: değince çatlar, kırılır, sonra yeniden donar
     this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
     this.screws = [];              // vidalar (isteğe bağlı toplanır): { x, y, w, h, got }
     this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
@@ -72,9 +74,16 @@ class Game {
       for (let c = 0; c < cols; c++) {
         const ch = map[r][c];
         const x = c * T, y = r * T;
-        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>');
+        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~');
         if (ch === '<' || ch === '>') this.belts.set(r * cols + c, ch === '<' ? -1 : 1);
+        if (ch === '~') this.ice.add(r * cols + c);
         this.blockers[r].push(null);
+        if (ch === 'o') {
+          // Eriyen buz: kapı gibi engel hücresi; kırılınca açılır (open), yeniden donunca kapanır
+          const th = { kind: 'thaw', r, c, open: false, crackT: -1, regrow: 0 };
+          this.blockers[r][c] = th;
+          this.thaws.push(th);
+        }
         this.oneway[r].push(ch === '-');
         if (ch === 'S' && !this.spawn) this.spawn = { x, y };
         else if (ch === 'E') {
@@ -104,6 +113,11 @@ class Game {
           // Metal sandık: tek kişi iter, mıknatıs çeker
           const k = PHYS.crateSize;
           this.boxes.push(makeBody('box', x + (T - k) / 2, y + T - k, k, k, { metal: true, push: { 1: 0, '-1': 0 }, pushers: 0, magT: 0 }));
+        }
+        else if (ch === 'O') {
+          // Kar topu: karlı zeminde yuvarlandıkça büyür; küçükken tek kişi, büyükken iki kişi iter. Mıknatıs çekmez
+          const k = PHYS.snowSmall;
+          this.boxes.push(makeBody('box', x + (T - k) / 2, y + T - k, k, k, { snow: true, big: false, rolled: 0, roll: 0, push: { 1: 0, '-1': 0 }, pushers: 0 }));
         }
         else if (ch === 'P' || ch === 'N') this.fixed.push({ x: x + T / 2, y: y + T / 2, c, r, pol: ch === 'P' ? 1 : -1 });
         else if (ch === 'p' || ch === 'n') this.poleCells.set(r * cols + c, ch === 'p' ? 1 : -1);
@@ -196,6 +210,15 @@ class Game {
     // Ortası boşluğun üstündeyse kenarıyla bantta duruyor: bant onu boşluğa doğru taşır (bandın ucundan düşer)
     const e = this.belts.get(r * this.cols + Math.floor(b.x / T)) || this.belts.get(r * this.cols + Math.floor((b.x + b.w - 0.001) / T));
     return e || 0;
+  }
+
+  // Ayağının altı kaygan buz mu (ortası boşluktaysa kenarıyla bastığı karoya bakılır)
+  iceUnder(b) {
+    if (!this.ice.size) return false;
+    const r = Math.floor((b.y + b.h + 1) / T), c = Math.floor((b.x + b.w / 2) / T);
+    if (this.ice.has(r * this.cols + c)) return true;
+    if (this.blocked(c, r)) return false;
+    return this.ice.has(r * this.cols + Math.floor(b.x / T)) || this.ice.has(r * this.cols + Math.floor((b.x + b.w - 0.001) / T));
   }
 
   fx(type, x, y, extra) {
@@ -303,11 +326,17 @@ class Game {
       p.want = want;
       // Mıknatısla savrulurken kontrol azalır; yoksa savrulma hemen sönerdi
       const ctl = p.magT > 0 ? 0.25 : 1;
+      // Kaygan buzda hızlanmak ve durmak yavaştır; havada kayma hızı sürer
+      const grip = p.onGround && ctl === 1, ice = grip && p.onIce;
       if (want) {
-        p.vx = approach(p.vx, want * ph.runSpeed, (p.onGround && ctl === 1 ? ph.accel : ph.airAccel) * ctl * dt);
+        // Buzda hız yavaş artar ama koşudan yükseğe çıkar; buzdan zıplayınca bu hız havada sürer (uzun atlama)
+        let top = ph.runSpeed;
+        if (ice) top = ph.iceSpeed;
+        else if (!p.onGround && p.fromIce && Math.sign(p.vx) === want) top = Math.max(top, Math.abs(p.vx));
+        p.vx = approach(p.vx, want * top, (ice ? ph.iceAccel : grip ? ph.accel : ph.airAccel) * ctl * dt);
         p.facing = want;
       } else {
-        p.vx = approach(p.vx, 0, (p.onGround && ctl === 1 ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
+        p.vx = approach(p.vx, 0, (ice ? ph.iceFriction : grip ? ph.friction : ph.airAccel * 0.4) * ctl * dt);
       }
       // Zıt kutuplu mıknatısa yapışıkken arkadaşından destek alıp zıplayabilir
       p.gripT = Math.max(0, p.gripT - dt);
@@ -327,14 +356,17 @@ class Game {
 
     // 2) Kutular: önceki adımda yeterince kişi ittiyse kayar
     for (const b of this.boxes) {
-      const need = b.metal ? 1 : this.boxNeed;
+      const light = b.metal || (b.snow && !b.big);
+      const need = light ? 1 : this.boxNeed;
       const dir = b.push[1] >= need ? 1 : b.push[-1] >= need ? -1 : 0;
-      if (b.metal) {
-        // Metal sandık: itilince kayar, mıknatısla savrulunca bir süre kayar, sonra durur
-        b.magT = Math.max(0, b.magT - dt);
+      if (light) {
+        // Metal sandık ve küçük kar topu: itilince kayar, mıknatısla savrulunca bir süre kayar, sonra durur.
+        // Kaygan buzda durmaz: bir şeye çarpana kadar kayar
+        b.magT = Math.max(0, (b.magT || 0) - dt);
         if (dir) b.vx = dir * ph.crateSpeed;
-        else b.vx = approach(b.vx, 0, (b.onGround && !b.magT ? 1800 : 200) * dt);
-      } else b.vx = dir * ph.boxSpeed;
+        else if (!b.onIce) b.vx = approach(b.vx, 0, (b.onGround && !b.magT ? 1800 : 200) * dt);
+      } else if (dir) b.vx = dir * ph.boxSpeed;
+      else if (!b.onIce) b.vx = 0;
       b.pushers = Math.max(b.push[1], b.push[-1]);
       b.push[1] = 0; b.push[-1] = 0;
     }
@@ -360,6 +392,9 @@ class Game {
       if (b.beltV && !g && Math.abs(b.x - x0 - (b.vx * dt + carry)) > 0.01) b.beltV = 0;   // havada duvara çarptı: bandın hızı biter
       this.moveY(b, b.vy * dt);
       b.dx = b.x - x0;
+      b.onIce = b.onGround && !b.ground && this.iceUnder(b);
+      if (b.onGround) b.fromIce = b.onIce;   // buzdan kalkan havada buz hızını korur
+      if (b.snow) this.rollSnow(b);
     }
     // Kime yaslanıyor? Kutu kaydıkça temas bir kare kopabildiği için küçük bir yoklama payı bırakılır
     for (const p of this.players) {
@@ -376,7 +411,8 @@ class Game {
     for (const p of this.players) {
       if (!p.supported || p.ground || p.inExit) continue;
       const c = Math.floor((p.x + p.w / 2) / T), r = Math.floor((p.y + p.h + 1) / T);
-      if (this.blocked(c, r) || (this.oneway[r] && this.oneway[r][c])) p.safe = { x: p.x, y: p.y };
+      const th = this.blockers[r] && this.blockers[r][c];
+      if ((this.blocked(c, r) && !(th && th.kind === 'thaw')) || (this.oneway[r] && this.oneway[r][c])) p.safe = { x: p.x, y: p.y };   // eriyen buzda değil
     }
 
     // 4) İtme zinciri: kutuya yaslanan oyuncuyu aynı yöne iten herkes iten sayılır
@@ -387,6 +423,7 @@ class Game {
       if (q && q.boxHit) q.boxHit.push[p.want]++;
     }
 
+    this.updateThaws(dt);
     this.updateSprings();
     this.updateScrews();
     this.updateKeys(dt);
@@ -400,7 +437,10 @@ class Game {
       if (!p.inExit && p.y > this.H + 150) this.fall(p);
     }
     for (const b of this.boxes) {
-      if (b.y > this.H + 150) { b.x = b.ox; b.y = b.oy; b.vx = b.vy = 0; }
+      if (b.y > this.H + 150) {
+        b.x = b.ox; b.y = b.oy; b.vx = b.vy = 0;
+        if (b.snow) { b.w = b.h = PHYS.snowSmall; b.big = false; b.rolled = 0; }   // kar topu küçülüp başa döner
+      }
     }
 
     if (this.players.length && this.players.every(p => p.inExit)) {
@@ -630,7 +670,41 @@ class Game {
     else { o.x = o.ox; o.y = o.oy; o.vx = o.vy = 0; }
   }
 
-  // Yay: üstüne basanı yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
+  // Kar topu yuvarlanır; karlı zeminde (buz değil) yeterince yuvarlanınca, yer varsa büyür
+  rollSnow(b) {
+    b.roll += b.dx / (b.w / 2);
+    if (b.big || !b.onGround || b.ground || b.onIce || !b.dx) return;
+    b.rolled += Math.abs(b.dx);
+    if (b.rolled < PHYS.snowGrow) return;
+    const k = PHYS.snowBig, nx = b.dx > 0 ? b.x : b.x + b.w - k, ny = b.y + b.h - k;   // itildiği yöne doğru büyür (iteni ezmez)
+    const r = { x: nx, y: ny, w: k, h: k };
+    if (this.rectBlocked(nx, ny, k, k, b) || this.solids.some(o => o !== b && overlap(o, r))) return;
+    b.x = nx; b.y = ny; b.w = b.h = k; b.big = true;
+    this.fx('grow', b.x + k / 2, b.y + k / 2);
+  }
+
+  // Eriyen buz: üstüne bir şey basınca çatlar, thawTime sonra kırılır; thawRegrow sonra hücre boşsa yeniden donar
+  updateThaws(dt) {
+    if (!this.thaws.length) return;
+    const bodies = this.players.filter(p => !p.inExit).concat(this.boxes, this.keys.filter(k => !k.used && !k.holder));
+    for (const th of this.thaws) {
+      const cell = { x: th.c * T, y: th.r * T, w: T, h: T };
+      if (th.open) {
+        th.regrow -= dt;
+        if (th.regrow <= 0 && !bodies.some(o => overlap(o, cell))) { th.open = false; th.crackT = -1; this.fx('freeze', cell.x + T / 2, cell.y + T / 2); }
+        continue;
+      }
+      if (th.crackT < 0) {
+        const on = bodies.some(o => Math.abs(o.y + o.h - cell.y) < 2 && o.x < cell.x + T && o.x + o.w > cell.x);
+        if (on) { th.crackT = 0; this.fx('crack', cell.x + T / 2, cell.y); }
+        continue;
+      }
+      th.crackT += dt;
+      if (th.crackT >= PHYS.thawTime) { th.open = true; th.regrow = PHYS.thawRegrow; this.fx('shatter', cell.x + T / 2, cell.y + T / 2); }
+    }
+  }
+
+  // Yay: üstüne düşeni yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
   updateSprings() {
     for (const s of this.springs) {
       const pad = { x: s.x, y: s.y - 2, w: s.w, h: s.h + 2 };

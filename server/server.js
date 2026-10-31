@@ -217,7 +217,7 @@ class Room {
       d: g.doors.map(d => [d.open ? 1 : 0, r3(d.openT)]),
       g: g.gates.map(x => (x.open ? 1 : 0)),
       b: g.buttons.map(x => (x.pressed ? 1 : 0)),
-      x: g.boxes.map(b => [r1(b.x), r1(b.y), b.pushers]),
+      x: g.boxes.map(b => [r1(b.x), r1(b.y), b.pushers, b.snow ? b.w : 0, b.snow ? r3(b.roll) : 0]),
       sw: [1, 2, 3].map(c => (g.switches[c] ? 1 : 0)),
       lv: g.levers.map(l => r3(l.flipT)),
       l: g.lifts.map(l => r1(l.y)),
@@ -226,6 +226,7 @@ class Room {
       m: g.movers.map(m => r1(m.x)),
       v: g.screws.map(sc => (sc.got ? 1 : 0)),
       sp: g.springs.map(s => r3(s.t)),
+      th: g.thaws.map(x => [x.open ? 1 : 0, r3(x.crackT)]),
       fx,
     };
   }

@@ -31,6 +31,9 @@ const EDITOR_TOOLS = [
   { id: 'beltR', ch: '>', label: 'Bant →', cls: 'tBeltR', tip: 'Taşıyıcı bant: zemindir; üstündekini sağa taşır.' },
   { id: 'press', chs: '789', label: 'Pres', cls: 'tPress', tip: 'Yan yana çiz: tek blok olur. Bulunduğu yerden aşağı iner, geri çıkar. Aynı renk açıkken yukarıda bekler. Altında kalan yana fırlar.' },
   { id: 'timer', chs: 'tuw', label: 'Zamanlı düğme', cls: 'tTimer', tip: 'Bırakıldıktan sonra aynı renkteki kapakları ' + PHYS.timerHold + ' saniye daha açık tutar.' },
+  { id: 'ice', ch: '~', label: 'Kaygan buz', cls: 'tIce', tip: 'Zemindir. Üstünde hızlanmak ve durmak zor, kayarsın. Sandık ve kar topu buzda itilince bir şeye çarpana kadar kayar.' },
+  { id: 'thaw', ch: 'o', label: 'Eriyen buz', cls: 'tThaw', tip: 'Üstüne bir şey basınca çatlar, ' + PHYS.thawTime + ' saniye sonra kırılır; ' + PHYS.thawRegrow + ' saniye sonra yeniden donar.' },
+  { id: 'snow', ch: 'O', label: 'Kar topu', cls: 'tSnow', tip: 'İtilince yuvarlanır; karlı zeminde (buzda değil) 3 karo yuvarlanınca büyür. Büyük kar topunu iki kişi iter. Mıknatıs çekmez.' },
 ];
 
 const EDITOR_KEY = 'editor-level-v1';

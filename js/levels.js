@@ -1241,6 +1241,101 @@ const LEVELS = [
       '########>>#<<<<<<<>>>>>>########################',
     ],
   },
+  {
+    id: 'kayak',
+    name: 'Kayak',
+    hint: 'Buzda hızlanmak yavaş ama uzun koşunca normalden hızlı gidersin: buzdan zıplayınca geniş çukuru aşarsın. Biri kapağı tutsun, karşıdaki şalter onu açık bırakır.',
+    map: [
+      '##################################',
+      '######...........................#',
+      '######...........................#',
+      '######...........................#',
+      '######...........................#',
+      '######...........................#',
+      '######......................V....#',
+      '#....a...........................#',
+      '#....a............V..............#',
+      '#..V.a...........................#',
+      '#1SS.a..................4.....E..#',
+      '######~~~~~~~~~~.....#############',
+    ],
+  },
+  {
+    id: 'catlak-kopru',
+    name: 'Çatlak köprü',
+    hint: 'Eriyen buz basınca çatlar, bir saniye sonra kırılır, üç saniye sonra yeniden donar. Köprüde durma, sırayla geçin. Anahtar karşıdaki rafta: birbirinizin başından alın.',
+    map: [
+      '################################',
+      '#...#..........................#',
+      '#...#..........................#',
+      '#...#..........................#',
+      '#...#..........................#',
+      '#...#...................V......#',
+      '#...#..........................#',
+      '#...D...................K......#',
+      '#...D.......V..........##......#',
+      '#.V.D..........................#',
+      '#.E.D.SS.......................#',
+      '#########ooooooo################',
+    ],
+  },
+  {
+    id: 'buz-hokeyi',
+    name: 'Buz hokeyi',
+    hint: 'Buzda itilen sandık bir şeye çarpana kadar kayar. Alçak kapağın üstünden siz atlarsınız, sandık atlayamaz: biri direkteki düğmede kapağı açsın, öbürü sandığı itsin.',
+    map: [
+      '################################',
+      '################################',
+      '################################',
+      '################################',
+      '#...........................#..#',
+      '#...........................#..#',
+      '#...........................#..#',
+      '#...........................a..#',
+      '#.2.......V.................a..#',
+      '#.#.................V.......a.V#',
+      '#.#.SS.M......b...........1#aE.#',
+      '####~~~~~~~~~~~~~~~~~~~~~~~#####',
+    ],
+  },
+  {
+    id: 'kartopu',
+    name: 'Kartopu',
+    hint: 'Kar topunu karda üç karo yuvarlayın: büyür. Büyüğünü ancak ikiniz itersiniz. Duvarın dibine itin, üstüne çıkıp rafa zıplayın.',
+    map: [
+      '################################',
+      '#..............................#',
+      '#..............................#',
+      '#..............................#',
+      '#..........................V...#',
+      '#..............................#',
+      '#...........................E..#',
+      '#..........V............########',
+      '#...V...................########',
+      '#.......................########',
+      '#.SS..O.................########',
+      '##############~~~~~#############',
+    ],
+  },
+  {
+    id: 'buz-kapisi',
+    name: 'Buz kapısı',
+    hint: 'Hepsi bir arada: buzda uzun koşup çukuru aşın, sandığı kapaktan kaydırın, eriyen köprüden sırayla geçin.',
+    map: [
+      '############################################',
+      '#................................#.........#',
+      '#................................#.........#',
+      '#................................#.........#',
+      '#................................#.........#',
+      '#................................#.........#',
+      '#................................#.........#',
+      '#..............V.................a.........#',
+      '#................................a.........#',
+      '#...........................V....a....V....#',
+      '#SS................2..M...b....1#a.......E.#',
+      '###~~~~~~~~~~.....###~~~~~~~~~~~####ooooo###',
+    ],
+  },
 ];
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
@@ -1274,10 +1369,17 @@ const AREAS = [
       { name: 'Pusula atölyesi', ids: ['cift-takoz', 'asili-takoz', 'yuk-yolu', 'buyuk-sapan', 'pusula-ignesi'] },
     ],
   },
+  {
+    id: 'buzul', name: 'Buzul', difficulty: 'Uzman', color: '#a5d8ff',
+    story: 'Kuzey\'e yaklaşırken her şey donmuş: kaygan buz, eriyen köprüler, kar topları. İğnenin üçüncü parçası buzun içinde.',
+    finale: { title: 'İğnenin üçüncü parçası bulundu!', line: 'Üç parça birleşti; iğne artık titremiyor. Kuzey Işıkları görünüyor…' },
+    parts: [
+      { name: 'Buz kapısı', ids: ['kayak', 'catlak-kopru', 'buz-hokeyi', 'kartopu', 'buz-kapisi'] },
+    ],
+  },
 ];
 // Henüz yapılmamış alanlar: Alanlar ekranında "yakında" olarak görünür
 const SOON_AREAS = [
-  { name: 'Buzul', difficulty: 'Uzman', color: '#a5d8ff' },
   { name: 'Kuzey Işıkları', difficulty: 'Uzman', color: '#b197fc' },
 ];
 
@@ -1305,7 +1407,7 @@ function levelUnlocked(i, done) {
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV<>789tuw';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV<>789tuw~oO';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

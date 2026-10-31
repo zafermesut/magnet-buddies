@@ -359,6 +359,9 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tBeltL::after { content: '‹'; } .tool i.tBeltR::after { content: '›'; }
 .tool i.tPress { background: linear-gradient(#8c90c8, #8c90c8) center top / 3px 40% no-repeat, linear-gradient(#5d6189, #5d6189) bottom / 100% 60% no-repeat; box-shadow: inset 0 -3px 0 var(--ch); }
 .tool i.tTimer { background: transparent; border: 2px solid var(--ch); border-radius: 50%; border-right-color: transparent; }
+.tool i.tIce { background: linear-gradient(160deg, #e7f5ff 0 18%, #a5d8ff 18% 100%); }
+.tool i.tThaw { background: rgba(165, 216, 255, 0.55); border: 1px dashed #d0ebff; }
+.tool i.tSnow { background: #f1f6ff; border-radius: 50%; box-shadow: inset -3px -3px 0 #a5c3e8; }
 .tool i.tSpring { background: linear-gradient(#ffa94d, #ffa94d) top / 100% 4px no-repeat, repeating-linear-gradient(0deg, #8c90c8 0 2px, transparent 2px 4px); }
 #edColors { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #8e92c0; transition: opacity .15s ease; }
 #edColors span { margin-right: auto; }

@@ -1212,6 +1212,82 @@ console.log('Fabrika öğeleri');
   ok(stillOpen && !gate.open, 'zamanlı düğme kanalı ' + PHYS.timerHold + ' sn açık tutar, sonra kapanır');
 }
 
+console.log('Buzul öğeleri');
+// Geçici bölümle oyun kur (LEVELS'e eklenip hemen çıkarılır)
+const tmpGame = (map, extra = {}) => {
+  LEVELS.push(Object.assign({ id: 'tmp', name: 'tmp', hint: '', map }, extra));
+  const g = new Game(LEVELS.length - 1, 2);
+  LEVELS.pop();
+  return g;
+};
+const flat = (floor, row10 = '#.SS' + '.'.repeat(27) + '#') => ['#'.repeat(32)].concat(Array(9).fill('#' + '.'.repeat(30) + '#'), [row10, floor]);
+{
+  // Kaygan buz: koşup bırakınca uzun kayar; normal zeminde hemen durur
+  const slide = floor => {
+    const g = tmpGame(flat(floor)), [A, B] = g.players;
+    B.x = 1 * T; A.x = 4 * T;
+    run(g, [() => I({ right: true }), idle], 1.2);
+    const x0 = A.x;
+    run(g, [idle, idle], 3);
+    return A.x - x0;
+  };
+  const onIce = slide('#' + '~'.repeat(30) + '#'), onRock = slide('#'.repeat(32));
+  ok(onIce > 3 * T && onRock < T, 'kaygan buzda bırakınca uzun kayar (' + (onIce / T).toFixed(1) + ' karo; normal zeminde ' + (onRock / T).toFixed(1) + ')');
+  // Buzda hızlanmak da yavaş: aynı sürede daha az yol
+  const g = tmpGame(flat('#' + '~'.repeat(30) + '#')), [A, B] = g.players;
+  B.x = 1 * T; A.x = 4 * T;
+  run(g, [() => I({ right: true }), idle], 0.3);
+  ok(A.vx < PHYS.runSpeed * 0.7, 'kaygan buzda hızlanmak yavaş (' + A.vx.toFixed(0) + ' px/sn)');
+}
+{
+  // Metal sandık buzda itilince duvara kadar kayar
+  const g = tmpGame(flat('#' + '~'.repeat(30) + '#', '#.SS..M' + '.'.repeat(24) + '#')), [A, B] = g.players, c = g.boxes[0];
+  B.x = 1 * T; A.x = c.x - A.w - 1;
+  run(g, [() => I({ right: true }), idle], 0.4);
+  run(g, [() => I({ left: true }), idle], 8);
+  ok(c.x + c.w >= 31 * T - 1, 'metal sandık buzda duvara kadar kayar (' + (c.x / T).toFixed(1) + ')');
+}
+{
+  // Eriyen buz: basınca çatlar, 1 sn sonra kırılır (üstündeki düşer), boşken 3 sn sonra yeniden donar
+  const floor = '#'.repeat(10) + 'ooo' + '#'.repeat(19);
+  const g = tmpGame(flat(floor)), [A, B] = g.players, th = g.thaws[1];
+  B.x = 1 * T; A.x = 11 * T + 3; A.y = 11 * T - A.h - 2;
+  run(g, [idle, idle], 0.6);
+  const holds = !th.open && th.crackT > 0 && A.supported;
+  run(g, [idle, idle], 0.6);
+  const broke = th.open;
+  run(g, [idle, idle], 1.5);
+  const fell = A.x < 10 * T || A.x > 13 * T || A.y < 11 * T - A.h - 1;   // düştü ve son sağlam yerde doğdu
+  run(g, [idle, idle], 3);
+  ok(holds && broke && fell && !th.open, 'eriyen buz çatlar, 1 sn sonra kırılır, sonra yeniden donar');
+}
+{
+  // Kar topu: karda yuvarlanınca büyür; büyüyünce tek kişi itemez, iki kişi iter; buzda büyümez
+  const g = tmpGame(flat('#'.repeat(32), '#.SS..O' + '.'.repeat(24) + '#')), [A, B] = g.players, sb = g.boxes[0];
+  B.x = 1 * T; A.x = sb.x - A.w - 1;
+  run(g, [() => I({ right: true }), idle], 2.5);
+  const grew = sb.big && sb.w === PHYS.snowBig;
+  const x1 = sb.x;
+  run(g, [() => I({ right: true }), idle], 1);
+  const solo = sb.x - x1;
+  B.x = A.x - B.w - 1; B.y = A.y;
+  run(g, [() => I({ right: true }), () => I({ right: true })], 1);
+  ok(grew && solo < 2 && sb.x - x1 > 40, 'kar topu karda büyür; büyükken tek kişi itemez, iki kişi iter');
+  const g2 = tmpGame(flat('#' + '~'.repeat(30) + '#', '#.SS..O' + '.'.repeat(24) + '#')), [A2, B2] = g2.players, s2 = g2.boxes[0];
+  B2.x = 1 * T; A2.x = s2.x - A2.w - 1;
+  run(g2, [() => I({ right: true }), idle], 0.5);
+  run(g2, [() => I({ left: true }), idle], 8);
+  ok(!s2.big && s2.x + s2.w >= 31 * T - 1, 'kar topu buzda büyümez, duvara kadar kayar');
+}
+{
+  // Kar topu mıknatısla çekilmez
+  const g = tmpGame(flat('#'.repeat(32), '#.SS..O' + '.'.repeat(24) + '#'), { magnet: true }), [A, B] = g.players, sb = g.boxes[0];
+  B.x = 20 * T; A.x = sb.x + 80;
+  const x0 = sb.x;
+  run(g, [() => I({ action: true }), idle], 1);
+  ok(Math.abs(sb.x - x0) < 1, 'kar topu mıknatısla çekilmez');
+}
+
 console.log('Fabrika bölümleri');
 // Bantta koşup çukurun kenarında zıpla (bant hız verir); karşıya inince biter
 const longJump = (edgeX, landX) => (g, p, t) => {
@@ -2005,6 +2081,125 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
     [(g, p, t) => (door.open ? goTo(ex)(g, p, t) : goTo(door.cells[0].c * T)(g, p, t)), (g, p, t) => (door.open ? goTo(ex)(g, p, t) : idle())],
   ]);
   ok(run(g, ctl, 90, g => g.done), 'F30. Pusula iğnesi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B1. Kayak: A düğmede (1) kapağı tutar; B buzda uzun koşup 5 karoluk çukuru aşar, şalterle (4) kapağı açık bırakır; A da koşar
+  const g = new Game(L('kayak'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
+  const edge = 16 * T, over = p => p.supported && p.x > 21 * T;
+  const skate = (g, p, t) => (over(p) ? null : I({ right: true, jump: (p.supported && p.x + p.w > edge - 4) || (!p.supported && p.vy < 0) }));
+  const ctl = phases([
+    [(g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t)), (g, p, t) => (g.switches[1] ? null : over(p) ? flip(lv, 1)(g, p, t) : g.gates[0].open ? skate(g, p, t) : idle())],
+    [skate, (g, p, t) => (over(A) ? null : goTo(27 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B1. Kayak geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B2. Çatlak köprü: sırayla köprüden koşarak geçerler (köprü arkalarından kırılır, sonra donar). A rafın dibinde, B onun
+  // başından rafa çıkıp anahtarı alır; yine sırayla dönerler, anahtarla kapı
+  const g = new Game(L('catlak-kopru'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, key = g.keys[0], door = g.doors[0];
+  const intact = () => g.thaws.every(th => !th.open && th.crackT < 0);
+  const right = p => p.supported && p.x > 16 * T, left = p => p.supported && p.x + p.w < 9 * T;
+  // Köprü sağlamken ve kimse üstünde değilken koş; köprüdeyken durmadan devam
+  const onBridge = p => p.x + p.w > 9 * T && p.x < 16 * T;
+  const dash = (dir, done) => (g, p, t) => {
+    if (done(p)) return null;
+    if (onBridge(p) || !p.supported) return I({ right: dir > 0, left: dir < 0 });
+    const other = p === A ? B : A;
+    if (!intact() || onBridge(other)) return goTo(dir > 0 ? 8 * T : 17 * T)(g, p, t);
+    return I({ right: dir > 0, left: dir < 0 });
+  };
+  const base = 22 * T + 10, shelf = { surf: 8 * T, x0: 23 * T, x1: 25 * T };
+  const ctl = phases([
+    [(g, p, t) => (right(p) && right(B) ? null : right(B) ? dash(1, right)(g, p, t) || idle() : goTo(6 * T)(g, p, t)), (g, p, t) => (right(p) && right(A) ? null : right(p) ? goTo(27 * T)(g, p, t) : dash(1, right)(g, p, t))],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - base) < 6 && p.supported ? null : goTo(base)(g, p, t)), (g, p, t) => (p.x < 20 * T ? goTo(18 * T)(g, p, t) : null)],
+    [(g, p, t) => (key.holder ? null : idle()), (g, p, t) => (key.holder === p ? null : surfOn(p, shelf) ? goTo(key.x + key.w / 2)(g, p, t) : towerUp(A, 8 * T, 1)(g, p, t) || idle())],
+    [(g, p, t) => (left(p) && left(B) ? null : left(B) ? dash(-1, left)(g, p, t) || idle() : goTo(22 * T)(g, p, t)), (g, p, t) => (left(p) && left(A) ? null : left(p) ? (door.open ? goTo(5 * T)(g, p, t) : goTo(door.cells[0].c * T + T)(g, p, t)) : p.supported && !onBridge(p) && p.y + p.h <= 8 * T + 1 ? I({ left: true }) : dash(-1, left)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B2. Çatlak köprü geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B3. Buz hokeyi: A direğin üstündeki düğmede (2) alçak b kapağını açar; B sandığı iter, sandık buzda kayıp kapaktan geçer,
+  // duvardaki düğmeye (1) çarpıp orada kalır: a kapağı açılır. İkisi sandığın üstünden çıkışa
+  const g = new Game(L('buz-hokeyi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2);
+  const pillar = { surf: 9 * T, x0: 2 * T, x1: 3 * T };
+  const onPillar = (g, p, t) => (surfOn(p, pillar) ? I({ left: p.x + p.w / 2 > 2 * T + 22, right: p.x + p.w / 2 < 2 * T + 18 })
+    : !p.supported ? I({ left: p.x + p.w / 2 > 2 * T + 20, jump: p.vy < 0 }) : Math.abs(p.x + p.w / 2 - (3 * T + 24)) > 6 ? goTo(3 * T + 24)(g, p, t) : I({ jump: true, left: true }));
+  let shoved = false;
+  const ctl = phases([
+    [(g, p, t) => (b1.pressed ? null : onPillar(g, p, t)),
+     (g, p, t) => {
+       if (b1.pressed) return null;
+       if (!b2.pressed) return goTo(crate.x - 40)(g, p, t);   // kapak açılana kadar sandığın arkasında bekle
+       if (crate.dx > 1) shoved = true;
+       return shoved ? I({ left: true }) : p.x + p.w <= crate.x + 3 ? I({ right: true }) : goTo(crate.x - 25)(g, p, t);   // bir kez it, sonra fren
+     }],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B3. Buz hokeyi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B4. Kartopu: A topu karda yuvarlar, büyür; ikisi büyük topu duvarın dibine iter (buzda kendiliğinden kayar).
+  // Topun üstünden 4 karoluk rafa zıplarlar
+  const g = new Game(L('kartopu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0];
+  const wall = 24 * T, top = p => p.supported && p.y + p.h <= 7 * T + 1 && p.x > wall - 10;
+  const atWall = () => sb.x + sb.w >= wall - 1;
+  const behind = p => p.x + p.w <= sb.x + 3 && p.supported && p.ground !== sb;
+  // Topa çık, oradan rafa zıpla
+  const climb = (g, p, t) => {
+    if (top(p)) return null;
+    if (p.ground === sb) return I({ right: true, jump: true });
+    if (!p.supported) return I({ right: true, jump: p.vy < 0 });
+    return Math.abs(p.x + p.w / 2 - (sb.x - 30)) > 8 ? goTo(sb.x - 30)(g, p, t) : I({ right: true, jump: true });
+  };
+  const ctl = phases([
+    [(g, p, t) => (sb.big ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)), (g, p, t) => (sb.big ? null : goTo(2 * T)(g, p, t))],
+    [(g, p, t) => (atWall() ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)),
+     (g, p, t) => (atWall() ? null : behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t))],
+    [climb, (g, p, t) => (top(A) ? null : goTo(sb.x - 100)(g, p, t))],
+    [(g, p, t) => (top(B) ? null : goTo(27 * T)(g, p, t)), climb],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B4. Kartopu geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B5. Buz kapısı (sınav): sırayla buzda koşup 5 karoluk çukuru aşarlar. A düğmede (2) alçak kapağı açar, B sandığı
+  // kaydırır: sandık duvardaki düğmeye (1) çarpar, a kapağı açılır. Eriyen köprüden sırayla geçip çıkışa
+  const g = new Game(L('buz-kapisi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2);
+  const edge = 13 * T, over = p => p.supported && p.x > 18 * T - 10;
+  const skate = (g, p, t) => (over(p) ? null : I({ right: true, jump: (p.supported && p.x + p.w > edge - 4) || (!p.supported && p.vy < 0) }));
+  let shoved = false;
+  const intact = () => g.thaws.every(th => !th.open && th.crackT < 0);
+  const onBridge = p => !p.inExit && p.x + p.w > 36 * T && p.x < 41 * T;
+  const dash = (g, p, t) => {
+    if (p.inExit) return null;
+    if (p.x > 41 * T) return goTo(ex)(g, p, t);
+    if (onBridge(p) || !p.supported) return I({ right: true });
+    const other = p === A ? B : A;
+    if (!intact() || onBridge(other)) return goTo(35 * T)(g, p, t);
+    return I({ right: true });
+  };
+  const ctl = phases([
+    [(g, p, t) => (over(B) ? skate(g, p, t) : idle()), (g, p, t) => (over(p) && over(A) ? null : over(p) ? goTo(crate.x - 40)(g, p, t) : skate(g, p, t))],
+    [(g, p, t) => (b1.pressed ? null : goTo(b2.x + b2.w / 2)(g, p, t)),
+     (g, p, t) => {
+       if (b1.pressed) return null;
+       if (!b2.pressed) return goTo(crate.x - 40)(g, p, t);
+       if (crate.dx > 1) shoved = true;
+       return shoved ? I({ left: true }) : p.x + p.w <= crate.x + 3 ? I({ right: true }) : goTo(crate.x - 25)(g, p, t);
+     }],
+    [(g, p, t) => (p.x > 34 * T ? null : goTo(35 * T)(g, p, t)), (g, p, t) => (p.x > 34 * T ? null : goTo(34 * T + 30)(g, p, t))],
+    [(g, p, t) => (B.inExit ? dash(g, p, t) : goTo(34 * T + 10)(g, p, t)), dash],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B5. Buz kapısı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

@@ -168,6 +168,7 @@ class Renderer3D {
       signBar: new THREE.BoxGeometry(0.42, 0.11, 0.06),
       poleField: new THREE.BoxGeometry(0.9, 1, 0.5),
       beltTop: new THREE.BoxGeometry(1, 0.14, 1.02),
+      snowball: new THREE.SphereGeometry(0.5, 24, 16),
       pressRod: new THREE.CylinderGeometry(0.09, 0.09, 1, 12),
       timerDot: new THREE.SphereGeometry(0.06, 10, 8),
     };
@@ -197,6 +198,9 @@ class Renderer3D {
       beltR: std('#ffffff', { roughness: 0.7, map: this.beltTexture(1) }),
       beltL: std('#ffffff', { roughness: 0.7, map: this.beltTexture(-1) }),
       press: std('#5d6189', { roughness: 0.35, metalness: 0.75 }),
+      // Buzul: parlak kaygan buz, kar topu
+      ice: std('#a5d8ff', { roughness: 0.08, metalness: 0.15, emissive: '#4dabf7', emissiveIntensity: 0.18 }),
+      snow: std('#f1f6ff', { roughness: 0.95, emissive: '#c5d8f5', emissiveIntensity: 0.15 }),
       hazard: std('#ffffff', { roughness: 0.5, map: this.hazardTexture() }),
       timerOn: std('#ffffff', { emissive: '#ffffff', emissiveIntensity: 1.4 }),
       timerOff: std('#2b2d55', { roughness: 0.6 }),
@@ -455,11 +459,12 @@ class Renderer3D {
     this.levelGroup.add(panel);
 
     // Duvar blokları ve üst kapakları
-    const cells = [], caps = [];
+    const cells = [], caps = [], iceCells = [];
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W; c++) {
         if (!game.grid[r][c]) continue;
         if ('PN'.includes(game.def.map[r][c])) continue;   // sabit mıknatıslar ayrıca çizilir
+        if (game.ice.has(r * W + c)) { iceCells.push([c, r]); continue; }   // kaygan buz ayrı malzemeyle
         cells.push([c, r]);
         if (r > 0 && !game.grid[r - 1][c] && !game.belts.has(r * W + c)) caps.push([c, r]);
       }
@@ -483,6 +488,18 @@ class Renderer3D {
     if (blocks.instanceColor) blocks.instanceColor.needsUpdate = true;
     // Kenar şeridi bloğun üst yüzeyinden biraz yukarıda: aynı düzlemde iki yüzey titreşir (z-fighting)
     inst(this.geo.cap, this.mat.cap, caps, (o, c, r) => o.position.set(c + 0.5, -r - 0.05, 0));
+    if (iceCells.length) inst(this.geo.block, this.mat.ice, iceCells, (o, c, r) => o.position.set(c + 0.5, -r - 0.5, 0));
+    // Eriyen buz: hücre başına yarı saydam blok (çatlarken titrer, kırılınca kaybolur)
+    this.thawObjs = game.thaws.map(th => {
+      const mat = this.mat.ice.clone();
+      mat.transparent = true;
+      mat.opacity = 0.8;
+      const m = new THREE.Mesh(this.geo.block, mat);
+      m.position.set(th.c + 0.5, -th.r - 0.5, 0);
+      m.castShadow = m.receiveShadow = true;
+      this.levelGroup.add(m);
+      return { th, m, mat, vis: 1 };
+    });
     // Taşıyıcı bantlar: bloğun üstünde oklu kauçuk
     for (const dir of [1, -1]) {
       const list = [...game.belts].filter(([, d]) => d === dir).map(([id]) => [id % W, Math.floor(id / W)]);
@@ -751,6 +768,13 @@ class Renderer3D {
 
     // Ağır kutular ve anahtarlar (konumları her karede güncellenir)
     this.boxObjs = game.boxes.map(b => {
+      if (b.snow) {
+        // Kar topu: beyaz küre; boyu ve dönüşü her karede
+        const m = new THREE.Mesh(this.geo.snowball, this.mat.snow);
+        m.castShadow = m.receiveShadow = true;
+        this.levelGroup.add(m);
+        return m;
+      }
       if (!b.metal) {
         const m = new THREE.Mesh(this.geo.crate, this.mat.crate);
         m.castShadow = m.receiveShadow = true;
@@ -990,6 +1014,10 @@ class Renderer3D {
         case 'screw': this.burst(x, y, 16, '#e3e6fb', { speed: 3, gravity: 0, life: 0.5 }); break;
         case 'spring': this.burst(x, y, 12, '#ffc078', { speed: 2.6, gravity: 2, life: 0.4, up: true }); break;
         case 'press': this.burst(x, y, 14, '#c9c7e8', { speed: 2.4, gravity: 2, life: 0.4, size: 0.06 }); break;
+        case 'crack': this.burst(x, y, 8, '#d0ebff', { speed: 1.6, gravity: 2, life: 0.35, size: 0.05 }); break;
+        case 'shatter': this.burst(x, y, 26, '#a5d8ff', { speed: 3.2, gravity: 4, life: 0.7, size: 0.08 }); break;
+        case 'freeze': this.burst(x, y, 12, '#e7f5ff', { speed: 1.4, gravity: 0, life: 0.5, size: 0.05 }); break;
+        case 'grow': this.burst(x, y, 22, '#f1f6ff', { speed: 2.6, gravity: 1, life: 0.6, size: 0.08 }); break;
         case 'bonk': this.burst(x, y, 12, '#ffd43b', { speed: 3, gravity: 1, life: 0.45 }); break;
         case 'click': this.burst(x, y, 12, e.color || '#fff', { speed: 2.5, gravity: 1, life: 0.45, up: true }); break;
         case 'swap': this.burst(x, y, 18, e.color || '#fff', { speed: 3, gravity: 0, life: 0.4 }); break;
@@ -1138,8 +1166,20 @@ class Renderer3D {
     }
     game.boxes.forEach((b, i) => {
       const m = this.boxObjs[i];
-      if (m) m.position.set(wx(b.x + b.w / 2), wy(b.y + b.h / 2), 0);
+      if (!m) return;
+      m.position.set(wx(b.x + b.w / 2), wy(b.y + b.h / 2), 0);
+      if (b.snow) { m.scale.setScalar(b.w / T); m.rotation.z = -b.roll; }
     });
+    for (const o of this.thawObjs) {
+      // Kırılınca hızla söner, yeniden donunca belirir; çatlarken titrer ve koyulaşır
+      o.vis += ((o.th.open ? 0 : 1) - o.vis) * Math.min(1, dt * 12);
+      o.m.visible = o.vis > 0.03;
+      o.m.scale.setScalar(0.6 + 0.4 * o.vis);
+      const k = o.th.crackT >= 0 && !o.th.open ? Math.min(1, o.th.crackT / PHYS.thawTime) : 0;
+      o.m.position.x = o.th.c + 0.5 + Math.sin(t * 60) * 0.04 * k;
+      o.mat.opacity = 0.8 * o.vis;
+      o.mat.emissiveIntensity = 0.18 + k * 0.6;
+    }
     game.keys.forEach((k, i) => {
       const g = this.keyObjs[i];
       if (!g) return;
@@ -1194,7 +1234,7 @@ class Renderer3D {
     }
 
     for (const box of game.boxes) {
-      if (box.metal) continue;   // metal sandığı tek kişi iter
+      if (box.metal || (box.snow && !box.big)) continue;   // metal sandığı ve küçük kar topunu tek kişi iter
       const n = game.boxNeed, gap = ppu * 0.42, s = this.worldToScreen(box.x + box.w / 2, box.y - 10, 0.5);
       for (let i = 0; i < n; i++) {
         ctx.beginPath();
