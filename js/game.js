@@ -673,7 +673,7 @@ class Game {
   // Kar topu yuvarlanır; karlı zeminde (buz değil) yeterince yuvarlanınca, yer varsa büyür
   rollSnow(b) {
     b.roll += b.dx / (b.w / 2);
-    if (b.big || !b.onGround || b.ground || b.onIce || !b.dx) return;
+    if (b.big || !b.onGround || b.ground || b.onIce || !b.dx || this.beltUnder(b)) return;   // buzda ve bantta büyümez
     b.rolled += Math.abs(b.dx);
     if (b.rolled < PHYS.snowGrow) return;
     const k = PHYS.snowBig, nx = b.dx > 0 ? b.x : b.x + b.w - k, ny = b.y + b.h - k;   // itildiği yöne doğru büyür (iteni ezmez)

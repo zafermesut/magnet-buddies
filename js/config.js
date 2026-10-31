@@ -47,7 +47,7 @@ const PHYS = {
   thawRegrow: 3,       // kırılan eriyen buz bu kadar sonra yeniden donar (boşsa)
   snowGrow: 120,       // kar topu karlı zeminde bu kadar yuvarlanınca büyür (px)
   snowSmall: 38,       // küçük kar topu (tek kişi iter)
-  snowBig: 76,         // büyük kar topu (iki kişi iter)
+  snowBig: 80,         // büyük kar topu (iki kişi iter): iki karo, 2×2 hendeği tam doldurur
 
   // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
   // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.

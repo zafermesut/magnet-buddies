@@ -2202,5 +2202,132 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
   ok(run(g, ctl, 90, g => g.done), 'B5. Buz kapısı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // B6. Kar köprüsü: A topu karda yuvarlar, büyür; ikisi büyük topu hendeğe iter, top dibe oturur. Topun üstüne inip karşıya zıplarlar
+  const g = new Game(L('kar-koprusu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0];
+  const inTrench = () => sb.big && sb.supported && sb.y > 10 * T;
+  const behind = p => p.x + p.w <= sb.x + 3 && p.supported && p.ground !== sb;
+  const far = p => p.supported && p.x > 20 * T;
+  const cross = (g, p, t) => (far(p) ? null : I({ right: true, jump: p.ground === sb || (!p.supported && p.vy < 0) }));
+  const ctl = phases([
+    [(g, p, t) => (sb.big ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)), (g, p, t) => (sb.big ? null : goTo(2 * T)(g, p, t))],
+    [(g, p, t) => (inTrench() ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)),
+     (g, p, t) => (inTrench() ? null : behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t))],
+    [cross, (g, p, t) => (far(A) ? cross(g, p, t) : goTo(12 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B6. Kar köprüsü geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B7. Eriyen kule: B, A'nın başına çıkar; A onu taşıyarak eriyen buza girer, B hemen rafa zıplar (buz kırılmadan), şalter (4)
+  // rafın altındaki kapağı açar. B raftan sağa iner; A eriyen buzdan koşarak kapaktan geçer
+  const g = new Game(L('eriyen-kule'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, lv = g.levers[0];
+  const shelf = { surf: 8 * T, x0: 14 * T, x1: 17 * T };
+  const spot = 13 * T + 4, ready = 9 * T;
+  const ctl = phases([
+    // Başlangıçta kule kurulur, A, B'yi taşıyarak buzun önüne gelir
+    [(g, p, t) => (B.ground === p ? null : idle()), (g, p, t) => (p.ground === A ? null : climbOn(A)(g, p, t))],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - ready) < 6 ? null : goTo(ready)(g, p, t)), (g, p, t) => (Math.abs(A.x + A.w / 2 - ready) < 6 ? null : I({ right: A.x - p.x > 2, left: A.x - p.x < -2 }))],
+    // A buza girer, B zıplar
+    [(g, p, t) => (surfOn(B, shelf) ? null : B.ground === p ? I({ right: p.x < spot }) : idle()),
+     (g, p, t) => {
+       if (surfOn(p, shelf)) return null;
+       if (p.ground === A) return A.x >= spot - 8 ? I({ jump: true, right: true }) : I({ right: A.x - p.x > 2, left: A.x - p.x < -2 });
+       return I({ right: true, jump: p.vy < 0 });
+     }],
+    [(g, p, t) => (g.switches[1] ? null : idle()), flip(lv, 1)],
+    // B raftan sağa iner; A buz donunca koşup geçer
+    [(g, p, t) => (p.x > 15 * T && p.supported ? null : g.thaws.some(th => th.open) ? goTo(9 * T)(g, p, t) : I({ right: true })),
+     (g, p, t) => (p.x > 17 * T && p.supported ? null : I({ right: true }))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B7. Eriyen kule geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B8. Kartopu takozu: A ilk topu buzda iter, top kayıp presin altına girer (bant girişte tutar), küçük kalır. Pres yukarıdayken
+  // topun üstünden geçerler. A düğmede (1) kapağı açar, B ikinci topu buzda iter: kapağın içine kayar, basamak tutar
+  const g = new Game(L('kartopu-takozu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, P = g.presses[0];
+  const [s1, s2] = g.boxes.slice().sort((p, q) => p.x - q.x), b1 = g.buttons[0], gx = 32 * T, out = 21 * T + 10;
+  const settled = () => s1.x + s1.w > 14 * T + 4 && Math.abs(s1.dx) < 0.01 && s1.supported;
+  const wedged = () => s2.x >= gx - 1 && s2.supported;
+  const going = new Set();
+  const cross = (g, p, t) => {
+    if (p.x > out) return null;
+    if (P.y <= P.topY + 1 && P.dir > 0 && P.pause > 0.9 && p.x + p.w < s1.x && p.x > s1.x - 80) going.add(p);
+    if (!going.has(p)) return goTo(s1.x - 50)(g, p, t);
+    if (p.x > s1.x + s1.w) return I({ right: true });
+    return I({ right: true, jump: p.supported || p.vy < 0 });
+  };
+  let shoved1 = false, shoved2 = false;
+  const ctl = phases([
+    [(g, p, t) => { if (settled()) return null; if (s1.dx > 1) shoved1 = true; return shoved1 ? I({ left: true }) : p.x + p.w <= s1.x + 3 ? I({ right: true }) : goTo(s1.x - 25)(g, p, t); },
+     (g, p, t) => (settled() ? null : goTo(1 * T)(g, p, t))],
+    [(g, p, t) => (A.x > out && B.x > out ? null : p.x > out ? goTo(22 * T + 20)(g, p, t) : B.x > out ? cross(g, p, t) || idle() : idle()),
+     (g, p, t) => (A.x > out && B.x > out ? null : p.x > out ? goTo(s2.x - 40)(g, p, t) : cross(g, p, t) || idle())],
+    [(g, p, t) => (wedged() ? null : goTo(b1.x + b1.w / 2)(g, p, t)),
+     (g, p, t) => { if (wedged()) return null; if (!b1.pressed) return goTo(s2.x - 40)(g, p, t); if (s2.dx > 1) shoved2 = true; return shoved2 ? I({ left: true }) : p.x + p.w <= s2.x + 3 ? I({ right: true }) : goTo(s2.x - 25)(g, p, t); }],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B8. Kartopu takozu geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B9. Buz pisti: A zamanlı düğmeye (t) basıp buzda koşar, hızla çukuru aşar, kapak kapanmadan geçer; şalterle (4) kapağı
+  // açık bırakır. B de koşar
+  const g = new Game(L('buz-pisti'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, tb = g.buttons[0], lv = g.levers[0];
+  const gx = 29 * T, past = p => p.supported && p.x > gx + T;
+  let ran = false, runT = null;
+  const sprint = (g, p, t) => (past(p) ? null : I({ right: true, jump: (p.supported && p.x + p.w > 15 * T - 6 && p.x < 15 * T) || (!p.supported && p.vy < 0) }));
+  const ctl = phases([
+    [(g, p, t) => {
+       if (past(p)) { if (runT === null) runT = g.t; return null; }
+       if (!ran) { if (Math.abs(p.x + p.w / 2 - (tb.x + tb.w / 2)) < 6) ran = true; return goTo(tb.x + tb.w / 2)(g, p, t); }
+       return sprint(g, p, t);
+     },
+     (g, p, t) => (past(A) ? null : idle())],
+    [flip(lv, 1), (g, p, t) => (g.switches[1] ? null : idle())],
+    [goTo(ex), (g, p, t) => (past(p) ? goTo(ex)(g, p, t) : sprint(g, p, t))],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'B9. Buz pisti geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // B10. Kar fırtınası (sınav): topu büyütüp hendeğe iterler, üstünden geçerler. B, A'nın başında; A eriyen buza girer, B rafa
+  // zıplar, şalter (4) rafın altındaki kapağı açar. Sırayla buzda koşup 5 karoluk çukuru aşarlar
+  const g = new Game(L('kar-firtinasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, sb = g.boxes[0], lv = g.levers[0];
+  const inTrench = () => sb.big && sb.supported && sb.y > 11 * T;
+  const behind = p => p.x + p.w <= sb.x + 3 && p.supported && p.ground !== sb;
+  const pastTrench = p => p.supported && p.x > 16 * T && p.x < 22 * T;
+  const crossT = (g, p, t) => (pastTrench(p) ? null : I({ right: true, jump: p.ground === sb || (!p.supported && p.vy < 0) }));
+  const shelf = { surf: 8 * T, x0: 25 * T, x1: 28 * T }, spot = 24 * T + 4, ready = 20 * T;
+  const edge = 37 * T, over = p => p.supported && p.x > 42 * T;
+  const skate = (g, p, t) => (over(p) ? null : I({ right: true, jump: (p.supported && p.x + p.w > edge - 4) || (!p.supported && p.vy < 0) }));
+  const ctl = phases([
+    [(g, p, t) => (sb.big ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)), (g, p, t) => (sb.big ? null : goTo(2 * T)(g, p, t))],
+    [(g, p, t) => (inTrench() ? null : behind(p) ? I({ right: true }) : goTo(sb.x - 40)(g, p, t)),
+     (g, p, t) => (inTrench() ? null : behind(p) && (p.x + p.w > A.x - 4 || behind(A)) ? I({ right: true }) : goTo(sb.x - 80)(g, p, t))],
+    [(g, p, t) => (pastTrench(p) && pastTrench(B) ? null : pastTrench(B) ? crossT(g, p, t) || goTo(17 * T)(g, p, t) : goTo(9 * T)(g, p, t)),
+     (g, p, t) => (pastTrench(p) && pastTrench(A) ? null : pastTrench(p) ? goTo(19 * T)(g, p, t) : crossT(g, p, t))],
+    // Kule: B, A'nın başına; A onu buzun önüne taşır
+    [(g, p, t) => (B.ground === p ? null : Math.abs(p.x + p.w / 2 - (17 * T + 20)) > 6 ? goTo(17 * T + 20)(g, p, t) : idle()),
+     (g, p, t) => (p.ground === A ? null : Math.abs(A.x + A.w / 2 - (17 * T + 20)) < 8 && A.supported ? climbOn(A)(g, p, t) : goTo(19 * T + 20)(g, p, t))],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - ready) < 6 ? null : goTo(ready)(g, p, t)), (g, p, t) => (Math.abs(A.x + A.w / 2 - ready) < 6 ? null : I({ right: A.x - p.x > 2, left: A.x - p.x < -2 }))],
+    [(g, p, t) => (surfOn(B, shelf) ? null : B.ground === p ? I({ right: p.x < spot }) : idle()),
+     (g, p, t) => {
+       if (surfOn(p, shelf)) return null;
+       if (p.ground === A) return A.x >= spot - 8 ? I({ jump: true, right: true }) : I({ right: A.x - p.x > 2, left: A.x - p.x < -2 });
+       return I({ right: true, jump: p.vy < 0 });
+     }],
+    [(g, p, t) => (g.switches[1] ? null : idle()), flip(lv, 1)],
+    // B raftan iner, buzda koşup çukuru aşar; A buz donunca kapaktan geçip koşar
+    [(g, p, t) => (over(p) ? null : over(B) ? (p.x > 25 * T ? skate(g, p, t) || idle() : p.x > 21 * T || !g.thaws.some(th => th.open || th.crackT >= 0) ? I({ right: true }) : goTo(20 * T)(g, p, t)) : goTo(20 * T)(g, p, t)),
+     (g, p, t) => (over(p) ? null : skate(g, p, t) || idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'B10. Kar fırtınası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
