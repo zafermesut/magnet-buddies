@@ -1847,5 +1847,165 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
   ok(run(g, ctl, 90, g => g.done), 'F25. Atölye ustası geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // F26. Çift takoz: A düğmede (2) iki sandığı bırakır: biri presin altına girer, öbürü bacadan a kapağının üstüne düşer.
+  // Pres yukarıdayken sandığın üstünden geçerler; A karşıdaki düğmede (1) kapağı açar, sandık kapağın içine düşer; çıkış
+  const g = new Game(L('cift-takoz'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, P = g.presses[0];
+  const b2 = g.buttons.find(b => b.channel === 2), b1 = g.buttons.find(b => b.channel === 1), gx = g.gates.find(x => x.channel === 1).cells[0].c * T;
+  const [near, far] = g.boxes.slice().sort((p, q) => p.x - q.x), out = 16 * T;
+  const settled = () => near.y + near.h >= 11 * T - 1 && Math.abs(near.dx) < 0.01 && near.x > 9 * T - 20 && far.y + far.h >= 8 * T - 1 && Math.abs(far.dx) < 0.01;
+  const wedged = () => far.y + far.h >= 11 * T - 1 && far.x >= gx - 1;
+  const going = new Set();
+  const cross = (g, p, t) => {
+    if (p.x > out) return null;
+    if (P.y <= P.topY + 1 && P.dir > 0 && P.pause > 0.9 && p.x + p.w < near.x && p.x > near.x - 80) going.add(p);
+    if (!going.has(p)) return goTo(near.x - 50)(g, p, t);
+    if (p.x > near.x + near.w) return I({ right: true });
+    return I({ right: true, jump: p.supported || p.vy < 0 });
+  };
+  const ctl = phases([
+    [(g, p, t) => (settled() ? null : goTo(b2.x + b2.w / 2)(g, p, t)), (g, p, t) => (settled() ? null : goTo(5 * T)(g, p, t))],
+    [(g, p, t) => (A.x > out && B.x > out ? null : p.x > out ? goTo(20 * T)(g, p, t) : B.x > out ? cross(g, p, t) || idle() : idle()),
+     (g, p, t) => (A.x > out && B.x > out ? null : p.x > out ? goTo(23 * T)(g, p, t) : cross(g, p, t) || idle())],
+    [(g, p, t) => (wedged() ? null : goTo(b1.x + b1.w / 2)(g, p, t)), (g, p, t) => (wedged() ? null : goTo(24 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F26. Çift takoz geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F27. Asılı takoz: B asılarak karşıya geçer, raftaki yuvada düğmeye (1) basar ve kutbunu + yapar (asılı onu duvara iter).
+  // A basamağın üstünde asılıp sandığı çeker, karşıya taşıyıp bırakır, inip sandığı rafın altından kapağın içine iter
+  const g = new Game(L('asili-takoz'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const b1 = g.buttons[0], gx = g.gates[0].cells[0].c * T, dropX = 20 * T + 20, endX = 19 * T + 30;
+  const hanging = p => !p.supported && p.vy <= 1 && p.gripT > 0;
+  const shelf = { surf: 9 * T, x0: 24 * T, x1: 26 * T };
+  const onB1 = () => b1.pressed && surfOn(B, shelf);
+  const dropped = () => crate.supported && crate.x > 19 * T && crate.y + crate.h >= 11 * T - 1;
+  const wedged = () => dropped() && crate.x >= gx - 1;
+  const toShelf = (g, p, t) => {
+    if (surfOn(p, shelf)) return Math.abs(p.x + p.w / 2 - (b1.x + b1.w / 2)) > 4 ? goTo(b1.x + b1.w / 2)(g, p, t) : p.pol !== 1 ? I({ swap: (t * 10 | 0) % 2 === 0 }) : idle();
+    if (!p.supported) return I({ right: p.y + p.h < 9 * T, jump: p.vy < 0 });
+    return Math.abs(p.x + p.w / 2 - (23 * T + 10)) > 6 ? goTo(23 * T + 10)(g, p, t) : I({ jump: true });
+  };
+  const ctl = phases([
+    [(g, p, t) => (onB1() && B.pol === 1 ? null : idle()), (g, p, t) => (onB1() && p.pol === 1 ? null : p.x > 19 * T && !hanging(p) ? toShelf(g, p, t) : hangAcross(5 * T + 20, endX, 1)(g, p, t) || toShelf(g, p, t))],
+    [(g, p, t) => {
+       if (dropped()) return null;
+       if (!hanging(p)) return p.supported ? (Math.abs(p.x + p.w / 2 - 6 * T) > 8 ? goTo(6 * T)(g, p, t) : I({ jump: (t * 4 | 0) % 2 === 0 })) : I();
+       const held = crate.y + crate.h < 10 * T && Math.abs(crate.x + crate.w / 2 - (p.x + p.w / 2)) < 60;
+       if (!held) { const d = 7 * T + 20 - (p.x + p.w / 2); return Math.abs(d) > 4 ? I({ right: d > 0, left: d < 0 }) : I({ action: true }); }   // basamağın üstünde: sandık basamağa dayanıp yapışır
+       const cx = crate.x + crate.w / 2;
+       return Math.abs(cx - dropX) > 8 ? I({ action: true, right: cx < dropX, left: cx > dropX }) : I();
+     },
+     (g, p, t) => (dropped() ? null : toShelf(g, p, t))],
+    [(g, p, t) => {
+       if (wedged()) return null;
+       if (!p.supported) return hanging(p) ? (p.x + p.w / 2 < 19 * T + 30 ? I({ right: true }) : I({ swap: (t * 10 | 0) % 2 === 0 })) : I();   // karanın üstüne gelince bırakıl
+       return p.x + p.w <= crate.x + 3 && p.ground !== crate ? I({ right: true }) : p.ground === crate ? I({ left: true }) : goTo(crate.x - p.w / 2 - 2)(g, p, t);
+     },
+     (g, p, t) => (wedged() ? null : toShelf(g, p, t))],
+    [goTo(ex), (g, p, t) => (p.pol === 1 ? I({ swap: (t * 10 | 0) % 2 === 0 }) : surfOn(p, shelf) ? I({ left: true }) : goTo(ex)(g, p, t))],   // − olup (tavana yapışmasın) yuvadan sola inip rafın altından
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'F27. Asılı takoz geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F28. Yük yolu: B gezgin platformun sol yarısına biner; A, platform düşme yerine gelirken düğmeye (2) basıp sandığı bırakır.
+  // Sandık platforma düşer; B karşı uçta onu banda iter, bant düğmeye (1) götürür: a kapağı açılır. İkisi platformla geçer
+  const g = new Game(L('yuk-yolu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0], M = g.movers[0];
+  const btn = g.buttons.find(b => b.channel === 2), b1 = g.buttons.find(b => b.channel === 1), dropX = 15 * T;
+  const ride = slot => (g, p, t) => { const d = M.x + slot - (p.x + p.w / 2); return I({ right: d > 3, left: d < -3 }); };
+  const far = p => p.supported && p.ground !== M && p.x > 22 * T;
+  const board = slot => (g, p, t) => (p.ground === M ? ride(slot)(g, p, t) : M.x <= M.minX + 1 && M.pause > 0.3 ? I({ right: true }) : goTo(M.minX - 20)(g, p, t));
+  const travel = (dropX - 9 * T) / PHYS.beltSpeed + 0.45;
+  const mAt = dt => { let x = M.x, d = M.dir, ps = M.pause, tt = dt;
+    while (tt > 0) { if (ps > 0) { const s = Math.min(ps, tt); ps -= s; tt -= s; continue; } x += d * PHYS.moverSpeed * Math.min(tt, 0.05); tt -= 0.05;
+      if (x >= M.maxX) { x = M.maxX; d = -1; ps = PHYS.moverPause; } if (x <= M.minX) { x = M.minX; d = 1; ps = PHYS.moverPause; } }
+    return x; };
+  let released = false;
+  const cross = (g, p, t) => (far(p) ? null : p.ground === M ? (M.x >= M.maxX - 1 && M.pause > 0.1 ? I({ right: true }) : ride(M.w - 20)(g, p, t)) : p.supported && p.x < M.minX ? board(M.w - 20)(g, p, t) : I({ right: true }));
+  const ctl = phases([
+    [(g, p, t) => (B.ground === M ? null : goTo(btn.x + btn.w / 2 + 60)(g, p, t)), (g, p, t) => (p.ground === M ? null : board(20)(g, p, t))],
+    // Sandık platformun sağ yarısına düşmeli: platform düşme yerinin solundayken bırak
+    [(g, p, t) => {
+       if (crate.ground === M) return null;
+       const x = mAt(travel);
+       if (!released && x + 50 < dropX && x + M.w > dropX + 40 && crate.x < 9 * T) released = true;
+       if (released && crate.x > 9 * T + 30) released = false;
+       return released || crate.x >= 9 * T ? goTo(btn.x + btn.w / 2)(g, p, t) : goTo(btn.x + btn.w / 2 + 60)(g, p, t);
+     },
+     (g, p, t) => (crate.ground === M ? null : p.ground === M ? ride(20)(g, p, t) : board(20)(g, p, t))],
+    // Karşı uçta B sandığı banda iter
+    [(g, p, t) => (b1.pressed ? null : goTo(btn.x + btn.w / 2 + 60)(g, p, t)),
+     (g, p, t) => (b1.pressed ? null : p.ground === M ? (M.x >= M.maxX - 1 && M.pause > 0.05 ? I({ right: true }) : ride(20)(g, p, t)) : far(p) ? idle() : board(20)(g, p, t))],
+    [(g, p, t) => cross(g, p, t), (g, p, t) => (far(A) ? null : far(p) ? goTo(27 * T)(g, p, t) : cross(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F28. Yük yolu geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F29. Büyük sapan: A düğmede (1) kapağı tutar. B, platform sol ucuna varacakken bantta koşup yaya basar, platforma iner,
+  // karşıda şalteri (4) çevirir; A da aynı yoldan
+  const g = new Game(L('buyuk-sapan'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, M = g.movers[0], btn = g.buttons[0], lv = g.levers[0];
+  const mAt = dt => { let x = M.x, d = M.dir, ps = M.pause, tt = dt;
+    while (tt > 0) { if (ps > 0) { const s = Math.min(ps, tt); ps -= s; tt -= s; continue; } x += d * PHYS.moverSpeed * Math.min(tt, 0.05); tt -= 0.05;
+      if (x >= M.maxX) { x = M.maxX; d = -1; ps = PHYS.moverPause; } if (x <= M.minX) { x = M.minX; d = 1; ps = PHYS.moverPause; } }
+    return x; };
+  const far = p => p.supported && p.ground !== M && p.x > 28 * T;
+  const startX = 4 * T + 20, flight = 1.75;
+  const go = new Set();
+  // Kalkış yerinde bekle; platform iniş anında sol ucundaysa koş (bant + yay), havada ve platformda sağa
+  const sling = (g, p, t) => {
+    if (far(p)) return null;
+    if (p.ground === M) return M.x >= M.maxX - 1 && M.pause > 0.05 ? I({ right: true }) : I({ right: p.x + p.w / 2 < M.x + M.w - 25, left: p.x + p.w / 2 > M.x + M.w - 15 });
+    if (!p.supported) return I({ right: true });
+    if (p.x > 6 * T) return I({ right: true });   // bantta: dur yok
+    if (go.has(p)) return I({ right: true });
+    if (Math.abs(p.x + p.w / 2 - startX) > 6) return goTo(startX)(g, p, t);
+    const x = mAt(flight);
+    if (x < M.minX + 30) go.add(p);
+    return idle();
+  };
+  const ctl = phases([
+    [(g, p, t) => (g.switches[1] ? null : goTo(btn.x + btn.w / 2)(g, p, t)), (g, p, t) => (g.switches[1] ? null : far(p) ? flip(lv, 1)(g, p, t) : g.gates[0].open ? sling(g, p, t) || idle() : idle())],
+    [sling, (g, p, t) => (far(A) ? null : goTo(31 * T)(g, p, t))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F29. Büyük sapan geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // F30. Pusula iğnesi (final): A düğmede (2) sandığı bırakır, sandık presin altına girer; pres yukarıdayken geçerler.
+  // Bantta koşup yayla 4 karoluk duvarın üstüne uçarlar. A rafın dibinde, B onun başından rafa: pusula parçası; kapı, çıkış
+  const g = new Game(L('pusula-ignesi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0], P = g.presses[0];
+  const piece = g.keys[0], door = g.doors[0], b2 = g.buttons[0], out = 16 * T;
+  const settled = () => crate.y + crate.h >= 11 * T - 1 && Math.abs(crate.dx) < 0.01 && crate.x > 9 * T - 20;
+  const going = new Set();
+  const cross = (g, p, t) => {
+    if (p.x > out) return null;
+    if (P.y <= P.topY + 1 && P.dir > 0 && P.pause > 0.9 && p.x + p.w < crate.x && p.x > crate.x - 80) going.add(p);
+    if (!going.has(p)) return goTo(crate.x - 50)(g, p, t);
+    if (p.x > crate.x + crate.w) return I({ right: true });
+    return I({ right: true, jump: p.supported || p.vy < 0 });
+  };
+  const top = p => p.supported && p.y + p.h <= 7 * T + 1 && p.x > 28 * T;
+  const sling = (g, p, t) => (top(p) ? null : I({ right: true }));
+  const base = 36 * T + 20, shelf = { surf: 4 * T, x0: 34 * T, x1: 36 * T };
+  const ctl = phases([
+    [(g, p, t) => (settled() ? null : goTo(b2.x + b2.w / 2)(g, p, t)), (g, p, t) => (settled() ? null : goTo(5 * T)(g, p, t))],
+    // Önce B: presin altından geçip hemen sapanla duvarın üstüne; sonra A
+    [(g, p, t) => (top(A) && top(B) ? null : top(p) ? goTo(31 * T)(g, p, t) : top(B) ? (p.x > out ? sling(g, p, t) : cross(g, p, t) || idle()) : idle()),
+     (g, p, t) => (top(A) && top(B) ? null : top(p) ? goTo(37 * T)(g, p, t) : p.x > out ? sling(g, p, t) : cross(g, p, t) || idle())],
+    // B rafın sağında durur; A rafın altından gelip B'nin başından sola, rafa
+    [(g, p, t) => (Math.abs(B.x + B.w / 2 - base) < 6 && B.supported ? null : goTo(31 * T)(g, p, t)), (g, p, t) => (Math.abs(p.x + p.w / 2 - base) < 6 && p.supported ? null : goTo(base)(g, p, t))],
+    [(g, p, t) => (piece.holder === p ? null : surfOn(p, shelf) ? goTo(piece.x + piece.w / 2)(g, p, t) : towerUp(B, 4 * T, -1)(g, p, t) || idle()),
+     (g, p, t) => (piece.holder ? null : idle())],
+    [(g, p, t) => (door.open ? goTo(ex)(g, p, t) : goTo(door.cells[0].c * T)(g, p, t)), (g, p, t) => (door.open ? goTo(ex)(g, p, t) : idle())],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'F30. Pusula iğnesi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);

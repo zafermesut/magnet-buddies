@@ -427,14 +427,15 @@ function showComplete(i, secs) {
     (prevBest && secs < prevBest ? ' · yeni rekor!' : prevBest ? ` · rekor ${fmt(prevBest)}` : '') +
     (game && game.screws && game.screws.length ? ` · vida <b>${bitCount(mask)}/${game.screws.length}</b>` : '');
   if (custom) $('completeTitle').textContent = 'Bölüm tamam!';
-  // Alan 1'in finali: pusula parçası bulundu, pusula ilk kez kıpırdar
+  // Alanın finali: pusula parçası bulundu, iğne bir sonraki alanı gösterir (yazılar alanın finale alanında)
   const final = !custom && LEVELS[i].final;
   $('compassScene').classList.toggle('hidden', !final);
   $('toSelectBtn').classList.toggle('hidden', !!final);
   if (final) {
-    $('completeTitle').textContent = 'Pusula parçası bulundu!';
-    $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b><br><span class="partDone">${icon('star')}Alan 1 · Hurdalık tamamlandı</span>
-      <br><span class="small">Pusula ilk kez kıpırdadı. İğne kuzeyi, Fabrika'yı gösteriyor…</span>`;
+    const a = areaOf(i), fin = AREAS[a].finale;
+    $('completeTitle').textContent = fin.title;
+    $('completeInfo').innerHTML = `Süre <b>${fmt(secs)}</b><br><span class="partDone">${icon('star')}Alan ${a + 1} · ${esc(AREAS[a].name)} tamamlandı</span>
+      <br><span class="small">${esc(fin.line)}</span>`;
     $('nextBtn').textContent = mode === 'online' ? 'ODAYA DÖN' : 'HARİTA';
   }
   // Kısmın son bölümü ilk kez geçildi: küçük kutlama ve haritada sıradaki kısım açılır
