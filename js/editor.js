@@ -36,6 +36,10 @@ const EDITOR_TOOLS = [
   { id: 'aurora', ch: '%', label: 'Işık perdesi', cls: 'tAurora', tip: 'Koyduğun yerden ilk duvara kadar iner. İçinde yerçekimi azalır: ~6 karo zıplanır, uzun süzülünür, yavaş düşülür.' },
   { id: 'bridge', chs: 'fgj', label: 'Işık köprüsü', cls: 'tBridge', tip: 'Yan yana çiz: tek köprü olur. Aynı renk açıkken duvara dayalı ucundan uzar, kapanınca söner. Alttan geçilir, üstüne basılır.' },
   { id: 'ibridge', chs: 'FGJ', label: 'Ters köprü', cls: 'tIBridge', tip: 'Aynı renk kapalıyken yanar, açılınca söner.' },
+  { id: 'beamR', ch: '[', label: 'Işın →', cls: 'tBeamR', tip: 'Işık yayıcı: katı blok, sağa ışın atar. Işın duvarda, kapalı kapakta ya da ilk cisimde biter.' },
+  { id: 'beamL', ch: ']', label: 'Işın ←', cls: 'tBeamL', tip: 'Işık yayıcı: katı blok, sola ışın atar.' },
+  { id: 'beamD', ch: 'v', label: 'Işın ↓', cls: 'tBeamD', tip: 'Işık yayıcı: katı blok, aşağı ışın atar.' },
+  { id: 'recv', chs: 'qrs', label: 'Işık alıcısı', cls: 'tRecv', tip: 'Işın üstüne düşerken aynı renkteki kapakları açar, köprüleri yakar. İçinden geçilir.' },
   { id: 'snow', ch: 'O', label: 'Kar topu', cls: 'tSnow', tip: 'İtilince yuvarlanır; karlı zeminde (buzda ve bantta değil) 3 karo yuvarlanınca büyür. Büyük kar topunu iki kişi iter. Mıknatıs çekmez.' },
 ];
 

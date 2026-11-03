@@ -124,6 +124,7 @@ function applySnapshot(g, s) {
   (s.sp || []).forEach((t, i) => { if (g.springs[i]) g.springs[i].t = t; });
   (s.th || []).forEach((a, i) => { const th = g.thaws[i]; if (th) { th.open = !!a[0]; th.crackT = a[1]; } });
   (s.br || []).forEach((n, i) => { if (g.bridges[i]) g.bridges[i].lit = n; });
+  (s.bm || []).forEach((a, i) => { if (g.beams[i]) { g.beams[i].end = a[0]; g.beams[i].ch = a[1]; } });
   for (const e of s.fx) g.effects.push(e);
   if (g.effects.length > 60) g.effects = g.effects.filter(e => g.t - e.t < 1.2);
 }

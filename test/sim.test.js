@@ -1320,7 +1320,7 @@ const towerUp = (A, topSurf, dir) => (g, p, t) => {
 const perdeUp = (x, surf, dir) => (g, p, t) => {
   if (p.supported && p.y + p.h <= surf + 1) return null;
   if (p.supported && Math.abs(p.x + p.w / 2 - x) > 6) return goTo(x)(g, p, t);
-  return I({ jump: !p.supported || (t * 5 | 0) % 2 === 0, right: dir > 0 && !p.supported && p.y + p.h < surf });
+  return I({ jump: !p.supported || (t * 5 | 0) % 2 === 0, right: dir > 0 && !p.supported && p.y + p.h < surf, left: dir < 0 && !p.supported && p.y + p.h < surf });
 };
 // Perdede kule: A'nın başına çık, oradan zıpla; surf'ün üstüne geçince sağa süzül
 const towerPerde = (A, surf, belowY) => (g, p, t) => {
@@ -1329,6 +1329,8 @@ const towerPerde = (A, surf, belowY) => (g, p, t) => {
   if (!p.supported && p.vy < 200 && p.y + p.h < belowY) return I({ jump: true, right: p.y + p.h < surf });
   return climbOn(A)(g, p, t);
 };
+// Kutunun üstünden sağa atla
+const hopPast = box => (g, p, t) => (p.supported && !p.ground && p.x > box.x + box.w + 2 ? null : I({ right: true, jump: !p.supported || (t * 4 | 0) % 2 === 0 }));
 const flip = (lv, ch) => (g, p, t) => (g.switches[ch] ? null : Math.abs(p.x + p.w / 2 - (lv.x + T / 2)) > 10 ? goTo(lv.x + T / 2)(g, p, t) : I({ action: tap(t) }));
 {
   // F1. Uzun atlama: A düğmede, B bantla çukuru aşar ve şalteri çevirir; A da aşar; kule ile duvara, şalter ile kapak
@@ -2952,6 +2954,19 @@ console.log('Kuzey öğeleri');
 }
 
 {
+  // Işın: alıcıya varınca kanalı açar; cisim, kapalı kapak keser; yürüyen, başının üstünden geçen ışını kesmez
+  const map = ['##########', '#........#', '#........#', '#........#', '#........#', '#.[.a..q.#', '#........#', '#........#', '#S.....E.#', '##########'];
+  const g = new Game({ name: 't', map }, 1), p = g.players[0];
+  run(g, [idle], 0.1);
+  ok(!g.channelOn(1) && g.beams[0].end === 4 * T, 'kapalı kapak ışını keser');
+  g.switches[1] = true; run(g, [idle], 0.1);
+  ok(g.beams[0].ch === 1 && g.beams[0].end === 7 * T + 20, 'açık kapaktan geçen ışın alıcıya varır');
+  p.x = 5 * T; p.y = 5 * T - 40; p.vy = 0;
+  let cut = false; run(g, [idle], 1, g => { if (g.beams[0].ch === 0) cut = true; return false; });
+  ok(cut && g.beams[0].ch === 1, 'düşen oyuncu ışını keserken kanal kapanır, geçince açılır');
+}
+
+{
   // K1. Işık perdesi: B perdede zıplayıp rafa çıkar, düğmede kapağı tutar; A geçip şalteri çevirir
   const g = new Game(L('isik-perdesi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
   const ctl = phases([
@@ -3065,6 +3080,78 @@ console.log('Kuzey öğeleri');
     [goTo(ex), goTo(ex)],
   ]);
   ok(run(g, ctl, 90, g => g.done), 'K5. Perde sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K6. Işık ışını: A ışında durur, ters kapak açılır; B geçip sandığı geri iter, sandık ışını keser; ikisi geçer
+  const g = new Game(L('isik-isini'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0];
+  const ctl = phases([
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - 2.5 * T) < 8 ? null : goTo(2.5 * T)(g, p, t)), (g, p, t) => (g.gates[0].open && p.supported && !p.ground && p.x > crate.x + crate.w ? null : g.gates[0].open && p.x > 15 * T ? I({ right: true, jump: !p.supported || (t * 4 | 0) % 2 === 0 }) : g.gates[0].open ? I({ right: true }) : idle())],
+    [idle, (g, p, t) => (crate.x < 205 ? null : I({ left: true }))],
+    [idle, (g, p, t) => (p.x > 16 * T ? null : I({ right: true }))],
+    [(g, p, t) => (p.supported && !p.ground && p.x > crate.x + crate.w ? null : I({ right: true, jump: !p.supported || (t * 4 | 0) % 2 === 0 })), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K6. Işık ışını geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // K7. Kutu gölgesi: ikisi ağır kutuyu ışının altına iter; ters köprü yanar, üstünden atlayıp geçerler
+  const g = new Game(L('kutu-golgesi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, box = g.boxes[0];
+  const cut = () => box.x + box.w > 12 * T + 34;
+  const push = (g, p, t) => (cut() ? null : I({ right: true }));
+  const ctl = phases([
+    [push, push],
+    [idle, hopPast(box)],
+    [hopPast(box), (g, p, t) => (p.x > 28 * T ? null : g.bridges[0].lit >= 10 ? I({ right: true }) : idle())],
+    [(g, p, t) => (p.x > 25 * T ? null : I({ right: true })), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K7. Kutu gölgesi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // K8. Buz mercek: A eriyen buza çıkar, kırılınca ışın alıcıya varır; B köprü sönmeden karşıya koşar, şalteri çevirir
+  const g = new Game(L('buz-mercek'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, br = g.bridges[0], lv = g.levers[0];
+  const over = p => p.supported && p.x > 31 * T;
+  const ctl = phases([
+    [idle, (g, p, t) => (p.x > 19 * T - 2 ? null : goTo(19 * T + 16)(g, p, t))],
+    [(g, p, t) => (g.thaws[0].crackT >= 0 ? null : p.supported && Math.abs(p.x + p.w / 2 - 5.5 * T) > 6 ? goTo(5.5 * T)(g, p, t) : I({ jump: true, right: p.y + p.h < 9 * T })), idle],
+    [(g, p, t) => (over(B) ? null : p.supported && p.y + p.h <= 9 * T + 1 ? idle() : goTo(9 * T)(g, p, t)), (g, p, t) => (over(p) ? null : br.lit >= 2 || p.x > 20 * T ? I({ right: true }) : idle())],
+    [idle, flip(lv, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K8. Buz mercek geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // K9. Işık zinciri: A düğmede kapağı tutar; B perdeden rafa çıkıp sandığı ışının yolundan iter. Işın ikinci ışının kapağını açar,
+  // köprü yanar; B geçip şalterle kalıcı yapar, A gelir
+  const g = new Game(L('isik-zinciri'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, crate = g.boxes[0], lv = g.levers[0], br = g.bridges[0], b3 = g.buttons[0];
+  const ctl = phases([
+    [(g, p, t) => (b3.pressed ? null : goTo(b3.x + b3.w / 2)(g, p, t)), perdeUp(26 * T, 6 * T, -1)],
+    [idle, (g, p, t) => (p.x + p.w < crate.x - 2 ? null : I({ left: true, jump: !p.supported || (t * 4 | 0) % 2 === 0 }))],
+    [idle, (g, p, t) => (crate.y > 6 * T ? null : I({ right: true }))],
+    [idle, (g, p, t) => (p.supported && p.x > 28 * T ? null : br.lit >= 10 || p.x < 25 * T || !p.supported ? I({ right: p.x < 27 * T || br.lit >= 10 }) : idle())],
+    [idle, flip(lv, 2)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K9. Işık zinciri geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+{
+  // K10. Işın sınavı: kutu ışının altına; ters köprüden geçilir. A eriyen buzu kırar, B koşar, şalter; A gelir
+  const g = new Game(L('isin-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, box = g.boxes[0], lv = g.levers[0], br = g.bridges.find(b => !b.inverse);
+  const cut = () => box.x + box.w > 9 * T + 34, push = (g, p, t) => (cut() ? null : I({ right: true }));
+  const past = p => p.supported && p.x > 18 * T, over = p => p.supported && p.x > 44 * T;
+  const walkOver = (g, p, t) => (past(p) ? null : I({ right: true }));
+  const ctl = phases([
+    [push, push],
+    [idle, hopPast(box)],
+    [hopPast(box), walkOver],
+    [walkOver, (g, p, t) => (p.x > 35 * T - 8 ? null : goTo(35 * T + 10)(g, p, t))],
+    [(g, p, t) => (g.thaws[0].crackT >= 0 ? null : p.supported && Math.abs(p.x + p.w / 2 - 19.5 * T) > 6 ? goTo(19.5 * T)(g, p, t) : I({ jump: true, right: p.y + p.h < 10 * T })), idle],
+    [(g, p, t) => (over(B) ? null : p.supported && p.y + p.h <= 10 * T + 1 ? idle() : goTo(22 * T)(g, p, t)), (g, p, t) => (over(p) ? null : br.lit >= 2 || p.x > 36 * T ? I({ right: true }) : idle())],
+    [idle, flip(lv, 2)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'K10. Işın sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

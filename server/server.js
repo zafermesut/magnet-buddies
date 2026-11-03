@@ -228,6 +228,7 @@ class Room {
       sp: g.springs.map(s => r3(s.t)),
       th: g.thaws.map(x => [x.open ? 1 : 0, r3(x.crackT)]),
       br: g.bridges.map(B => r3(B.lit)),
+      bm: g.beams.map(B => [r1(B.end), B.ch]),
       fx,
     };
   }

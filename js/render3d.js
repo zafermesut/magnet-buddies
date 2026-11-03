@@ -526,6 +526,22 @@ class Renderer3D {
         this.auroraObjs.push({ m, mat, c });
       }
     }
+    // Işık ışınları: yayıcı lens, ışın çubuğu; alıcı: dönen elmas
+    this.beamObjs = game.beams.map(B => {
+      const lens = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color: '#ff9de2', emissive: '#ff9de2', emissiveIntensity: 0.9 }));
+      lens.position.set(B.c + 0.5 + B.dx * 0.42, -B.r - 0.5 - B.dy * 0.42, 0.2);
+      const ray = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffc4ee', transparent: true, opacity: 0.85, fog: false }));
+      this.levelGroup.add(lens, ray);
+      return { B, ray };
+    });
+    this.recvObjs = [...game.receivers].map(([id, ch]) => {
+      const col = CHANNEL_COLORS[ch];
+      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.2, flatShading: true });
+      const m = new THREE.Mesh(new THREE.OctahedronGeometry(0.3), mat);
+      m.position.set(id % W + 0.5, -Math.floor(id / W) - 0.5, 0);
+      this.levelGroup.add(m);
+      return { m, mat, ch };
+    });
     // Işık köprüleri: kanal renginde parlayan çubuk; sönükken ince iz
     this.bridgeObjs = game.bridges.map(B => {
       const col = CHANNEL_COLORS[B.channel];
@@ -1210,6 +1226,17 @@ class Renderer3D {
     for (const o of this.auroraObjs) {
       o.mat.opacity = 0.42 + 0.14 * Math.sin(t * 1.6 + o.c * 0.9);
       o.m.position.x = o.c + 0.5 + Math.sin(t * 0.8 + o.c * 1.3) * 0.06;
+    }
+    for (const o of this.beamObjs) {
+      const B = o.B, a = B.dy ? (B.r + 1) * T : B.dx > 0 ? (B.c + 1) * T : B.c * T, len = Math.max(0.001, Math.abs(B.end - a) / T);
+      o.ray.visible = len > 0.01;
+      if (B.dy) { o.ray.scale.set(0.09, len, 0.09); o.ray.position.set(B.c + 0.5, -(a + B.end) / 2 / T, 0.1); }
+      else { o.ray.scale.set(len, 0.09, 0.09); o.ray.position.set((a + B.end) / 2 / T, -B.r - 0.5, 0.1); }
+      o.ray.material.opacity = 0.75 + 0.2 * Math.sin(t * 12);
+    }
+    for (const o of this.recvObjs) {
+      o.m.rotation.y = t * 1.8;
+      o.mat.emissiveIntensity = game.beams.some(b => b.ch === o.ch) ? 1.1 : 0.15;
     }
     for (const o of this.bridgeObjs) {
       const n = o.B.lit;

@@ -349,6 +349,10 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tMagP::after { content: '+'; } .tool i.tMagN::after { content: '−'; }
 .tool i.tPoleP { background: rgba(255, 135, 135, .35); border: 1.5px solid #ff8787; }
 .tool i.tPoleN { background: rgba(102, 217, 232, .35); border: 1.5px solid #66d9e8; }
+.tool i.tBeamR, .tool i.tBeamL, .tool i.tBeamD { background: #3a3f72; box-shadow: inset 0 0 0 2px #ff9de2; position: relative; }
+.tool i.tBeamR::after, .tool i.tBeamL::after, .tool i.tBeamD::after { position: absolute; inset: 0; display: grid; place-items: center; color: #ff9de2; font-style: normal; font-weight: 800; font-size: 11px; line-height: 1; }
+.tool i.tBeamR::after { content: '→'; } .tool i.tBeamL::after { content: '←'; } .tool i.tBeamD::after { content: '↓'; }
+.tool i.tRecv { background: var(--ch); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .tool i.tAurora { background: linear-gradient(#b197fc, rgba(99, 230, 190, .25)); }
 .tool i.tBridge { background: linear-gradient(var(--ch), var(--ch)) center / 100% 4px no-repeat; box-shadow: 0 0 6px var(--ch); }
 .tool i.tIBridge { background: repeating-linear-gradient(90deg, var(--ch) 0 4px, transparent 4px 7px) center / 100% 4px no-repeat; }

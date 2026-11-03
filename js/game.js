@@ -44,6 +44,7 @@ class Game {
     for (const B of this.bridges) if (B.inverse) B.lit = B.n;   // ters köprü başta yanar
     this.boxNeed = Math.max(1, Math.min(this.def.boxNeed || 2, playerCount));
     this.solids = [];
+    this.updateBeams();   // editör önizlemesi de ışınları görsün
   }
 
   // ---------- Bölüm okuma ----------
@@ -62,6 +63,8 @@ class Game {
     this.thaws = [];               // eriyen buz hücreleri: değince çatlar, kırılır, sonra yeniden donar
     this.aurora = new Set();       // ışık perdesi hücreleri: r * cols + c (işaretli hücreden ilk duvara kadar iner)
     this.bridges = [];             // ışık köprüleri: kanalı açıkken karo karo uzar (lit: yanan karo sayısı)
+    this.beams = [];               // ışık ışınları: yayıcıdan çıkar, ilk engelde biter; alıcıya varınca kanalını açar
+    this.receivers = new Map();    // ışık alıcısı hücreleri: r * cols + c → kanal
     this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
     this.screws = [];              // vidalar (isteğe bağlı toplanır): { x, y, w, h, got }
     this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
@@ -77,7 +80,9 @@ class Game {
       for (let c = 0; c < cols; c++) {
         const ch = map[r][c];
         const x = c * T, y = r * T;
-        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~');
+        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~' || ch === '[' || ch === ']' || ch === 'v');
+        if (ch === '[' || ch === ']' || ch === 'v') this.beams.push({ c, r, dx: ch === '[' ? 1 : ch === ']' ? -1 : 0, dy: ch === 'v' ? 1 : 0, end: 0, ch: 0 });
+        if ('qrs'.includes(ch)) this.receivers.set(r * cols + c, 'qrs'.indexOf(ch) + 1);
         if (ch === '<' || ch === '>') this.belts.set(r * cols + c, ch === '<' ? -1 : 1);
         if (ch === '~') this.ice.add(r * cols + c);
         if ('fgjFGJ'.includes(ch) && map[r][c - 1] !== ch) {
@@ -218,7 +223,7 @@ class Game {
 
   // Bir kanal açık mı: düğmesine basılıyor ya da şalteri açık
   channelOn(ch) {
-    return this.switches[ch] || this.buttons.some(b => b.channel === ch && (b.pressed || b.left > 0));
+    return this.switches[ch] || this.buttons.some(b => b.channel === ch && (b.pressed || b.left > 0)) || this.beams.some(b => b.ch === ch);
   }
 
   // Ayağının altındaki taşıyıcı bandın yönü (bant yoksa 0)
@@ -464,6 +469,7 @@ class Game {
     }
 
     this.updateThaws(dt);
+    this.updateBeams();
     this.updateBridges(dt);
     this.updateSprings();
     this.updateScrews();
@@ -744,6 +750,35 @@ class Game {
       }
       th.crackT += dt;
       if (th.crackT >= PHYS.thawTime) { th.open = true; th.regrow = PHYS.thawRegrow; this.fx('shatter', cell.x + T / 2, cell.y + T / 2); }
+    }
+  }
+
+  // Işık ışını: yayıcıdan düz gider; duvarda, kapalı kapakta, eriyen buzda ya da ilk cisimde biter.
+  // Alıcıya varırsa alıcının kanalını açar. end: ışının bittiği yer (yatayda x, dikeyde y)
+  updateBeams() {
+    if (!this.beams.length) return;
+    const bodies = this.solids.concat(this.keys.filter(k => !k.used && !k.holder));
+    for (const B of this.beams) {
+      let c = B.c + B.dx, r = B.r + B.dy;
+      B.ch = 0;
+      while (r < this.rows && !this.blocked(c, r)) {
+        const rc = this.receivers.get(r * this.cols + c);
+        if (rc) { B.ch = rc; break; }
+        c += B.dx; r += B.dy;
+      }
+      // Bittiği yer: alıcının ortası ya da engelin yakın kenarı
+      if (B.dy) B.end = B.ch ? r * T + T / 2 : r * T;
+      else B.end = B.ch ? c * T + T / 2 : B.dx > 0 ? c * T : (c + 1) * T;
+      const line = B.dy ? B.c * T + T / 2 : B.r * T + T / 2;
+      const from = B.dy ? (B.r + 1) * T : B.dx > 0 ? (B.c + 1) * T : B.c * T;
+      for (const o of bodies) {
+        if (B.dy) {
+          if (o.x < line && o.x + o.w > line && o.y + o.h > from && o.y < B.end) { B.end = Math.max(from, o.y); B.ch = 0; }
+        } else if (o.y < line && o.y + o.h > line) {
+          if (B.dx > 0 && o.x + o.w > from && o.x < B.end) { B.end = Math.max(from, o.x); B.ch = 0; }
+          if (B.dx < 0 && o.x < from && o.x + o.w > B.end) { B.end = Math.min(from, o.x + o.w); B.ch = 0; }
+        }
+      }
     }
   }
 

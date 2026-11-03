@@ -85,6 +85,7 @@ class Renderer {
     this.drawDoors(ctx, game);
     this.drawGates(ctx, game, t);
     this.drawBridges(ctx, game, t);
+    this.drawBeams(ctx, game, t);
     this.drawButtons(ctx, game);
     this.drawScrap(ctx, game, t);
     this.drawThaws(ctx, game);
@@ -129,6 +130,27 @@ class Renderer {
       const a = 0.16 + 0.07 * Math.sin(t * 1.6 + c * 0.9 + r * 0.25);
       ctx.fillStyle = `rgba(${150 - r * 4}, ${150 + r * 6}, 225, ${a})`;
       ctx.fillRect(x, y, T, T);
+    }
+  }
+
+  // Işık ışını: yayıcı blok, ışın çizgisi ve alıcı elması (ışın değince kanal renginde parlar)
+  drawBeams(ctx, g, t) {
+    for (const [id, ch] of g.receivers) {
+      const x = (id % g.cols) * T + T / 2, y = Math.floor(id / g.cols) * T + T / 2, on = g.beams.some(b => b.ch === ch);
+      ctx.fillStyle = CHANNEL_COLORS[ch];
+      ctx.globalAlpha = on ? 1 : 0.45;
+      ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(x + 10, y); ctx.lineTo(x, y + 12); ctx.lineTo(x - 10, y); ctx.closePath(); ctx.fill();
+      ctx.globalAlpha = 1;
+    }
+    for (const B of g.beams) {
+      const x0 = B.c * T + T / 2, y0 = B.r * T + T / 2;
+      ctx.fillStyle = '#ff9de2';
+      ctx.beginPath(); ctx.arc(x0, y0, 9, 0, Math.PI * 2); ctx.fill();
+      const x1 = B.dy ? x0 : B.end, y1 = B.dy ? B.end : y0;
+      ctx.strokeStyle = 'rgba(255,157,226,' + (0.45 + 0.1 * Math.sin(t * 12)) + ')'; ctx.lineWidth = 7;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
     }
   }
 
