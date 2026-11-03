@@ -49,6 +49,12 @@ const PHYS = {
   snowSmall: 38,       // küçük kar topu (tek kişi iter)
   snowBig: 80,         // büyük kar topu (iki kişi iter): iki karo, 2×2 hendeği tam doldurur
 
+  // Kuzey Işıkları öğeleri
+  auroraGravity: 0.4,  // ışık perdesinde yerçekimi bu kata iner: zıplama ~6 karo, uzun süzülme
+  auroraFall: 380,     // perdede en fazla bu hızla düşülür
+  bridgeGrow: 10,      // ışık köprüsü saniyede bu kadar karo uzar
+  bridgeFade: 20,      // kanal kapanınca saniyede bu kadar karo söner
+
   // Mıknatıs: eylem tuşunu basılı tutan oyuncu çevresindekileri iter (aynı kutup) ya da çeker (zıt kutup).
   // Kendisi etkilenmez. Anahtar metaldir: kutup ne olursa olsun çekilir.
   magnetRange: 280,

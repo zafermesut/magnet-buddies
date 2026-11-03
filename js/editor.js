@@ -33,6 +33,9 @@ const EDITOR_TOOLS = [
   { id: 'timer', chs: 'tuw', label: 'Zamanlı düğme', cls: 'tTimer', tip: 'Bırakıldıktan sonra aynı renkteki kapakları ' + PHYS.timerHold + ' saniye daha açık tutar.' },
   { id: 'ice', ch: '~', label: 'Kaygan buz', cls: 'tIce', tip: 'Zemindir. Üstünde hızlanmak ve durmak zor, kayarsın. Sandık ve kar topu buzda itilince bir şeye çarpana kadar kayar.' },
   { id: 'thaw', ch: 'o', label: 'Eriyen buz', cls: 'tThaw', tip: 'Üstüne bir şey basınca çatlar, ' + PHYS.thawTime + ' saniye sonra kırılır; ' + PHYS.thawRegrow + ' saniye sonra yeniden donar.' },
+  { id: 'aurora', ch: '%', label: 'Işık perdesi', cls: 'tAurora', tip: 'Koyduğun yerden ilk duvara kadar iner. İçinde yerçekimi azalır: ~6 karo zıplanır, uzun süzülünür, yavaş düşülür.' },
+  { id: 'bridge', chs: 'fgj', label: 'Işık köprüsü', cls: 'tBridge', tip: 'Yan yana çiz: tek köprü olur. Aynı renk açıkken duvara dayalı ucundan uzar, kapanınca söner. Alttan geçilir, üstüne basılır.' },
+  { id: 'ibridge', chs: 'FGJ', label: 'Ters köprü', cls: 'tIBridge', tip: 'Aynı renk kapalıyken yanar, açılınca söner.' },
   { id: 'snow', ch: 'O', label: 'Kar topu', cls: 'tSnow', tip: 'İtilince yuvarlanır; karlı zeminde (buzda ve bantta değil) 3 karo yuvarlanınca büyür. Büyük kar topunu iki kişi iter. Mıknatıs çekmez.' },
 ];
 

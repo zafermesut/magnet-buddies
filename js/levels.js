@@ -1838,6 +1838,104 @@ const LEVELS = [
       '#############.....#################...##########',
     ],
   },
+  {
+    id: 'isik-perdesi',
+    name: 'Işık perdesi',
+    hint: 'Işık perdesinin içinde yerçekimi azalır, çok yükseğe zıplarsınız. Biri raftaki düğmede kapağı tutsun, öbürü geçip şalteri çevirsin.',
+    map: [
+      '##############################',
+      '#.....%%%...........a........#',
+      '#...................a........#',
+      '#...................a........#',
+      '#......V............a........#',
+      '#...........V..1....a........#',
+      '#........########...a........#',
+      '#...................a........#',
+      '#...................a........#',
+      '#...................a........#',
+      '#.S.S...............a..4.V.E.#',
+      '##############################',
+    ],
+  },
+  {
+    id: 'isik-koprusu',
+    name: 'Işık köprüsü',
+    hint: 'Işık köprüsü düğmeye basılıyken uzar, bırakınca söner. Alttan geçilir: perdede zıplayıp üstüne çıkabilirsiniz.',
+    map: [
+      '########################################',
+      '#......................%%%.............#',
+      '#......................................#',
+      '#......................................#',
+      '#......................................#',
+      '#.................................5..E.#',
+      '#.......................gggggggg########',
+      '#..................................V####',
+      '#.............V.........V..........#####',
+      '#..................................#####',
+      '#1.S.S..............1.2............#####',
+      '#########ffffffffff#####################',
+      '#########..........#####################',
+    ],
+  },
+  {
+    id: 'zit-kopru',
+    name: 'Zıt köprüler',
+    hint: 'Düğmeye basılınca sönük köprüler yanar, yanan köprü söner. Arkadaşın sütunda beklerken düğmeye basıp ya da inip sıradaki köprüyü yak.',
+    map: [
+      '##################################',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#................................#',
+      '#............V.....V.............#',
+      '#................................#',
+      '#1.S.S....................1..V.E.#',
+      '########fffff#FFFFF#fffff#########',
+      '########.....#.....#.....#########',
+    ],
+  },
+  {
+    id: 'perde-kulesi',
+    name: 'Perde kulesi',
+    hint: 'Raf perdeden tek zıplamayla yetişilmeyecek kadar yüksek. Kule kurun: üstteki rafa çıkıp şalteri çevirsin, ışık köprüsü basamak olur.',
+    map: [
+      '##############################',
+      '#......%%%...................#',
+      '#.......V....................#',
+      '#...........4.......V......E.#',
+      '#.........####################',
+      '#.........####################',
+      '#.........####################',
+      '#.....ffff####################',
+      '#.......V.####################',
+      '#.........####################',
+      '#.S.S.....####################',
+      '##############################',
+    ],
+  },
+  {
+    id: 'perde-sinavi',
+    name: 'Perde sınavı',
+    hint: 'Sınav. Perdede süzülerek çukuru aşın, kapağı biriniz tutsun. Zıt köprülerde sırayı arkadaşın değiştirsin. Son raf için yine kule.',
+    map: [
+      '################################################',
+      '#.......%%%%%%%%%%%...................%%%%.....#',
+      '#............a.................................#',
+      '#............a..........................V......#',
+      '#............a..............................6.E#',
+      '#............a.V..........................######',
+      '#............a............................######',
+      '#............a............................######',
+      '#............a........................jjjj######',
+      '#............a...............V............######',
+      '#.........................................######',
+      '#1.S...............1..2.............2.....######',
+      '#########.........######GGGGG#ggggg#############',
+      '#########.........######.....#.....#############',
+    ],
+  },
 ];
 
 const levelIndexById = id => LEVELS.findIndex(l => l.id === id);
@@ -1884,11 +1982,16 @@ const AREAS = [
       { name: 'Pusula buzulu', ids: ['donmus-kopru', 'buzlu-pist', 'firtina-kulesi', 'firtina-kosusu', 'pusula-ignesi-3'] },
     ],
   },
+  {
+    id: 'kuzey', name: 'Kuzey Işıkları', difficulty: 'Uzman', color: '#b197fc',
+    story: 'Son yolculuk. Gökyüzü yere iniyor: ışık perdelerinde yerçekimi azalır, köprüler ışıktan. Pusula burada onarılacak.',
+    parts: [
+      { name: 'Işık perdesi', ids: ['isik-perdesi', 'isik-koprusu', 'zit-kopru', 'perde-kulesi', 'perde-sinavi'] },
+    ],
+  },
 ];
 // Henüz yapılmamış alanlar: Alanlar ekranında "yakında" olarak görünür
-const SOON_AREAS = [
-  { name: 'Kuzey Işıkları', difficulty: 'Uzman', color: '#b197fc' },
-];
+const SOON_AREAS = [];
 
 // Kısımlar düz liste olarak da durur (her biri alanını bilir)
 const PARTS = AREAS.flatMap(a => a.parts.map(p => Object.assign({ area: a }, p)));
@@ -1914,7 +2017,7 @@ function levelUnlocked(i, done) {
 
 // ---------- Kendi bölümün: doğrulama ve linke sığdırma ----------
 
-const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV<>789tuw~oO';
+const LEVEL_CHARS = '#.SEKD123abcH456-xyz^ABC=:MPNpnCV<>789tuw~oO%fgjFGJ';
 const LEVEL_LIMITS = { minCols: 10, maxCols: 48, minRows: 6, maxRows: 20, name: 24 };
 
 // Bölüm oynanabilir mi? Hata listesi döner (boşsa geçerli). Sunucu da aynı kontrolü yapar.

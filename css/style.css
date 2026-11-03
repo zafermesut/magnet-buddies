@@ -349,6 +349,9 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tMagP::after { content: '+'; } .tool i.tMagN::after { content: '−'; }
 .tool i.tPoleP { background: rgba(255, 135, 135, .35); border: 1.5px solid #ff8787; }
 .tool i.tPoleN { background: rgba(102, 217, 232, .35); border: 1.5px solid #66d9e8; }
+.tool i.tAurora { background: linear-gradient(#b197fc, rgba(99, 230, 190, .25)); }
+.tool i.tBridge { background: linear-gradient(var(--ch), var(--ch)) center / 100% 4px no-repeat; box-shadow: 0 0 6px var(--ch); }
+.tool i.tIBridge { background: repeating-linear-gradient(90deg, var(--ch) 0 4px, transparent 4px 7px) center / 100% 4px no-repeat; }
 .tool i.tIGate { background: repeating-linear-gradient(0deg, var(--ch) 0 3px, transparent 3px 6px); }
 .tool i.tMover { background: linear-gradient(#9a9ee0, #9a9ee0) center / 100% 5px no-repeat, linear-gradient(#3a3c6e, #3a3c6e) center / 100% 1px no-repeat; }
 .tool i.tStop { background: linear-gradient(#ffa94d, #ffa94d) center top / 4px 60% no-repeat; }

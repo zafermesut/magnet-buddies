@@ -118,7 +118,7 @@ console.log('Vidalar');
     };
     g.screws.forEach(sc => {
       const r = Math.floor(sc.y / T), c = Math.floor(sc.x / T);
-      if (!near(r, c, reach) && !helper(r, c)) bad.push(l.id + ' (' + r + ',' + c + ')');
+      if (!near(r, c, g.aurora.has(r * g.cols + c) ? 7 : reach) && !helper(r, c)) bad.push(l.id + ' (' + r + ',' + c + ')');
     });
   });
   ok(!bad.length, 'her vida ulaşılabilir görünüyor' + (bad.length ? ': ' + bad.join(', ') : ''));
@@ -379,7 +379,7 @@ function phases(list) {
     while (i < list.length) {
       const r = list[i][k](g, p, t);
       if (r) return r;
-      if (list[i].every((f, j) => f(g, g.players[j], t) === null)) i++;
+      if (list[i].every((f, j) => f === idle || f(g, g.players[j], t) === null)) i++;   // idle olan aşamayı bekletmez
       else return I();
     }
     return I();
@@ -1314,6 +1314,19 @@ const towerUp = (A, topSurf, dir) => (g, p, t) => {
   if (p.supported && p.y + p.h <= topSurf + 1) return null;
   if (p.ground === A) return I({ jump: (t * 5 | 0) % 2 === 0 });   // tuş kenar ister: aralıklı bas
   if (!p.supported && p.vy < 0 && p.y + p.h < topSurf + 6) return I({ jump: true, right: dir > 0, left: dir < 0 });
+  return climbOn(A)(g, p, t);
+};
+// Perdede tam zıplayıp surf yüzeyine çık: x'te zıplar, surf'ün üstüne geçince dir yönüne süzülür
+const perdeUp = (x, surf, dir) => (g, p, t) => {
+  if (p.supported && p.y + p.h <= surf + 1) return null;
+  if (p.supported && Math.abs(p.x + p.w / 2 - x) > 6) return goTo(x)(g, p, t);
+  return I({ jump: !p.supported || (t * 5 | 0) % 2 === 0, right: dir > 0 && !p.supported && p.y + p.h < surf });
+};
+// Perdede kule: A'nın başına çık, oradan zıpla; surf'ün üstüne geçince sağa süzül
+const towerPerde = (A, surf, belowY) => (g, p, t) => {
+  if (p.supported && p.y + p.h <= surf + 1) return null;
+  if (p.ground === A) return I({ jump: (t * 5 | 0) % 2 === 0 });
+  if (!p.supported && p.vy < 200 && p.y + p.h < belowY) return I({ jump: true, right: p.y + p.h < surf });
   return climbOn(A)(g, p, t);
 };
 const flip = (lv, ch) => (g, p, t) => (g.switches[ch] ? null : Math.abs(p.x + p.w / 2 - (lv.x + T / 2)) > 10 ? goTo(lv.x + T / 2)(g, p, t) : I({ action: tap(t) }));
@@ -2899,6 +2912,159 @@ const passPresses = (presses, toX, speed = PHYS.runSpeed, hover = false) => (g, 
      (g, p, t) => (door.open ? goTo(ex)(g, p, t) : I({ right: true }))],
   ]);
   ok(run(g, ctl, 90, g => g.done), 'B30. Pusula iğnesi III geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+console.log('Kuzey öğeleri');
+{
+  const map = ['##########', '#.%%%....#', '#........#', '#....FFFF#', '#........#', '#........#', '#....ffff#', '#........#', '#........#', '#S.....E.#', '##########'];
+  // Perde: zıplama 6 karoyu aşar, 7'yi aşmaz; perde dışında normal
+  const height = x => {
+    const g = new Game({ name: 't', map }, 1), p = g.players[0];
+    p.x = x; let top = p.y;
+    for (let i = 0; i < 180; i++) { g.step(DT, [I({ jump: i > 3 })]); top = Math.min(top, p.y); }
+    return g.spawn.y + T - p.h - top;
+  };
+  const inside = height(3 * T), outside = height(6 * T);
+  ok(inside > 6 * T && inside < 7 * T, 'perdede zıplama 6 karoyu aşar, 7 karoyu aşmaz (' + (inside / T).toFixed(1) + ')');
+  ok(outside < 3 * T, 'perde dışında zıplama normal (' + (outside / T).toFixed(1) + ')');
+  // Köprü: kanalı açıkken uzar, üstüne basılır, kapanınca söner; ters köprü tersini yapar
+  const g = new Game({ name: 't', map }, 1), p = g.players[0], B = g.bridges.find(b => !b.inverse), R = g.bridges.find(b => b.inverse);
+  ok(B.lit === 0 && R.lit === R.n, 'köprü başta sönük, ters köprü başta yanık');
+  g.switches[1] = true;
+  run(g, [idle], 0.2);
+  ok(B.lit > 0 && B.lit < B.n, 'köprü karo karo uzar (' + B.lit.toFixed(1) + ')');
+  run(g, [idle], 1);
+  ok(B.lit === B.n && R.lit === 0, 'kanal açıkken köprü yanar, ters köprü söner');
+  ok(B.fromRight && B.c + B.n === 9, 'duvara dayalı köprü duvardan uzar');
+  p.x = 6 * T; p.y = 4 * T; p.vy = 0;
+  run(g, [idle], 0.8);
+  ok(p.supported && p.y + p.h === 6 * T, 'köprünün üstüne basılır');
+  g.switches[1] = false;
+  run(g, [idle], 0.4);
+  ok(B.lit === 0 && p.y + p.h > 6 * T, 'kanal kapanınca köprü söner, üstündeki düşer');
+  // Alttan geçilir
+  const h = new Game({ name: 't', map }, 1), q = h.players[0], lit = h.bridges.find(b => !b.inverse);
+  h.switches[1] = true; run(h, [idle], 1);
+  q.x = 6 * T; q.y = 6 * T + 2; q.vy = -600;
+  run(h, [idle], 0.25);
+  ok(q.y + q.h < 6 * T, 'köprüden alttan geçilir');
+  ok(lit.lit === lit.n && !validateLevel({ name: 't', map }).length, 'perde ve köprü karoları doğrulamadan geçer');
+}
+
+{
+  // K1. Işık perdesi: B perdede zıplayıp rafa çıkar, düğmede kapağı tutar; A geçip şalteri çevirir
+  const g = new Game(L('isik-perdesi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
+  const ctl = phases([
+    [idle, perdeUp(7 * T + 20, 6 * T, 1)],
+    [(g, p, t) => (p.x > 21 * T ? null : g.gates[0].open ? goTo(22 * T)(g, p, t) : idle()), (g, p, t) => (A.x > 21 * T ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [flip(lv, 1), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K1. Işık perdesi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K2. Işık köprüsü: A düğmede köprüyü yakar, B geçip karşı düğmeyle A'yı geçirir. A ikinci düğmede yüksek köprüyü yakar,
+  // B perdede zıplayıp alttan köprüye çıkar, şalteri çevirir; A da aynı yoldan
+  const g = new Game(L('isik-koprusu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, lv = g.levers[0];
+  const bL = g.buttons.find(b => b.channel === 1 && b.x < 5 * T), bR = g.buttons.find(b => b.channel === 1 && b.x > 5 * T), b2 = g.buttons.find(b => b.channel === 2);
+  const low = g.bridges.find(b => b.channel === 1), cx = b => b.x + b.w / 2, over = p => p.supported && p.x > 19 * T;
+  const ctl = phases([
+    [(g, p, t) => (over(B) ? null : goTo(cx(bL))(g, p, t)), (g, p, t) => (over(p) ? null : low.lit >= 10 ? I({ right: true }) : idle())],
+    [(g, p, t) => (over(p) ? null : low.lit >= 10 ? I({ right: true }) : idle()), (g, p, t) => (over(A) ? null : goTo(cx(bR))(g, p, t))],
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - cx(b2)) < 8 && p.supported ? null : goTo(cx(b2))(g, p, t)), (g, p, t) => (p.x > 24 * T ? null : goTo(24 * T + 20)(g, p, t))],
+    [(g, p, t) => (surfOn(B, { surf: 6 * T, x0: 24 * T, x1: 40 * T }) ? null : idle()), perdeUp(24 * T + 20, 6 * T, 0)],
+    [idle, flip(lv, 2)],
+    [perdeUp(24 * T + 20, 6 * T, 0), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K2. Işık köprüsü geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K3. Zıt köprüler: düğmeye basan köprüleri değiştirir; öbürü sütunda bekleyip sıradakine geçer. Karşıda roller değişir
+  const g = new Game(L('zit-kopru'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const bL = g.buttons[0], bR = g.buttons[1], cx = b => b.x + b.w / 2;
+  const at = (p, c) => p.supported && !p.ground && p.x + p.w / 2 > c * T && p.x + p.w / 2 < (c + 1) * T;
+  // Sütunlar 13, 19; karşı zemin 26: walker c'ye yürür, köprü yanınca
+  const lit = (g, i) => g.bridges[i].lit >= g.bridges[i].n;
+  const walk = (c, i) => (g, p, t) => (at(p, c) ? null : lit(g, i) ? goTo(c * T + 20)(g, p, t) : idle());
+  const off = (b, x) => (g, p, t) => (Math.abs(p.x + p.w / 2 - x) < 8 ? null : goTo(x)(g, p, t));
+  const on = b => (g, p, t) => (b.pressed ? null : goTo(cx(b))(g, p, t));
+  const ctl = phases([
+    [on(bL), idle],
+    [idle, walk(13, 0)],
+    [off(bL, 4 * T), idle],
+    [idle, walk(19, 1)],
+    [on(bL), idle],
+    [idle, walk(26, 2)],
+    [idle, on(bR)],
+    [walk(13, 0), idle],
+    [idle, off(bR, 28 * T)],
+    [walk(19, 1), idle],
+    [idle, on(bR)],
+    [walk(25, 2), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K3. Zıt köprüler geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K4. Perde kulesi: A, B'nin başından perdede rafa çıkar (tek zıplama 6 karoda kalır), şalteri çevirir; B köprüden çıkar
+  const g = new Game(L('perde-kulesi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, lv = g.levers[0];
+  const spot = 9 * T + 16, surf = 4 * T;
+  const ctl = phases([
+    [(g, p, t) => (Math.abs(B.x + B.w / 2 - spot) < 8 ? null : idle()), (g, p, t) => (Math.abs(p.x + p.w / 2 - spot) < 8 ? null : goTo(spot)(g, p, t))],
+    [towerPerde(B, surf, 8 * T), idle],
+    [flip(lv, 1), idle],
+    [idle, perdeUp(8 * T + 20, 7 * T, 0)],
+    [idle, perdeUp(9 * T + 16, surf, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K4. Perde kulesi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K5. Perde sınavı: A düğmede kapağı açar, B perdede süzülüp çukuru aşar, karşı düğmeyle A'yı geçirir. Zıt köprülerde rol değişimi.
+  // Son rafta kule: A şalteri çevirir, B köprüden çıkar
+  const g = new Game(L('perde-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, lv = g.levers[0];
+  const bL = g.buttons[0], bR = g.buttons[1], c2 = g.buttons[2], d2 = g.buttons[3], cx = b => b.x + b.w / 2;
+  const across = p => p.supported && p.x > 18 * T;
+  const floatOver = (g, p, t) => (across(p) ? null : g.gates[0].open && p.x > 6 * T ? I({ right: true, jump: !p.supported || p.x + p.w > 9 * T - 3 }) : g.gates[0].open ? I({ right: true }) : idle());
+  const on = b => (g, p, t) => (b.pressed ? null : goTo(cx(b))(g, p, t));
+  const off = x => (g, p, t) => (Math.abs(p.x + p.w / 2 - x) < 8 ? null : goTo(x)(g, p, t));
+  const at = (p, c) => p.supported && !p.ground && p.x + p.w / 2 > c * T && p.x + p.w / 2 < (c + 1) * T;
+  const lit = (g, i) => g.bridges[i].lit >= g.bridges[i].n;
+  const G = g.bridges.find(b => b.inverse), f = g.bridges.find(b => !b.inverse && b.channel === 2);
+  const i0 = g.bridges.indexOf(G), i1 = g.bridges.indexOf(f);
+  const walk = (c, i) => (g, p, t) => (at(p, c) ? null : lit(g, i) ? goTo(c * T + 20)(g, p, t) : idle());
+  const spot = 41 * T + 16, surf = 5 * T;
+  const ctl = phases([
+    [on(bL), idle],
+    [idle, floatOver],
+    [idle, on(bR)],
+    [floatOver, idle],
+    [idle, (g, p, t) => (p.x > 23 * T ? null : goTo(23 * T + 20)(g, p, t))],
+    [on(c2), (g, p, t) => (c2.pressed ? null : idle())],
+    [off(21 * T), idle],
+    [idle, walk(29, i0)],
+    [on(c2), idle],
+    [idle, walk(35, i1)],
+    [off(23 * T + 22), idle],
+    [idle, on(d2)],
+    [off(23 * T + 22), idle],
+    [idle, off(38 * T)],
+    [walk(29, i0), idle],
+    [idle, on(d2)],
+    [walk(35, i1), idle],
+    [(g, p, t) => (Math.abs(B.x + B.w / 2 - spot) < 8 ? null : goTo(37 * T)(g, p, t)), (g, p, t) => (Math.abs(p.x + p.w / 2 - spot) < 8 ? null : goTo(spot)(g, p, t))],
+    [towerPerde(B, surf, 9 * T), idle],
+    [flip(lv, 3), idle],
+    [idle, perdeUp(40 * T + 20, 8 * T, 0)],
+    [idle, perdeUp(41 * T + 16, surf, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'K5. Perde sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');

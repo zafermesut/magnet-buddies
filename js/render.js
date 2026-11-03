@@ -80,9 +80,11 @@ class Renderer {
     ctx.scale(z, z);
 
     const t = game.t;
+    this.drawAurora(ctx, game, t);
     this.drawTiles(ctx, game);
     this.drawDoors(ctx, game);
     this.drawGates(ctx, game, t);
+    this.drawBridges(ctx, game, t);
     this.drawButtons(ctx, game);
     this.drawScrap(ctx, game, t);
     this.drawThaws(ctx, game);
@@ -117,6 +119,32 @@ class Renderer {
           ctx.beginPath(); ctx.moveTo(x + 8, y + 7); ctx.lineTo(x + 18, y + 3); ctx.moveTo(x + 24, y + 8); ctx.lineTo(x + 30, y + 5); ctx.stroke();
         }
       }
+    }
+  }
+
+  // Işık perdesi: tavandan inen, dalgalanan mor-yeşil şeritler
+  drawAurora(ctx, g, t) {
+    for (const id of g.aurora) {
+      const r = Math.floor(id / g.cols), c = id % g.cols, x = c * T, y = r * T;
+      const a = 0.16 + 0.07 * Math.sin(t * 1.6 + c * 0.9 + r * 0.25);
+      ctx.fillStyle = `rgba(${150 - r * 4}, ${150 + r * 6}, 225, ${a})`;
+      ctx.fillRect(x, y, T, T);
+    }
+  }
+
+  // Işık köprüsü: kanal renginde parlayan ince çubuk; sönükken kesik çizgili iz
+  drawBridges(ctx, g, t) {
+    for (const B of g.bridges) {
+      const col = CHANNEL_COLORS[B.channel], y = B.r * T;
+      ctx.strokeStyle = col; ctx.globalAlpha = 0.3; ctx.lineWidth = 2; ctx.setLineDash(B.inverse ? [2, 6] : [6, 6]);
+      ctx.beginPath(); ctx.moveTo(B.c * T, y + 3); ctx.lineTo((B.c + B.n) * T, y + 3); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalAlpha = 0.8 + 0.2 * Math.sin(t * 5);
+      const w = B.lit * T, x = B.fromRight ? (B.c + B.n) * T - w : B.c * T;
+      ctx.fillStyle = col;
+      ctx.fillRect(x, y, w, 6);
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(x, y + 1, w, 2);
+      ctx.globalAlpha = 1;
     }
   }
 

@@ -41,6 +41,7 @@ class Game {
         pol: pols[i % pols.length], magnetOn: false, actT: 0, magT: 0, gripT: 0,
       }));
     }
+    for (const B of this.bridges) if (B.inverse) B.lit = B.n;   // ters köprü başta yanar
     this.boxNeed = Math.max(1, Math.min(this.def.boxNeed || 2, playerCount));
     this.solids = [];
   }
@@ -59,6 +60,8 @@ class Game {
     this.belts = new Map();        // taşıyıcı bant hücreleri: r * cols + c → yön (-1 / 1)
     this.ice = new Set();          // kaygan buz hücreleri: r * cols + c
     this.thaws = [];               // eriyen buz hücreleri: değince çatlar, kırılır, sonra yeniden donar
+    this.aurora = new Set();       // ışık perdesi hücreleri: r * cols + c (işaretli hücreden ilk duvara kadar iner)
+    this.bridges = [];             // ışık köprüleri: kanalı açıkken karo karo uzar (lit: yanan karo sayısı)
     this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
     this.screws = [];              // vidalar (isteğe bağlı toplanır): { x, y, w, h, got }
     this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
@@ -77,6 +80,14 @@ class Game {
         this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~');
         if (ch === '<' || ch === '>') this.belts.set(r * cols + c, ch === '<' ? -1 : 1);
         if (ch === '~') this.ice.add(r * cols + c);
+        if ('fgjFGJ'.includes(ch) && map[r][c - 1] !== ch) {
+          // Işık köprüsü: yan yana aynı harfler tek köprü; büyük harfli terstir (kanal kapalıyken yanar). Duvara dayalı uçtan uzar
+          let n = 1;
+          while (map[r][c + n] === ch) n++;
+          const solid = k => k >= 0 && k < cols && '#~<>PN'.includes(map[r][k]);
+          const inverse = ch === ch.toUpperCase();
+          this.bridges.push({ channel: 'fgj'.indexOf(ch.toLowerCase()) + 1, inverse, r, c, n, lit: 0, fromRight: solid(c + n) && !solid(c - 1) });
+        }
         this.blockers[r].push(null);
         if (ch === 'o') {
           // Eriyen buz: kapı gibi engel hücresi; kırılınca açılır (open), yeniden donunca kapanır
@@ -143,6 +154,14 @@ class Game {
           const topY = Math.min(y, (ceil + 2) * T);
           this.lifts.push(makeBody('lift', x, y, w * T, T, { channel: 'xyz'.indexOf(ch) + 1, topY, supported: true, onGround: true }));
         }
+      }
+    }
+
+    // Işık perdesi: işaretli hücreden aşağıya, ilk duvara (yoksa haritanın dibine) kadar iner
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        if (map[r][c] !== '%') continue;
+        for (let q = r; q < rows && !this.grid[q][c]; q++) this.aurora.add(q * cols + c);
       }
     }
 
@@ -221,6 +240,20 @@ class Game {
     return this.ice.has(r * this.cols + Math.floor(b.x / T)) || this.ice.has(r * this.cols + Math.floor((b.x + b.w - 0.001) / T));
   }
 
+  // Ortası ışık perdesinde mi
+  inAurora(b) {
+    return this.aurora.size > 0 && this.aurora.has(Math.floor((b.y + b.h / 2) / T) * this.cols + Math.floor((b.x + b.w / 2) / T));
+  }
+
+  // Bu hücrede yanan bir ışık köprüsü var mı
+  bridgeLit(c, r) {
+    for (const B of this.bridges) {
+      if (B.r !== r || c < B.c || c >= B.c + B.n) continue;
+      if ((B.fromRight ? B.c + B.n - c : c - B.c + 1) <= B.lit + 0.001) return true;
+    }
+    return false;
+  }
+
   fx(type, x, y, extra) {
     this.effects.push(Object.assign({ type, x, y, t: this.t }, extra));
   }
@@ -256,6 +289,8 @@ class Game {
       if (this.blocks(b, c, r)) { b.y = dy > 0 ? r * T - b.h : (r + 1) * T; hit = 'tile'; break; }
       // Tek yönlü platform: yalnızca yukarıdan gelen üstüne basar, alttan geçilir
       if (dy > 0 && !hit && this.oneway[r] && this.oneway[r][c] && b.y + b.h - dy <= r * T + 0.01) { b.y = r * T - b.h; hit = 'tile'; break; }
+      // Işık köprüsü de yukarıdan basılır, alttan geçilir
+      if (dy > 0 && !hit && this.bridges.length && b.y + b.h - dy <= r * T + 0.01 && this.bridgeLit(c, r)) { b.y = r * T - b.h; hit = 'tile'; break; }
     }
     for (const o of this.solids) {
       if (o === b || !overlap(b, o)) continue;
@@ -379,7 +414,8 @@ class Game {
     const movers = this.solids.filter(o => o.kind !== 'lift' && o.kind !== 'mover' && o.kind !== 'press').sort((a, b) => (b.y + b.h) - (a.y + a.h));
     for (const b of movers) { b.dx = 0; b.blockedBy = null; b.boxHit = null; }
     for (const b of movers) {
-      b.vy = Math.min(b.vy + ph.gravity * dt, ph.maxFall);
+      const low = this.inAurora(b);
+      b.vy = Math.min(b.vy + ph.gravity * (low ? ph.auroraGravity : 1) * dt, low ? ph.auroraFall : ph.maxFall);
       const g = b.ground;
       // Üstündekini taşır; ama oyuncunun kafasına düşen sandık taşınmaz, oyuncu yürüyünce kayıp düşer
       // Taşıyıcı bant: yerdeyken bandın hızını alır, zıplayınca bu hız havada da sürer (bantla uzun atlama)
@@ -428,6 +464,7 @@ class Game {
     }
 
     this.updateThaws(dt);
+    this.updateBridges(dt);
     this.updateSprings();
     this.updateScrews();
     this.updateKeys(dt);
@@ -710,6 +747,14 @@ class Game {
     }
   }
 
+  // Işık köprüsü: kanalı açıkken dayandığı uçtan uzar, kapanınca hızla söner (üstündeki düşer)
+  updateBridges(dt) {
+    for (const B of this.bridges) {
+      const on = this.channelOn(B.channel) !== B.inverse;
+      B.lit = on ? Math.min(B.n, B.lit + PHYS.bridgeGrow * dt) : Math.max(0, B.lit - PHYS.bridgeFade * dt);
+    }
+  }
+
   // Yay: üstüne düşeni yukarı fırlatır. Zıplama tuşu basılıysa daha yükseğe.
   updateSprings() {
     for (const s of this.springs) {
@@ -759,7 +804,8 @@ class Game {
         k.vx = k.vy = 0;
         continue;
       }
-      k.vy = Math.min(k.vy + ph.gravity * dt, ph.maxFall);
+      const low = this.inAurora(k);
+      k.vy = Math.min(k.vy + ph.gravity * (low ? ph.auroraGravity : 1) * dt, low ? ph.auroraFall : ph.maxFall);
       k.magT = Math.max(0, (k.magT || 0) - dt);
       k.vx = approach(k.vx, 0, (k.onGround && !k.magT ? 1500 : 150) * dt);
       const carry = (k.ground && (k.ground.kind === 'mover' || this.solids.includes(k.ground)) ? k.ground.dx || 0 : 0) +

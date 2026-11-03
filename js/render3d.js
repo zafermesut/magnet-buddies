@@ -500,6 +500,43 @@ class Renderer3D {
       this.levelGroup.add(m);
       return { th, m, mat, vis: 1 };
     });
+    // Işık perdesi: tavandan inen, dalgalanan şeritler (sütun başına bir şerit, oyun düzleminin arkasında)
+    this.auroraObjs = [];
+    if (game.aurora.size) {
+      const cols = new Map();
+      for (const id of game.aurora) {
+        const r = Math.floor(id / W), c = id % W, s = cols.get(c);
+        if (!s) cols.set(c, { r0: r, r1: r }); else { s.r0 = Math.min(s.r0, r); s.r1 = Math.max(s.r1, r); }
+      }
+      const tex = canvasTexture(4, 128, (g, w, h) => {
+        const grad = g.createLinearGradient(0, 0, 0, h);
+        grad.addColorStop(0, 'rgba(177,151,252,0.1)');
+        grad.addColorStop(0.25, 'rgba(177,151,252,0.85)');
+        grad.addColorStop(0.7, 'rgba(99,230,190,0.65)');
+        grad.addColorStop(1, 'rgba(99,230,190,0.08)');
+        g.fillStyle = grad;
+        g.fillRect(0, 0, w, h);
+      });
+      for (const [c, s] of cols) {
+        const h = s.r1 - s.r0 + 1;
+        const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.3, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+        const m = new THREE.Mesh(new THREE.PlaneGeometry(1, h), mat);
+        m.position.set(c + 0.5, -s.r0 - h / 2, -0.45);
+        this.levelGroup.add(m);
+        this.auroraObjs.push({ m, mat, c });
+      }
+    }
+    // Işık köprüleri: kanal renginde parlayan çubuk; sönükken ince iz
+    this.bridgeObjs = game.bridges.map(B => {
+      const col = CHANNEL_COLORS[B.channel];
+      const mat = new THREE.MeshStandardMaterial({ color: col, emissive: col, emissiveIntensity: 0.65, transparent: true, opacity: 0.95 });
+      const m = new THREE.Mesh(new THREE.BoxGeometry(1, 0.14, 0.8), mat);
+      const track = new THREE.Mesh(new THREE.BoxGeometry(B.n, 0.02, 0.8), new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: B.inverse ? 0.12 : 0.22 }));
+      track.position.set(B.c + B.n / 2, -B.r - 0.07, 0);
+      m.position.y = -B.r - 0.07;
+      this.levelGroup.add(m, track);
+      return { B, m };
+    });
     // Taşıyıcı bantlar: bloğun üstünde oklu kauçuk
     for (const dir of [1, -1]) {
       const list = [...game.belts].filter(([, d]) => d === dir).map(([id]) => [id % W, Math.floor(id / W)]);
@@ -1170,6 +1207,16 @@ class Renderer3D {
       m.position.set(wx(b.x + b.w / 2), wy(b.y + b.h / 2), 0);
       if (b.snow) { m.scale.setScalar(b.w / T); m.rotation.z = -b.roll; }
     });
+    for (const o of this.auroraObjs) {
+      o.mat.opacity = 0.42 + 0.14 * Math.sin(t * 1.6 + o.c * 0.9);
+      o.m.position.x = o.c + 0.5 + Math.sin(t * 0.8 + o.c * 1.3) * 0.06;
+    }
+    for (const o of this.bridgeObjs) {
+      const n = o.B.lit;
+      o.m.visible = n > 0.02;
+      o.m.scale.x = Math.max(0.01, n);
+      o.m.position.x = o.B.fromRight ? o.B.c + o.B.n - n / 2 : o.B.c + n / 2;
+    }
     for (const o of this.thawObjs) {
       // Kırılınca hızla söner, yeniden donunca belirir; çatlarken titrer ve koyulaşır
       o.vis += ((o.th.open ? 0 : 1) - o.vis) * Math.min(1, dt * 12);
