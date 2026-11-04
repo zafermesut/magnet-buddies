@@ -3154,5 +3154,92 @@ console.log('Kuzey öğeleri');
   ok(run(g, ctl, 90, g => g.done), 'K10. Işın sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // K11. Yüksek yay: B yayla rafa çıkar, düğmede kapağı tutar; A geçip şalterle köprüyü yakar; B köprüden karşıya geçer
+  const g = new Game(L('yuksek-yay'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0], br = g.bridges[0];
+  const up = (g, p, t) => {
+    if (p.supported && p.y + p.h <= 4 * T + 1) return Math.abs(p.x + p.w / 2 - (btn.x + btn.w / 2)) < 6 ? null : goTo(btn.x + btn.w / 2)(g, p, t);
+    if (!p.supported) return p.y + p.h < 4 * T ? I({ right: true }) : I();
+    return goTo(8 * T + 20)(g, p, t);
+  };
+  const ctl = phases([
+    [idle, up],
+    [(g, p, t) => (p.x > 22 * T ? null : goTo(23 * T)(g, p, t)), idle],
+    [flip(lv, 2), idle],
+    [idle, (g, p, t) => (p.x > 22 * T ? null : br.lit >= br.n ? I({ right: true }) : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K11. Yüksek yay geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K12. Sandık yayı: B düğmede kapakları tutar; A aşağı inip sandığı yaya iter, sandık ince rafa konar, kapaklar açık kalır
+  const g = new Game(L('sandik-yayi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons.find(b => b.y > 8 * T), c = g.boxes[0];
+  const placed = () => c.supported && c.y < 5 * T;
+  const ctl = phases([
+    [idle, (g, p, t) => (btn.pressed ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (p.x > 13 * T && p.supported ? null : goTo(14 * T)(g, p, t)), idle],
+    [(g, p, t) => (placed() ? null : c.supported && c.y > 12 * T && c.x + c.w < 24 * T + 4 ? I({ right: true }) : I()), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K12. Sandık yayı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K13. Hafif sandık: B düğmede kafesin kapağını açar; A raftan sandığı perdede yukarı çeker, üstteki düğmeye sürükler; ikisi geçer
+  const g = new Game(L('hafif-sandik'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2);
+  const surf = 6 * T, up = () => c.supported && c.y + c.h <= surf + 1;
+  const ctl = phases([
+    [idle, (g, p, t) => (b1.pressed ? null : goTo(b1.x + b1.w / 2)(g, p, t))],
+    [(g, p, t) => (p.x > 8 * T + 30 && p.y + p.h <= 9 * T + 1 ? null : goTo(9 * T + 30)(g, p, t)), idle],
+    [perdeUp(9 * T + 30, surf, 1), idle],
+    [(g, p, t) => (up() ? null : Math.abs(p.x + p.w / 2 - 11.6 * T) > 6 ? goTo(11.6 * T)(g, p, t) : I({ action: true })), idle],
+    [(g, p, t) => (c.ground !== p && c.y + c.h > surf - 1 && p.x + p.w <= c.x + 2 && p.supported ? null : c.ground === p ? I({ left: true }) : goTo(c.x - 19)(g, p, t)), idle],
+    [(g, p, t) => (b2.pressed ? null : I({ right: true })), idle],
+    [idle, (g, p, t) => (p.x > 8 * T + 30 && p.y + p.h <= 9 * T + 1 ? null : goTo(9 * T + 30)(g, p, t))],
+    [idle, perdeUp(9 * T + 30, surf, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K13. Hafif sandık geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K14. Perde fırlatma: A, B'yi rafa fırlatır; B kutup değiştirip A'yı çeker. İkisi raftan karşıya süzülür
+  const g = new Game(L('perde-firlatma'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, surf = 8 * T;
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= surf + 1);
+  const glide = (g, p, t) => (p.supported && p.x > 23 * T ? null : I({ right: true, jump: p.x + p.w / 2 > 12 * T + 20 }));
+  const ctl = phases([climbWall(g, A, B, 7 * T, 9 * T, surf, both), [glide, idle], [idle, glide], [goTo(ex), goTo(ex)]]);
+  ok(run(g, ctl, 60, g => g.done), 'K14. Perde fırlatma geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K15. Süzülüş sınavı: B düğmede kapağı tutar; A aşağıda sandığı yaya iter, raftaki sandık ışını keser, ters kapak açılır.
+  // A geri döner; ikisi geçer. A, B'yi rafa fırlatır, B çeker; raftan karşıya süzülürler
+  const g = new Game(L('suzulus-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], btn = g.buttons[0], surf = 7 * T;
+  const placed = () => c.supported && c.y < 6 * T;
+  const both = () => [A, B].every(p => p.supported && p.y + p.h <= surf + 1);
+  const glide = (g, p, t) => (p.supported && p.x > 36 * T ? null : I({ right: true, jump: !p.supported || (!p.prevJump && p.x + p.w / 2 > 26 * T + 16) }));
+  // Raftan önce sağdaki süzülür (arkadaşına takılmasın)
+  let first = null;
+  const lead = (g, p, t) => { first = first || (A.x > B.x ? A : B); return p === first ? glide(g, p, t) : null; };
+  const rest = (g, p, t) => (p === first ? null : glide(g, p, t));
+  const past = x => (g, p, t) => (p.x > x && p.supported ? null : goTo(x + 40)(g, p, t));
+  const inv = g.gates.find(x => x.inverse), a = g.gates.find(x => !x.inverse);
+  g.step(DT, [I(), I()]);
+  ok(!inv.open && !a.open, 'K15. başta iki kapak da kapalı (ışın ters kapağı kapalı tutar)');
+  const ctl = phases([
+    [idle, (g, p, t) => (btn.pressed ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (p.x + p.w < 12 * T && p.supported ? null : goTo(10.5 * T)(g, p, t)), idle],
+    [(g, p, t) => (placed() ? null : c.supported && c.y > 13 * T && c.x > 3 * T ? I({ left: true }) : I()), idle],
+    [(g, p, t) => (inv.open ? (p.x > 13 * T && p.supported ? null : goTo(14 * T)(g, p, t)) : I()), idle],
+    [past(20 * T), past(20 * T)],
+    climbWall(g, A, B, 23 * T, 25 * T, surf, both),
+    [lead, lead],
+    [rest, rest],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'K15. Süzülüş sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
