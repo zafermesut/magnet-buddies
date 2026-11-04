@@ -3425,5 +3425,100 @@ console.log('Kuzey öğeleri');
   ok(run(g, ctl, 90, g => g.done), 'K25. Kuzey yolu geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // K26. İki sandık: A aşağı iner, sandığı ince rafın altına iter; B üstteki sandığı ince rafa iter; ışın alıcıya varır, kapak açılır
+  const g = new Game(L('iki-sandik'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, low = g.boxes.find(b => b.mirror < 0), up = g.boxes.find(b => b.mirror > 0);
+  const col = b => b.x + b.w / 2;
+  const ctl = phases([
+    [(g, p, t) => (p.y > 8 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (col(low) >= 14.3 * T ? null : I({ right: true })), (g, p, t) => (col(up) >= 14.3 * T ? null : I({ right: true }))],
+    [(g, p, t) => (g.gates[0].open ? null : idle()), idle],
+    [(g, p, t) => (p.x < low.x - 30 ? null : I({ left: true })), idle],
+    [(g, p, t) => (p.x > low.x + low.w && p.supported ? null : I({ right: true, jump: !p.supported || !p.prevJump })), idle],
+    [(g, p, t) => (p.inExit || (p.x > 32 * T && p.supported) ? null : goTo(33 * T)(g, p, t)), idle],
+    [idle, (g, p, t) => (p.x < up.x - 30 ? null : I({ left: true }))],
+    [idle, (g, p, t) => (p.x > up.x + up.w && p.supported ? null : I({ right: true, jump: !p.supported || !p.prevJump }))],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K26. İki sandık geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K27. Uçan sandık: A perdeden süzülüp düğmede kapağı açar; B sandığı kenara iter; A perdede çeker, sandığı ikinci düğmeye iter
+  const g = new Game(L('ucan-sandik'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], b1 = g.buttons.find(b => b.channel === 1), b2 = g.buttons.find(b => b.channel === 2);
+  const land = p => p.supported && p.x > 18 * T - 4;
+  const glide = (g, p, t) => (land(p) ? null : p.x + p.w / 2 < 11 * T + 22 && p.supported ? goTo(11 * T + 30)(g, p, t) : I({ right: true, jump: !p.supported || !p.prevJump }));
+  const ctl = phases([
+    [(g, p, t) => (p.x > 8 * T && p.supported ? null : goTo(9 * T)(g, p, t)), idle],
+    [glide, idle],
+    [(g, p, t) => (b1.pressed ? null : goTo(b1.x + b1.w / 2)(g, p, t)), idle],
+    [idle, (g, p, t) => (c.x + c.w / 2 >= 11.85 * T ? null : I({ right: true }))],
+    [idle, (g, p, t) => (p.x + p.w < c.x - 20 ? null : I({ left: true }))],
+    [(g, p, t) => (c.x > 16 * T ? null : Math.abs(p.x + p.w / 2 - 18.5 * T) > 6 ? goTo(18.5 * T)(g, p, t) : I({ action: true })), idle],
+    [(g, p, t) => (c.x + c.w >= 26 * T - 2 ? null : Object.assign(goTo(26.5 * T)(g, p, t), { action: true })), idle],
+    [idle, glide],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K27. Uçan sandık geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K28. Gök sapanı: B düğmede kapağı tutar; A bantta koşup yaya basar, perdede karşıya uçar, şalteri çevirir; B de uçar
+  const g = new Game(L('gok-sapani'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, btn = g.buttons[0], lv = g.levers[0];
+  const fly = (g, p, t) => (p.supported && p.x > 31 * T - 20 ? null : p.x < 7 * T ? goTo(8 * T)(g, p, t) : I({ right: true }));
+  const ctl = phases([
+    [idle, (g, p, t) => (btn.pressed ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [fly, idle],
+    [flip(lv, 1), idle],
+    [idle, fly],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K28. Gök sapanı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K29. Işık nöbeti: basamakta duran ışını keser, ters köprü yanar. Dört nöbet: A, B, A, B
+  const g = new Game(L('isik-nobeti'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2;
+  const F = g.bridges.find(b => b.channel === 1), G_ = g.bridges.find(b => b.channel === 2);
+  const stand = c => (g, p, t) => (p.supported && p.y + p.h <= 11 * T + 1 && Math.abs(p.x + p.w / 2 - (c + 0.5) * T) < 10 ? null : goTo((c + 0.5) * T)(g, p, t));
+  const cross = (x, br) => (g, p, t) => (p.x > x * T && p.supported ? null : br.lit >= br.n || p.x > (x - 8) * T ? goTo((x + 0.5) * T)(g, p, t) : idle());
+  const ctl = phases([
+    [stand(7), idle],
+    [idle, cross(19, F)],
+    [idle, stand(21)],
+    [cross(19, F), idle],
+    [stand(27), idle],
+    [idle, (g, p, t) => (p.x > 22 * T && p.supported && p.y + p.h > 11 * T ? null : goTo(23 * T)(g, p, t))],
+    [idle, cross(37, G_)],
+    [idle, stand(39)],
+    [cross(37, G_), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K29. Işık nöbeti geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K30. Büyük Pusula (final): B düğmede tuzak kapağı açar, A aşağı iner; buzu kırar, sandığı yayıcıya iter, köprü yanar.
+  // B geçer, perdedeki yayla rafa çıkar, parçayı alır; kapı açılır, şalter A'yı kurtarır
+  const g = new Game(L('buyuk-pusula'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], lv = g.levers[0], th = g.thaws[0], btn = g.buttons[0], br = g.bridges[0], piece = g.keys[0], door = g.doors[0];
+  const stop1 = () => c.x + c.w >= 13 * T - 1 && c.x + c.w < 14 * T, stop2 = () => c.x + c.w >= 19 * T - 1;
+  const ctl = phases([
+    [idle, (g, p, t) => (btn.pressed ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (p.y > 11 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (stop1() ? null : c.vx > 10 ? I() : I({ right: true })), idle],
+    [(g, p, t) => (p.ground === c ? null : I({ right: p.x + p.w / 2 < c.x + c.w / 2, left: p.x > c.x + 2, jump: p.x + p.w > c.x - 40 && (!p.prevJump || !p.supported) })), idle],
+    [(g, p, t) => (th.crackT >= 0 ? null : I({ right: true })), idle],
+    [(g, p, t) => (p.x + p.w <= c.x + 3 && p.supported ? null : I({ left: true, jump: !p.supported || !p.prevJump })), idle],
+    [(g, p, t) => (stop2() ? null : th.open ? I({ right: true }) : I()), idle],
+    [idle, (g, p, t) => (p.x > 22 * T && p.supported ? null : br.lit >= br.n ? goTo(23 * T)(g, p, t) : goTo(13 * T)(g, p, t))],
+    [idle, (g, p, t) => (piece.holder === p ? null : p.supported && p.y + p.h <= 3 * T + 1 ? goTo(piece.x + piece.w / 2)(g, p, t) : !p.supported ? I({ right: p.y + p.h < 3 * T }) : goTo(26.5 * T)(g, p, t))],
+    [idle, (g, p, t) => (door.open ? null : I({ right: true }))],
+    [idle, flip(lv, 1)],
+    [(g, p, t) => (p.inExit || (p.x > 41 * T && p.supported) ? null : goTo(42 * T)(g, p, t)), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'K30. Büyük Pusula geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
