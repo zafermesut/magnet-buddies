@@ -3343,5 +3343,87 @@ console.log('Kuzey öğeleri');
   ok(run(g, ctl, 60, g => g.done), 'K20. Ayna sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // K21. Buzlu perde: B düğmede kapağı tutar, A geçip içerdeki düğmeyle B'yi alır; ikisi buzda hızlanıp perdede karşıya süzülür
+  const g = new Game(L('buzlu-perde'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, [b0, b1] = g.buttons;
+  const on = b => (g, p, t) => (b.pressed && overlap(p, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }) ? null : goTo(b.x + b.w / 2)(g, p, t));
+  const leap = (g, p, t) => (p.supported && p.x > 34 * T ? null : p.supported && p.x + p.w / 2 < 21 * T + 28 ? I({ right: true }) : I({ right: true, jump: true }));
+  const ctl = phases([
+    [idle, on(b0)],
+    [on(b1), idle],
+    [idle, (g, p, t) => (p.x > 9 * T + 2 && p.supported ? null : goTo(9.5 * T)(g, p, t))],
+    [(g, p, t) => (p.supported && p.x > 34 * T ? null : p.x < 13 * T ? I({ right: true }) : leap(g, p, t)), idle],
+    [idle, leap],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K21. Buzlu perde geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K22. Pres ritmi: A düğmede presi yukarıda tutar, ışın kesilmez, köprü yanar; B geçip karşıdaki düğmeyle A'yı alır
+  const g = new Game(L('pres-ritmi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, [b0, b1] = g.buttons, br = g.bridges[0];
+  const on = b => (g, p, t) => (b.pressed && overlap(p, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }) ? null : goTo(b.x + b.w / 2)(g, p, t));
+  const ctl = phases([
+    [on(b0), idle],
+    [idle, (g, p, t) => (b1.pressed ? null : br.lit >= br.n || p.x > 11 * T ? goTo(b1.x + b1.w / 2)(g, p, t) : goTo(9 * T)(g, p, t))],
+    [(g, p, t) => (p.x > 26 * T && p.supported ? null : br.lit >= br.n ? goTo(27 * T)(g, p, t) : idle()), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K22. Pres ritmi geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K23. Buz aynası: B düğmede kapağı açar, A aşağı iner, sandığı iter, eriyen buzda durur. A üstünden buzu kırar, geri döner,
+  // sandığı iter; sandık yayıcıya dayanınca köprü yanar. B geçip şalterle alttaki kapağı açar
+  const g = new Game(L('buz-aynasi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], lv = g.levers[0], th = g.thaws[0], btn = g.buttons[0], br = g.bridges[0];
+  const stop1 = () => c.x + c.w >= 13 * T - 1 && c.x + c.w < 14 * T, stop2 = () => c.x + c.w >= 19 * T - 1;
+  const ctl = phases([
+    [idle, (g, p, t) => (btn.pressed ? null : goTo(btn.x + btn.w / 2)(g, p, t))],
+    [(g, p, t) => (p.y > 8 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (stop1() ? null : c.vx > 10 ? I() : I({ right: true })), idle],
+    [(g, p, t) => (p.ground === c ? null : I({ right: p.x + p.w / 2 < c.x + c.w / 2, left: p.x > c.x + 2, jump: p.x + p.w > c.x - 40 && (!p.prevJump || !p.supported) })), idle],
+    [(g, p, t) => (th.crackT >= 0 ? null : I({ right: true })), idle],
+    [(g, p, t) => (p.x + p.w <= c.x + 3 && p.supported ? null : I({ left: true, jump: !p.supported || !p.prevJump })), idle],
+    [(g, p, t) => (stop2() ? null : th.open ? I({ right: true }) : I()), idle],
+    [idle, (g, p, t) => (p.x > 22 * T && p.supported ? null : br.lit >= br.n ? goTo(23 * T)(g, p, t) : goTo(13 * T)(g, p, t))],
+    [idle, flip(lv, 1)],
+    [(g, p, t) => (p.inExit || (p.x > 32 * T && p.supported) ? null : goTo(33 * T)(g, p, t)), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K23. Buz aynası geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K24. Ters bant: A sandığı bandın tersine yayıcıya dayar ve itmeyi sürdürür, köprü yanar; B geçip şalterle kalıcı yapar; A perdeden çıkıp gelir
+  const g = new Game(L('ters-bant'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], lv = g.levers[0], br = g.bridges[0];
+  const ctl = phases([
+    [(g, p, t) => (p.y > 8 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (br.lit >= br.n ? null : I({ right: true })), idle],
+    [(g, p, t) => (g.switches[3] ? null : I({ right: true })), (g, p, t) => (p.x > 26 * T && p.supported ? (g.switches[3] ? null : flip(lv, 3)(g, p, t) || null) : br.lit >= br.n ? goTo(27 * T)(g, p, t) : goTo(17 * T)(g, p, t))],
+    [(g, p, t) => (p.supported && p.y + p.h <= 7 * T + 1 ? null : p.supported && Math.abs(p.x + p.w / 2 - 2 * T) < 8 ? I({ jump: !p.prevJump || !p.supported }) : p.supported ? goTo(2 * T)(g, p, t) : I({ jump: true, right: p.y + p.h < 7 * T - 2 })), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K24. Ters bant geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K25. Kuzey yolu: kapaktan sırayla geçilir, buzda hızlanıp perdede karşıya süzülünür; pres köprüsünde biri düğmede presi tutar
+  const g = new Game(L('kuzey-yolu'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, [b0, b1, b2, b3] = g.buttons, br = g.bridges[0];
+  const on = b => (g, p, t) => (b.pressed && overlap(p, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }) ? null : goTo(b.x + b.w / 2)(g, p, t));
+  const leap = (g, p, t) => (p.supported && p.x > 30 * T ? null : p.x < 10 * T ? I({ right: true }) : p.supported && p.x + p.w / 2 < 17 * T + 28 ? I({ right: true }) : I({ right: true, jump: true }));
+  const ctl = phases([
+    [idle, on(b0)],
+    [on(b1), idle],
+    [idle, (g, p, t) => (p.x > 7 * T && p.supported ? null : goTo(7 * T + 20)(g, p, t))],
+    [leap, idle],
+    [idle, leap],
+    [on(b2), idle],
+    [idle, (g, p, t) => (b3.pressed ? null : br.lit >= br.n || p.x > 35 * T ? goTo(b3.x + b3.w / 2)(g, p, t) : goTo(33.5 * T)(g, p, t))],
+    [(g, p, t) => (p.x > 43 * T && p.supported ? null : br.lit >= br.n ? goTo(43.5 * T)(g, p, t) : idle()), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 90, g => g.done), 'K25. Kuzey yolu geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);
