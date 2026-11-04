@@ -6,6 +6,26 @@ Oyunda Ayarlar penceresinin altında hangi sürümü oynadığın yazar.
 - **Küçük sürüm** (`0.1.0` → `0.2.0`): yeni bölümler, yeni öğeler, yeni özellikler.
 - **Yama** (`0.1.0` → `0.1.1`): düzeltmeler ve küçük iyileştirmeler.
 
+## 0.6.0 · 4 Kasım 2026
+
+**Son alan: Kuzey Işıkları** (Uzman, 30 bölüm). Pusula onarılıyor, oyunun 120 bölümü tamam.
+
+- **Altı kısım, 30 bölüm:**
+  - **Işık perdesi:** Işık perdesi, Işık köprüsü, Zıt köprüler, Perde kulesi, Perde sınavı.
+  - **Işık yolu:** Işık ışını, Kutu gölgesi, Buz mercek, Işık zinciri, Işın sınavı.
+  - **Süzülüş:** Yüksek yay, Sandık yayı, Hafif sandık, Perde fırlatma, Süzülüş sınavı.
+  - **Aynalar:** Ayna, Makas, Ayna sandığı, Zamanlı ayna, Ayna sınavı.
+  - **Eski yollar:** Buzlu perde, Pres ritmi, Buz aynası, Ters bant, Kuzey yolu.
+  - **Büyük Pusula:** İki sandık, Uçan sandık, Gök sapanı, Işık nöbeti ve final Büyük Pusula.
+- **Yeni öğeler:**
+  - **Işık perdesi:** içinde yerçekimi azalır; çok yükseğe zıplar, uzağa süzülürsün. Yay ve mıknatıs da perdede çok daha güçlüdür.
+  - **Işık köprüsü:** kanalı açıkken karo karo uzar, kapanınca söner. Alttan geçilir, üstüne basılır. Ters köprü kanalı kapalıyken yanar.
+  - **Işık ışını ve alıcı:** ışın alıcıya varınca kanalını açar. Önüne geçen oyuncu, sandık ya da kapalı kapak onu keser.
+  - **Ayna:** ışını 90 derece çevirir. Döner ayna düğmeyle yön değiştirir.
+  - **Ayna sandığı:** itilir, mıknatıs çeker; ışını kesmez, çevirir.
+- **Bölüm editörü:** bütün yeni öğeler editörde de var.
+- **Final:** iğnenin son parçası yerine oturur, Büyük Pusula onarılır.
+
 ## 0.5.0 · 31 Ekim 2026
 
 **Yeni alan: Buzul** (Uzman, 30 bölüm)

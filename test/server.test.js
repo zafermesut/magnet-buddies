@@ -163,6 +163,17 @@ function client(name) {
     const sCustom = await b.wait(m => m.t === 's' && m.p.length === 2 && m.p[0][1] < 7 * 40);
     ok(!!sCustom, 'sunucu kendi bölümünü simüle ediyor');
 
+    console.log('Aynalı ışın online');
+    a.send({ t: 'lobby' });
+    await a.wait(m => m.t === 'room' && m.state === 'lobby');
+    a.send({ t: 'custom', def: { name: 'Ayna', magnet: false, map: [
+      '##########', '#....q...#', '#........#', '#[...d...#', '#........#', '#.S....E.#', '##########'] } });
+    await b.wait(m => m.t === 'room' && m.custom && m.custom.name === 'Ayna');
+    a.msgs.length = 0; b.msgs.length = 0;
+    a.send({ t: 'start', custom: true });
+    const sBeam = await b.wait(m => m.t === 's' && m.bm && m.bm.length === 1);
+    ok(sBeam && sBeam.bm[0][1] === 1 && JSON.stringify(sBeam.bm[0][0]) === JSON.stringify([60, 140, 220, 140, 220, 60]), 'ışının kırık çizgisi ve kanalı istemciye gidiyor');
+
     console.log('Paket kuyruğu');
     a.send({ t: 'lobby' });
     await a.wait(m => m.t === 'room' && m.state === 'lobby' && m.custom && m.custom.total === 1);
