@@ -352,6 +352,11 @@ select { font: inherit; padding: 9px 10px; border-radius: 12px; border: 1px soli
 .tool i.tBeamR, .tool i.tBeamL, .tool i.tBeamD { background: #3a3f72; box-shadow: inset 0 0 0 2px #ff9de2; position: relative; }
 .tool i.tBeamR::after, .tool i.tBeamL::after, .tool i.tBeamD::after { position: absolute; inset: 0; display: grid; place-items: center; color: #ff9de2; font-style: normal; font-weight: 800; font-size: 11px; line-height: 1; }
 .tool i.tBeamR::after { content: '→'; } .tool i.tBeamL::after { content: '←'; } .tool i.tBeamD::after { content: '↓'; }
+.tool i.tMirrorA, .tool i.tMirrorB, .tool i.tMirrorT, .tool i.tCrateA, .tool i.tCrateB { background: #3a3f72; box-shadow: inset 0 0 0 2px #cfe8ff; }
+.tool i.tMirrorA, .tool i.tCrateA { background-image: linear-gradient(135deg, transparent 42%, #e7f5ff 42%, #e7f5ff 58%, transparent 58%); }
+.tool i.tMirrorB, .tool i.tCrateB { background-image: linear-gradient(45deg, transparent 42%, #e7f5ff 42%, #e7f5ff 58%, transparent 58%); }
+.tool i.tMirrorT { box-shadow: inset 0 0 0 2px var(--ch); background-image: linear-gradient(135deg, transparent 42%, #e7f5ff 42%, #e7f5ff 58%, transparent 58%); }
+.tool i.tCrateA, .tool i.tCrateB { background-color: #9ea3c7; box-shadow: inset 0 0 0 2px #5d6194; }
 .tool i.tRecv { background: var(--ch); clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
 .tool i.tAurora { background: linear-gradient(#b197fc, rgba(99, 230, 190, .25)); }
 .tool i.tBridge { background: linear-gradient(var(--ch), var(--ch)) center / 100% 4px no-repeat; box-shadow: 0 0 6px var(--ch); }

@@ -65,6 +65,7 @@ class Game {
     this.bridges = [];             // ışık köprüleri: kanalı açıkken karo karo uzar (lit: yanan karo sayısı)
     this.beams = [];               // ışık ışınları: yayıcıdan çıkar, ilk engelde biter; alıcıya varınca kanalını açar
     this.receivers = new Map();    // ışık alıcısı hücreleri: r * cols + c → kanal
+    this.mirrors = new Map();      // aynalar: r * cols + c → { c, r, slash, channel }
     this.fixed = [];               // sabit mıknatıs blokları: { x, y, pol }
     this.screws = [];              // vidalar (isteğe bağlı toplanır): { x, y, w, h, got }
     this.poleCells = new Map();    // kutup kapısı hücreleri: r * cols + c → kutup
@@ -80,8 +81,10 @@ class Game {
       for (let c = 0; c < cols; c++) {
         const ch = map[r][c];
         const x = c * T, y = r * T;
-        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~' || ch === '[' || ch === ']' || ch === 'v');
+        this.grid[r].push(ch === '#' || ch === 'P' || ch === 'N' || ch === '<' || ch === '>' || ch === '~' || ch === '[' || ch === ']' || ch === 'v' || 'dehik'.includes(ch));
         if (ch === '[' || ch === ']' || ch === 'v') this.beams.push({ c, r, dx: ch === '[' ? 1 : ch === ']' ? -1 : 0, dy: ch === 'v' ? 1 : 0, end: 0, ch: 0 });
+        // Ayna: katı blok, ışını 90 derece çevirir. d "/" e "\\" sabit; h i k döner ayna: başta "/", kanalı açıkken "\\"
+        if ('dehik'.includes(ch)) this.mirrors.set(r * cols + c, { c, r, slash: ch !== 'e', channel: 'hik'.indexOf(ch) + 1 });
         if ('qrs'.includes(ch)) this.receivers.set(r * cols + c, 'qrs'.indexOf(ch) + 1);
         if (ch === '<' || ch === '>') this.belts.set(r * cols + c, ch === '<' ? -1 : 1);
         if (ch === '~') this.ice.add(r * cols + c);
@@ -125,10 +128,10 @@ class Game {
         }
         else if ('abcABC'.includes(ch)) (gateCells[ch] = gateCells[ch] || []).push({ r, c });
         else if (ch === 'H') this.boxes.push(makeBody('box', x, y, 2 * T, 2 * T, { push: { 1: 0, '-1': 0 }, pushers: 0 }));
-        else if (ch === 'M') {
-          // Metal sandık: tek kişi iter, mıknatıs çeker
+        else if (ch === 'M' || ch === 'l' || ch === 'm') {
+          // Metal sandık: tek kişi iter, mıknatıs çeker. Ayna sandığı (l "\\", m "/") ışını keser yerine çevirir
           const k = PHYS.crateSize;
-          this.boxes.push(makeBody('box', x + (T - k) / 2, y + T - k, k, k, { metal: true, push: { 1: 0, '-1': 0 }, pushers: 0, magT: 0 }));
+          this.boxes.push(makeBody('box', x + (T - k) / 2, y + T - k, k, k, { metal: true, mirror: ch === 'M' ? 0 : ch === 'm' ? 1 : -1, push: { 1: 0, '-1': 0 }, pushers: 0, magT: 0 }));
         }
         else if (ch === 'O') {
           // Kar topu: karlı zeminde yuvarlandıkça büyür; küçükken tek kişi, büyükken iki kişi iter. Mıknatıs çekmez
@@ -753,31 +756,55 @@ class Game {
     }
   }
 
-  // Işık ışını: yayıcıdan düz gider; duvarda, kapalı kapakta, eriyen buzda ya da ilk cisimde biter.
-  // Alıcıya varırsa alıcının kanalını açar. end: ışının bittiği yer (yatayda x, dikeyde y)
+  // Ayna şu an "/" mu (döner ayna kanalı açıkken ters döner)
+  mirrorSlash(m) { return m.channel && this.channelOn(m.channel) ? !m.slash : m.slash; }
+
+  // Işık ışını: yayıcıdan düz gider; aynada döner; duvarda, kapalı kapakta, eriyen buzda ya da ilk cisimde biter.
+  // Ayna sandığı ışını kesmez, çevirir. Alıcıya varırsa alıcının kanalını açar.
+  // pts: kırılma noktaları (x0, y0, x1, y1, ...); end: son parçanın bittiği yer (yatayda x, dikeyde y)
   updateBeams() {
     if (!this.beams.length) return;
     const bodies = this.solids.concat(this.keys.filter(k => !k.used && !k.holder));
     for (const B of this.beams) {
-      let c = B.c + B.dx, r = B.r + B.dy;
+      let dx = B.dx, dy = B.dy, sx = B.c * T + T / 2, sy = B.r * T + T / 2, skip = null;
       B.ch = 0;
-      while (r < this.rows && !this.blocked(c, r)) {
-        const rc = this.receivers.get(r * this.cols + c);
-        if (rc) { B.ch = rc; break; }
-        c += B.dx; r += B.dy;
-      }
-      // Bittiği yer: alıcının ortası ya da engelin yakın kenarı
-      if (B.dy) B.end = B.ch ? r * T + T / 2 : r * T;
-      else B.end = B.ch ? c * T + T / 2 : B.dx > 0 ? c * T : (c + 1) * T;
-      const line = B.dy ? B.c * T + T / 2 : B.r * T + T / 2;
-      const from = B.dy ? (B.r + 1) * T : B.dx > 0 ? (B.c + 1) * T : B.c * T;
-      for (const o of bodies) {
-        if (B.dy) {
-          if (o.x < line && o.x + o.w > line && o.y + o.h > from && o.y < B.end) { B.end = Math.max(from, o.y); B.ch = 0; }
-        } else if (o.y < line && o.y + o.h > line) {
-          if (B.dx > 0 && o.x + o.w > from && o.x < B.end) { B.end = Math.max(from, o.x); B.ch = 0; }
-          if (B.dx < 0 && o.x < from && o.x + o.w > B.end) { B.end = Math.min(from, o.x + o.w); B.ch = 0; }
+      B.pts = [sx, sy];
+      for (let n = 0; n < 12; n++) {   // aynalar döngü kursa da sınırlı
+        let c = Math.floor(sx / T) + dx, r = Math.floor(sy / T) + dy, rc = 0, mirror = null;
+        while (r < this.rows) {
+          if (this.blocked(c, r)) { mirror = this.mirrors.get(r * this.cols + c) || null; break; }
+          rc = this.receivers.get(r * this.cols + c) || 0;
+          if (rc) break;
+          c += dx; r += dy;
         }
+        // Bittiği yer: ayna ya da alıcının ortası, yoksa engelin yakın kenarı
+        const mid = mirror || rc;
+        let end = dy ? (mid ? r * T + T / 2 : dy > 0 ? r * T : (r + 1) * T) : (mid ? c * T + T / 2 : dx > 0 ? c * T : (c + 1) * T);
+        const lo = dy ? sy : sx, line = dy ? sx : sy, d = dy || dx;
+        let hit = null;
+        for (const o of bodies) {
+          if (o === skip) continue;
+          const a0 = dy ? o.y : o.x, a1 = dy ? o.y + o.h : o.x + o.w, b0 = dy ? o.x : o.y, b1 = dy ? o.x + o.w : o.y + o.h;
+          if (b0 >= line || b1 <= line) continue;
+          if (d > 0 && a1 > lo && a0 < end) { end = Math.max(lo, a0); hit = o; }
+          if (d < 0 && a0 < lo && a1 > end) { end = Math.min(lo, a1); hit = o; }
+        }
+        B.end = end;
+        if (hit && hit.mirror) {
+          // Ayna sandığı: ortasında döner, ışın sandığın sütunundan (ya da satırından) devam eder
+          if (dy) sy = hit.y + hit.h / 2; else sx = hit.x + hit.w / 2;
+          B.pts.push(sx, sy);
+          const slash = hit.mirror > 0, ndx = slash ? -dy : dy, ndy = slash ? -dx : dx;
+          dx = ndx; dy = ndy; skip = hit;
+          continue;
+        }
+        B.pts.push(dy ? line : end, dy ? end : line);
+        if (hit) break;
+        if (rc) { B.ch = rc; break; }
+        if (!mirror) break;
+        sx = mirror.c * T + T / 2; sy = mirror.r * T + T / 2;
+        const slash = this.mirrorSlash(mirror), ndx = slash ? -dy : dy, ndy = slash ? -dx : dx;
+        dx = ndx; dy = ndy; skip = null;
       }
     }
   }

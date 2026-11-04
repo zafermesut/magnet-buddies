@@ -192,6 +192,7 @@ class Renderer3D {
       rail: std('#6d71b8', { roughness: 0.5, metalness: 0.5 }),
       springPad: std('#ffa94d', { roughness: 0.4, emissive: '#ff922b', emissiveIntensity: 0.25 }),
       metalCrate: std('#9ea3c7', { roughness: 0.3, metalness: 0.8 }),
+      mirror: std('#e7f5ff', { roughness: 0.1, metalness: 0.6, emissive: '#a5d8ff', emissiveIntensity: 0.6 }),
       nut: std('#eef0ff', { roughness: 0.25, metalness: 0.7, emissive: '#b9bdf5', emissiveIntensity: 0.8 }),
       sign: new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false }),
       // Fabrika: kayan oklu bant, çelik pres, uyarı şeritleri, zamanlı düğmenin sayaç ışıkları
@@ -462,7 +463,7 @@ class Renderer3D {
     const cells = [], caps = [], iceCells = [];
     for (let r = 0; r < H; r++) {
       for (let c = 0; c < W; c++) {
-        if (!game.grid[r][c]) continue;
+        if (!game.grid[r][c] || game.mirrors.has(r * W + c)) continue;
         if ('PN'.includes(game.def.map[r][c])) continue;   // sabit mıknatıslar ayrıca çizilir
         if (game.ice.has(r * W + c)) { iceCells.push([c, r]); continue; }   // kaygan buz ayrı malzemeyle
         cells.push([c, r]);
@@ -530,9 +531,24 @@ class Renderer3D {
     this.beamObjs = game.beams.map(B => {
       const lens = new THREE.Mesh(new THREE.SphereGeometry(0.26, 16, 12), new THREE.MeshStandardMaterial({ color: '#ff9de2', emissive: '#ff9de2', emissiveIntensity: 0.9 }));
       lens.position.set(B.c + 0.5 + B.dx * 0.42, -B.r - 0.5 - B.dy * 0.42, 0.2);
-      const ray = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffc4ee', transparent: true, opacity: 0.85, fog: false }));
-      this.levelGroup.add(lens, ray);
-      return { B, ray };
+      this.levelGroup.add(lens);
+      return { B, rays: [] };
+    });
+    // Aynalar: çerçeve ve dönen çapraz plaka (blok çizilmez ki ışın görünsün)
+    this.mirrorObjs = [...game.mirrors.values()].map(M => {
+      const col = M.channel ? CHANNEL_COLORS[M.channel] : '#8c90c8';
+      const frameMat = new THREE.MeshStandardMaterial({ color: col, roughness: 0.4, metalness: 0.5 });
+      for (const [w, h, x, y] of [[1, 0.1, 0, 0.45], [1, 0.1, 0, -0.45], [0.1, 1, -0.45, 0], [0.1, 1, 0.45, 0]]) {
+        const bar = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.9), frameMat);
+        bar.position.set(M.c + 0.5 + x, -M.r - 0.5 + y, 0);
+        this.levelGroup.add(bar);
+      }
+      const back = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 0.08), new THREE.MeshStandardMaterial({ color: '#2b2f5c', roughness: 0.8 }));
+      back.position.set(M.c + 0.5, -M.r - 0.5, -0.4);
+      const plate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.5), this.mat.mirror);
+      plate.position.set(M.c + 0.5, -M.r - 0.5, 0.1);
+      this.levelGroup.add(back, plate);
+      return { M, plate, vis: M.slash ? 1 : -1 };
     });
     this.recvObjs = [...game.receivers].map(([id, ch]) => {
       const col = CHANNEL_COLORS[ch];
@@ -843,6 +859,12 @@ class Renderer3D {
         const rv = new THREE.Mesh(this.geo.rivet, this.mat.rail);
         rv.position.set(x, y, 0.46);
         g.add(rv);
+      }
+      if (b.mirror) {
+        const plate = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.12, 0.06), this.mat.mirror);
+        plate.position.z = 0.46;
+        plate.rotation.z = b.mirror * Math.PI / 4;
+        g.add(plate);
       }
       g.scale.setScalar(PHYS.crateSize / T);
       this.levelGroup.add(g);
@@ -1228,11 +1250,24 @@ class Renderer3D {
       o.m.position.x = o.c + 0.5 + Math.sin(t * 0.8 + o.c * 1.3) * 0.06;
     }
     for (const o of this.beamObjs) {
-      const B = o.B, a = B.dy ? (B.r + 1) * T : B.dx > 0 ? (B.c + 1) * T : B.c * T, len = Math.max(0.001, Math.abs(B.end - a) / T);
-      o.ray.visible = len > 0.01;
-      if (B.dy) { o.ray.scale.set(0.09, len, 0.09); o.ray.position.set(B.c + 0.5, -(a + B.end) / 2 / T, 0.1); }
-      else { o.ray.scale.set(len, 0.09, 0.09); o.ray.position.set((a + B.end) / 2 / T, -B.r - 0.5, 0.1); }
-      o.ray.material.opacity = 0.75 + 0.2 * Math.sin(t * 12);
+      const pts = o.B.pts, n = pts.length / 2 - 1;
+      while (o.rays.length < n) {
+        const ray = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: '#ffc4ee', transparent: true, opacity: 0.85, fog: false }));
+        this.levelGroup.add(ray);
+        o.rays.push(ray);
+      }
+      o.rays.forEach((ray, i) => {
+        ray.visible = i < n;
+        if (i >= n) return;
+        const x0 = pts[2 * i], y0 = pts[2 * i + 1], x1 = pts[2 * i + 2], y1 = pts[2 * i + 3];
+        ray.scale.set(Math.max(0.09, Math.abs(x1 - x0) / T), Math.max(0.09, Math.abs(y1 - y0) / T), 0.09);
+        ray.position.set((x0 + x1) / 2 / T, -(y0 + y1) / 2 / T, 0.1);
+        ray.material.opacity = 0.75 + 0.2 * Math.sin(t * 12);
+      });
+    }
+    for (const o of this.mirrorObjs) {
+      o.vis += ((game.mirrorSlash(o.M) ? 1 : -1) - o.vis) * 0.2;
+      o.plate.rotation.z = o.vis * Math.PI / 4;
     }
     for (const o of this.recvObjs) {
       o.m.rotation.y = t * 1.8;

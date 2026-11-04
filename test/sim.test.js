@@ -3241,5 +3241,107 @@ console.log('Kuzey öğeleri');
   ok(run(g, ctl, 90, g => g.done), 'K15. Süzülüş sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
 }
 
+{
+  // Ayna fiziği: sabit ayna döndürür, döner ayna kanalıyla yön değiştirir, cisim keser, ayna sandığı çevirir
+  const row = s => '#' + s.padEnd(18, '.') + '#';
+  const g = new Game({ name: 'a', map: ['#'.repeat(20), row('......r'), row('.'), row('[.....h.....q'), row('.'), row('......s'), row('.'), row('S.1.............E'), '#'.repeat(20)] }, 2);
+  g.step(DT, [I(), I()]);
+  ok(g.beams[0].ch === 2 && g.beams[0].pts.length === 6, 'döner ayna başta "/": sağa giden ışın yukarı döner, alıcıya varır');
+  g.players[0].x = g.buttons[0].x; g.step(DT, [I(), I()]); g.step(DT, [I(), I()]);
+  ok(g.beams[0].ch === 3, 'düğmeye basılınca ayna "\\\\" olur: ışın aşağı döner');
+  const f = new Game({ name: 'a', map: ['#'.repeat(20), row('.'), row('[....e'), row('.'), row('.'), row('.....e..q'), row('.'), row('S...............E'), '#'.repeat(20)] }, 2);
+  f.step(DT, [I(), I()]);
+  ok(f.beams[0].ch === 1 && f.beams[0].pts.length === 8, 'iki sabit ayna ışını merdiven gibi çevirir');
+  f.players[0].x = 6 * T + 3; f.players[0].y = 3 * T; f.step(DT, [I(), I()]);
+  ok(f.beams[0].ch === 0 && Math.abs(f.beams[0].end - 3 * T) < 2, 'aynadan sonraki parçayı cisim keser');
+  const c = new Game({ name: 'a', map: ['#'.repeat(20), row('.'), row('.'), row('.......q'), row('.'), row('.'), row('S...l........]'), '#'.repeat(20)] }, 2);
+  c.step(DT, [I(), I()]);
+  ok(c.beams[0].ch === 0 && c.beams[0].pts.length === 6, 'ayna sandığı ışını yukarı çevirir; sütun tutmazsa alıcıya varmaz');
+  const box = c.boxes[0]; box.x = 8 * T + 1; c.step(DT, [I(), I()]);
+  ok(c.beams[0].ch === 1, 'ayna sandığı alıcının sütununa gelince ışın alıcıya varır');
+}
+
+{
+  // K16. Ayna: A rafta ışını keser, ters kapak açılır; B geçip karşıda inen ışını keser, A gelir
+  const g = new Game(L('ayna'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, inv = g.gates[0];
+  g.step(DT, [I(), I()]);
+  ok(!inv.open, 'K16. ışın varken ters kapak kapalı');
+  const ctl = phases([
+    [(g, p, t) => (p.supported && p.y + p.h <= 10 * T + 1 && Math.abs(p.x + p.w / 2 - 5 * T) < 8 ? null : goTo(5 * T)(g, p, t)), idle],
+    [(g, p, t) => (p.supported && p.y + p.h <= 8 * T + 1 && p.x > 7 * T + 8 ? null : I({ jump: !p.supported || !p.prevJump, right: true })), idle],
+    [idle, (g, p, t) => (Math.abs(p.x + p.w / 2 - 26.5 * T) < 8 ? null : inv.open || p.x > 17 * T ? goTo(26.5 * T)(g, p, t) : idle())],
+    [(g, p, t) => (p.x > 17 * T ? null : goTo(19 * T)(g, p, t)), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K16. Ayna geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K17. Makas: A düğmede yakın köprüyü yakar, B adaya geçip adadaki düğmeye basar; A geçer. B inince uzak köprü yanar, ikisi geçer
+  const g = new Game(L('makas'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, [b0, b1] = g.buttons;
+  const near = g.bridges.find(x => x.channel === 3), far = g.bridges.find(x => x.channel === 2);
+  const on = b => (g, p, t) => (b.pressed && overlap(p, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }) ? null : goTo(b.x + b.w / 2)(g, p, t));
+  const ctl = phases([
+    [on(b0), idle],
+    [idle, (g, p, t) => (b1.pressed ? null : near.lit >= near.n || p.x > 16 * T ? goTo(b1.x + b1.w / 2)(g, p, t) : idle())],
+    [(g, p, t) => (p.supported && p.x > 16 * T ? null : goTo(16.5 * T)(g, p, t)), idle],
+    [idle, (g, p, t) => (p.x > 19 * T + 6 && p.supported ? null : I({ right: true }))],
+    [idle, (g, p, t) => (p.x > 28 * T && p.supported ? null : far.lit >= far.n ? I({ right: true }) : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K17. Makas geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K18. Ayna sandığı: A aşağıda sandığı iter; B köprülerden geçip şalteri çevirir, alttaki kapak açılır
+  const g = new Game(L('ayna-sandigi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], lv = g.levers[0];
+  const near = g.bridges.find(x => x.channel === 3), far = g.bridges.find(x => x.channel === 2);
+  const cx = () => c.x + c.w / 2;
+  const ctl = phases([
+    [(g, p, t) => (p.y > 8 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (cx() >= 12.3 * T ? null : I({ right: true })), idle],
+    [idle, (g, p, t) => (p.x > 16 * T && p.supported ? null : near.lit >= near.n || p.x > 10 * T ? goTo(17 * T)(g, p, t) : goTo(8.5 * T)(g, p, t))],
+    [(g, p, t) => (cx() >= 18.3 * T ? null : I({ right: true })), idle],
+    [idle, (g, p, t) => (p.x > 26 * T && p.supported ? null : far.lit >= far.n ? goTo(27 * T)(g, p, t) : idle())],
+    [idle, flip(lv, 1)],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K18. Ayna sandığı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K19. Zamanlı ayna: B kuleyle rafa çıkar; ikisi zamanlı düğmelerde iki aynayı çevirir, ışın alıcıya varır; bırakıp köprüden koşarlar
+  const g = new Game(L('zamanli-ayna'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, t1 = g.buttons.find(b => b.channel === 1), t2 = g.buttons.find(b => b.channel === 2);
+  const on = b => (g, p, t) => (b.pressed && overlap(p, { x: b.x, y: b.y - 4, w: b.w, h: b.h + 4 }) ? null : goTo(b.x + b.w / 2)(g, p, t));
+  const ctl = phases([
+    [(g, p, t) => (Math.abs(p.x + p.w / 2 - 6.4 * T) < 8 ? null : goTo(6.4 * T)(g, p, t)), idle],
+    [idle, towerUp(A, 9 * T, 1)],
+    [idle, on(t2)],
+    [on(t1), idle],
+    [(g, p, t) => (g.beams[0].ch === 3 ? null : idle()), idle],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K19. Zamanlı ayna geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
+{
+  // K20. Ayna sınavı: A aşağıda ayna sandığını iter, yakın köprü yanar; B adadaki düğmeye basar, alttaki kapak açılır, A geçer.
+  // B inince döner ayna uzak köprüyü yakar, B geçer
+  const g = new Game(L('ayna-sinavi'), 2), [A, B] = g.players, ex = g.exit.x + g.exit.w / 2, c = g.boxes[0], btn = g.buttons[0];
+  const near = g.bridges.find(x => x.channel === 3), far = g.bridges.find(x => x.channel === 2);
+  g.step(DT, [I(), I()]);
+  ok(far.lit > 0 && near.lit === 0 && !g.gates[0].open, 'K20. başta uzak köprü yanıyor, yakın köprü sönük, kapak kapalı');
+  const ctl = phases([
+    [(g, p, t) => (p.y > 8 * T && p.supported ? null : I({ left: true })), idle],
+    [(g, p, t) => (c.x + c.w / 2 >= 12.3 * T ? null : I({ right: true })), idle],
+    [idle, (g, p, t) => (btn.pressed ? null : near.lit >= near.n || p.x > 10 * T ? goTo(btn.x + btn.w / 2)(g, p, t) : goTo(8.5 * T)(g, p, t))],
+    [(g, p, t) => (p.inExit || (p.x > 32 * T && p.supported) ? null : g.gates[0].open ? goTo(33 * T)(g, p, t) : idle()), idle],
+    [idle, (g, p, t) => (p.x > 19 * T + 6 && p.supported ? null : I({ right: true }))],
+    [idle, (g, p, t) => (p.x > 26 * T && p.supported ? null : far.lit >= far.n ? I({ right: true }) : idle())],
+    [goTo(ex), goTo(ex)],
+  ]);
+  ok(run(g, ctl, 60, g => g.done), 'K20. Ayna sınavı geçildi (' + g.t.toFixed(1) + ' sn)');
+}
+
 console.log(failed ? '\\n' + failed + ' test başarısız' : '\\nTüm testler geçti');
 `, ctx);

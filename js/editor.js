@@ -40,6 +40,11 @@ const EDITOR_TOOLS = [
   { id: 'beamL', ch: ']', label: 'Işın ←', cls: 'tBeamL', tip: 'Işık yayıcı: katı blok, sola ışın atar.' },
   { id: 'beamD', ch: 'v', label: 'Işın ↓', cls: 'tBeamD', tip: 'Işık yayıcı: katı blok, aşağı ışın atar.' },
   { id: 'recv', chs: 'qrs', label: 'Işık alıcısı', cls: 'tRecv', tip: 'Işın üstüne düşerken aynı renkteki kapakları açar, köprüleri yakar. İçinden geçilir.' },
+  { id: 'mirrorA', ch: 'd', label: 'Ayna /', cls: 'tMirrorA', tip: 'Katı blok. Işını 90 derece çevirir: sağdan geleni aşağı, soldan geleni yukarı.' },
+  { id: 'mirrorB', ch: 'e', label: 'Ayna \\', cls: 'tMirrorB', tip: 'Katı blok. Işını 90 derece çevirir: soldan geleni aşağı, sağdan geleni yukarı.' },
+  { id: 'mirrorT', chs: 'hik', label: 'Döner ayna', cls: 'tMirrorT', tip: 'Başta / durur, aynı renk açıkken \\ döner: ışını başka yöne çevirir.' },
+  { id: 'crateA', ch: 'm', label: 'Ayna sandığı /', cls: 'tCrateA', tip: 'Metal sandık gibi itilir. Işını kesmez, 90 derece çevirir.' },
+  { id: 'crateB', ch: 'l', label: 'Ayna sandığı \\', cls: 'tCrateB', tip: 'Metal sandık gibi itilir. Işını kesmez, 90 derece çevirir.' },
   { id: 'snow', ch: 'O', label: 'Kar topu', cls: 'tSnow', tip: 'İtilince yuvarlanır; karlı zeminde (buzda ve bantta değil) 3 karo yuvarlanınca büyür. Büyük kar topunu iki kişi iter. Mıknatıs çekmez.' },
 ];
 

@@ -142,16 +142,37 @@ class Renderer {
       ctx.beginPath(); ctx.moveTo(x, y - 12); ctx.lineTo(x + 10, y); ctx.lineTo(x, y + 12); ctx.lineTo(x - 10, y); ctx.closePath(); ctx.fill();
       ctx.globalAlpha = 1;
     }
+    // Ayna: koyu blok, üstünde çapraz parlak plaka; döner ayna kanal renginde çerçeveli, yumuşakça döner
+    for (const m of g.mirrors.values()) {
+      const x = m.c * T + T / 2, y = m.r * T + T / 2;
+      m.vis = m.vis === undefined ? (m.slash ? 1 : -1) : m.vis + ((g.mirrorSlash(m) ? 1 : -1) - m.vis) * 0.2;
+      ctx.fillStyle = '#2b2f5c';
+      ctx.fillRect(x - T / 2, y - T / 2, T, T);
+      ctx.strokeStyle = m.channel ? CHANNEL_COLORS[m.channel] : '#6d71b8'; ctx.lineWidth = 3;
+      ctx.strokeRect(x - T / 2 + 2, y - T / 2 + 2, T - 4, T - 4);
+      this.drawMirrorPlate(ctx, x, y, m.vis);
+    }
     for (const B of g.beams) {
       const x0 = B.c * T + T / 2, y0 = B.r * T + T / 2;
       ctx.fillStyle = '#ff9de2';
       ctx.beginPath(); ctx.arc(x0, y0, 9, 0, Math.PI * 2); ctx.fill();
-      const x1 = B.dy ? x0 : B.end, y1 = B.dy ? B.end : y0;
+      const line = () => { ctx.beginPath(); ctx.moveTo(B.pts[0], B.pts[1]); for (let i = 2; i < B.pts.length; i += 2) ctx.lineTo(B.pts[i], B.pts[i + 1]); ctx.stroke(); };
+      ctx.lineJoin = 'round';
       ctx.strokeStyle = 'rgba(255,157,226,' + (0.45 + 0.1 * Math.sin(t * 12)) + ')'; ctx.lineWidth = 7;
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      line();
       ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x1, y1); ctx.stroke();
+      line();
     }
+  }
+
+  // Aynanın çapraz plakası: vis 1 "/", -1 "\\"
+  drawMirrorPlate(ctx, x, y, vis) {
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-vis * Math.PI / 4);
+    ctx.fillStyle = '#e7f5ff';
+    ctx.fillRect(-22, -3, 44, 6);
+    ctx.restore();
   }
 
   // Işık köprüsü: kanal renginde parlayan ince çubuk; sönükken kesik çizgili iz
@@ -425,6 +446,7 @@ class Renderer {
       ctx.fillRect(x, y, w, h);
       ctx.fillStyle = '#5d6194';
       for (const [dx, dy] of [[5, 5], [w - 9, 5], [5, h - 9], [w - 9, h - 9]]) ctx.fillRect(x + dx, y + dy, 4, 4);
+      if (b.mirror) this.drawMirrorPlate(ctx, x + w / 2, y + h / 2, b.mirror);
       return;
     }
     ctx.fillStyle = PAL.box;
